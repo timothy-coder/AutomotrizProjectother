@@ -11,7 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-
+import { Eye, Pencil, Trash2 } from "lucide-react";
 export default function TiposActividadesTable({
   data = [],
   onView,
@@ -34,17 +34,17 @@ export default function TiposActividadesTable({
         <div className="flex gap-2">
           {onView && (
             <Button size="sm" variant="ghost" onClick={() => onView(row.original)}>
-              Ver
+              <Eye size={16} />
             </Button>
           )}
           {onEdit && (
             <Button size="sm" variant="ghost" onClick={() => onEdit(row.original)}>
-              Editar
+              <Pencil size={16} />
             </Button>
           )}
           {onDelete && (
-            <Button size="sm" variant="destructive" onClick={() => onDelete(row.original)}>
-              Eliminar
+            <Button size="sm" variant="ghost" onClick={() => onDelete(row.original)}>
+              <Trash2 size={16} />
             </Button>
           )}
         </div>

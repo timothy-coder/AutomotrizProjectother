@@ -14,7 +14,7 @@ import MarcasTable from "@/app/components/marcas/MarcasTable";
 import MarcaDialog from "@/app/components/marcas/MarcaDialog";
 import ModeloDialog from "@/app/components/marcas/ModeloDialog";
 import ConfirmDeleteDialog from "@/app/components/marcas/ConfirmDeleteDialog";
-
+import { Plus,Eye, Pencil, Trash2 } from "lucide-react";
 export default function MarcasPage() {
   useRequirePerm("marcas", "view");
 
@@ -220,7 +220,7 @@ export default function MarcasPage() {
 
           {permCreate && (
             <Button onClick={onNewMarca} disabled={loading}>
-              Nueva marca
+              <Plus size={16} />Nueva marca
             </Button>
           )}
         </div>

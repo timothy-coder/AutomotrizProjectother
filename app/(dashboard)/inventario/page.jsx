@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { useRequirePerm } from "@/hooks/useRequirePerm";
 import { useAuth } from "@/context/AuthContext";
 import { hasPermission } from "@/lib/permissions";
-
 import {
   flexRender,
   getCoreRowModel,
@@ -38,7 +37,8 @@ import {
   Plus,
   RefreshCcw,
   Loader2,
-  SlidersHorizontal,
+  SlidersHorizontal,Eye, Pencil, Trash2,
+  Boxes
 } from "lucide-react";
 
 
@@ -218,39 +218,39 @@ export default function InventarioPage() {
             <div className="flex flex-wrap gap-2 justify-end">
               <Button
                 size="sm"
-                variant="outline"
+                variant="ghost"
                 onClick={() => {
                   setActiveProduct(p);
                   setDialogMode("view");
                   setOpenDialog(true);
                 }}
               >
-                Ver
+                <Eye size={16} />
               </Button>
 
               {permEdit && (
                 <>
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="ghost"
                     onClick={() => {
                       setActiveProduct(p);
                       setDialogMode("edit");
                       setOpenDialog(true);
                     }}
                   >
-                    Editar
+                    <Pencil size={16} />
                   </Button>
 
                   <Button
                     size="sm"
-                    variant="secondary"
+                    variant="ghost"
                     onClick={() => {
                       setDistProduct(p);
                       setOpenDist(true);
                     }}
                   >
-                    Distribución
+                    <Boxes size={16} />Distribución
                   </Button>
                 </>
               )}
@@ -258,13 +258,13 @@ export default function InventarioPage() {
               {permDelete && (
                 <Button
                   size="sm"
-                  variant="destructive"
+                  variant="ghost"
                   onClick={() => {
                     setDeleteTarget(p);
                     setOpenDelete(true);
                   }}
                 >
-                  Eliminar
+                  <Trash2 size={16} />
                 </Button>
               )}
             </div>
@@ -487,6 +487,7 @@ export default function InventarioPage() {
         }
         loading={loading}
         onConfirm={confirmDelete}
+        
       />
     </div>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-
+import { Plus,Eye, Pencil, Trash2 } from "lucide-react";
 export default function ModelosSubTable({
   marca,
   modelos = [],
@@ -39,20 +39,20 @@ export default function ModelosSubTable({
                     {canEdit && (
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant="ghost"
                         onClick={() => onEdit?.(modelo)}
                       >
-                        Editar
+                        <Pencil size={16} />
                       </Button>
                     )}
 
                     {canDelete && (
                       <Button
                         size="sm"
-                        variant="destructive"
+                        variant="ghost"
                         onClick={() => onDelete?.(modelo)}
                       >
-                        Eliminar
+                        <Trash2 size={16} />
                       </Button>
                     )}
                   </td>

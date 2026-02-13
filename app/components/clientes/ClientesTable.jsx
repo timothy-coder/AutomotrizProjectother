@@ -15,7 +15,7 @@ import {
   TableRow,
   TableHeader
 } from "@/components/ui/table";
-
+import { Car,Eye, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function ClientesTable({
@@ -64,7 +64,7 @@ export default function ClientesTable({
                 variant="secondary"
                 onClick={() => onSelect(cliente)}
               >
-                Ver
+                <Eye size={16} />
               </Button>
             )}
 
@@ -74,7 +74,7 @@ export default function ClientesTable({
                 variant="outline"
                 onClick={() => onVehiculos(cliente)}
               >
-                Vehículos
+                <Car size={16} />
               </Button>
             )}
 
@@ -83,17 +83,17 @@ export default function ClientesTable({
                 size="sm"
                 onClick={() => onEdit(cliente)}
               >
-                Editar
+                <Pencil size={16} />
               </Button>
             )}
 
             {onDelete && (
               <Button
                 size="sm"
-                variant="destructive"
+                variant="ghost"
                 onClick={() => onDelete(cliente)}
               >
-                Eliminar
+                <Trash2 size={16} />
               </Button>
             )}
 

@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import ModelosSubTable from "@/app/components/marcas/ModelosSubTable";
-
+import { Plus,Eye, Pencil, Trash2,ChevronRight,ChevronDown } from "lucide-react";
 export default function MarcasTable({
   loading,
   marcas = [],
@@ -54,7 +54,7 @@ export default function MarcasTable({
               disabled={!hasModels}
               className="px-2"
             >
-              {row.getIsExpanded() ? "▾" : "▸"}
+              {row.getIsExpanded() ? <ChevronDown/> : <ChevronRight/>}
             </Button>
           );
         },
@@ -101,29 +101,29 @@ export default function MarcasTable({
             <div className="flex gap-2 justify-end">
               <Button
                 size="sm"
-                variant="outline"
+                variant="ghost"
                 onClick={() => onViewMarca?.(m)}
               >
-                Ver
+                <Eye size={16} />
               </Button>
 
               {canEditMarca && (
                 <Button
                   size="sm"
-                  variant="outline"
+                  variant="ghost"
                   onClick={() => onEditMarca?.(m)}
                 >
-                  Editar
+                  <Pencil size={16} />
                 </Button>
               )}
 
               {canDeleteMarca && (
                 <Button
                   size="sm"
-                  variant="destructive"
+                  variant="ghost"
                   onClick={() => onDeleteMarca?.(m)}
                 >
-                  Eliminar
+                  <Trash2 size={16} />
                 </Button>
               )}
 
@@ -132,7 +132,7 @@ export default function MarcasTable({
                   size="sm"
                   onClick={() => onNewModelo?.(m.id)}
                 >
-                  + Modelo
+                  <Plus size={16} /> Modelo
                 </Button>
               )}
             </div>
