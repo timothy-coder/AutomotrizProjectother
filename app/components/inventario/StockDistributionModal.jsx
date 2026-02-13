@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 
 import { Button } from "@/components/ui/button";
-
+import { Plus,Eye, Pencil, Trash2 } from "lucide-react";
 import { DndContext, closestCenter } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -158,7 +158,7 @@ export default function StockDistributionModal({
                 setLocationOpen(true);
               }}
             >
-              Nueva ubicación
+             <Plus size={16} /> Nueva ubicación
             </Button>
           )}
 
@@ -189,7 +189,7 @@ export default function StockDistributionModal({
                               setLocationOpen(true);
                             }}
                           >
-                            Editar
+                            <Pencil size={16} />
                           </Button>
 
                           <Button
@@ -200,7 +200,7 @@ export default function StockDistributionModal({
                               setDeleteOpen(true);
                             }}
                           >
-                            Eliminar
+                            <Trash2 size={16} />
                           </Button>
 
                         </div>

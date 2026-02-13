@@ -137,7 +137,7 @@ export default function UserDialog({
         form.password !== form.password2;
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog open={open} onOpenChange={onOpenChange} className="bg-white">
             <DialogContent className="max-w-4xl">
 
                 <DialogHeader>
