@@ -168,6 +168,7 @@ export default function MarcasTable({
     getExpandedRowModel: getExpandedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getRowCanExpand: () => true,
   });
 
   return (

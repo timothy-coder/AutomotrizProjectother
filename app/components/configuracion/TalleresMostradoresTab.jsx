@@ -19,6 +19,7 @@ export default function TalleresMostradoresTab() {
   const [tallerNombre, setTallerNombre] = useState("");
   const [mostradorNombre, setMostradorNombre] = useState("");
 
+
   useEffect(() => {
     async function loadCentros() {
       try {

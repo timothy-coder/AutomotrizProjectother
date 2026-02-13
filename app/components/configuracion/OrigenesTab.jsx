@@ -24,7 +24,10 @@ export default function OrigenesTab() {
     load();
   }
 
-  useEffect(load, []);
+
+  useEffect(() => {
+    load();
+  }, []);
 
   return (
     <div className="space-y-4">
