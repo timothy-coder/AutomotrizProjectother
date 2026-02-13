@@ -3,23 +3,45 @@ import { db } from "@/lib/db";
 
 export async function PUT(req, { params }) {
 
-  const { id } = await params;
-  const { centro_id, nombre } = await req.json();
+  try {
 
-  await db.query(`
-    UPDATE talleres
-    SET centro_id=?, nombre=?
-    WHERE id=?
-  `, [centro_id, nombre, id]);
+    const { nombre } = await req.json();
 
-  return NextResponse.json({ message: "Taller actualizado" });
+    await db.query(`
+      UPDATE talleres
+      SET nombre = ?
+      WHERE id = ?
+    `, [nombre, params.id]);
+
+    return NextResponse.json({ message: "Actualizado" });
+
+  } catch (error) {
+
+    console.error(error);
+    return NextResponse.json(
+      { message: "Error actualizando taller" },
+      { status: 500 }
+    );
+  }
 }
 
 export async function DELETE(req, { params }) {
 
-  const { id } = await params;
+  try {
 
-  await db.query(`DELETE FROM talleres WHERE id=?`, [id]);
+    await db.query(`
+      DELETE FROM talleres
+      WHERE id = ?
+    `, [params.id]);
 
-  return NextResponse.json({ message: "Taller eliminado" });
+    return NextResponse.json({ message: "Eliminado" });
+
+  } catch (error) {
+
+    console.error(error);
+    return NextResponse.json(
+      { message: "Error eliminando taller" },
+      { status: 500 }
+    );
+  }
 }

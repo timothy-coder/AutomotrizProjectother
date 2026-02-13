@@ -3,315 +3,243 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { useAuth } from "@/context/AuthContext";
-import { hasPermission } from "@/lib/permissions";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
+} from "@/components/ui/dialog";
 
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { Pencil, Trash2, Plus } from "lucide-react";
 
-const DAYS = [
-  { key: "lunes", label: "Lunes" },
-  { key: "martes", label: "Martes" },
-  { key: "miercoles", label: "Miércoles" },
-  { key: "jueves", label: "Jueves" },
-  { key: "viernes", label: "Viernes" },
-  { key: "sabado", label: "Sábado" },
-  { key: "domingo", label: "Domingo" },
-];
+export default function CentrosTab() {
 
-const emptyWeek = {
-  lunes: { active: false, start: "", end: "" },
-  martes: { active: false, start: "", end: "" },
-  miercoles: { active: false, start: "", end: "" },
-  jueves: { active: false, start: "", end: "" },
-  viernes: { active: false, start: "", end: "" },
-  sabado: { active: false, start: "", end: "" },
-  domingo: { active: false, start: "", end: "" },
-};
+  const [items, setItems] = useState([]);
 
-export default function HorariosCentroTab() {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
-  const { permissions } = useAuth();
-  const permEdit = hasPermission(permissions || {}, "configuracion", "edit");
+  const [editing, setEditing] = useState(null);
+  const [nombre, setNombre] = useState("");
 
-  const [centros, setCentros] = useState([]);
-  const [centroId, setCentroId] = useState(null);
-  const [slotMinutes, setSlotMinutes] = useState(30);
-  const [week, setWeek] = useState({ ...emptyWeek });
-  const [loading, setLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
-  // ✅ cargar centros
-  useEffect(() => {
-    async function loadCentros() {
-      try {
-        const r = await fetch("/api/centros", { cache: "no-store" });
-        const data = await r.json();
-        setCentros(Array.isArray(data) ? data : []);
-      } catch {
-        toast.error("Error cargando centros");
-      }
-    }
-    loadCentros();
-  }, []);
+  // ================= LOAD =================
 
-  // ✅ cargar configuración del centro
-  useEffect(() => {
-    if (!centroId) return;
-
-    let cancelled = false;
-
-    async function loadConfig() {
-      try {
-        setLoading(true);
-
-        // ⚠️ aquí asumimos que creaste este endpoint:
-        // GET /api/horacitas_centro/by-centro/[centroId]
-        const r = await fetch(`/api/horacitas_centro/by-centro/${centroId}`, { cache: "no-store" });
-        const data = await r.json();
-
-        if (cancelled) return;
-
-        if (!r.ok || !data) {
-          setSlotMinutes(30);
-          setWeek({ ...emptyWeek });
-          return;
-        }
-
-        setSlotMinutes(Number(data.slot_minutes || 30));
-        setWeek(data.week_json || { ...emptyWeek });
-
-      } catch {
-        if (!cancelled) toast.error("Error cargando horario");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    loadConfig();
-
-    return () => { cancelled = true; };
-
-  }, [centroId]);
-
-  async function saveConfig() {
-    if (!centroId) return toast.warning("Seleccione un centro");
-
-    const slot = Number(slotMinutes);
-    if (!Number.isFinite(slot) || slot < 5 || slot > 240) {
-      return toast.warning("Slot debe estar entre 5 y 240");
-    }
-
+  async function load() {
     try {
-      setLoading(true);
 
-      // Upsert por centro (recomendado)
-      const r = await fetch(`/api/horacitas_centro/by-centro/${centroId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          slot_minutes: slot,
-          week_json: week,
-        }),
-      });
+      const r = await fetch("/api/centros", { cache: "no-store" });
+      const data = await r.json();
 
-      const data = await r.json().catch(() => ({}));
-
-      if (!r.ok) return toast.error(data.message || "No se pudo guardar");
-
-      toast.success("Horario guardado");
+      setItems(Array.isArray(data) ? data : []);
 
     } catch {
-      toast.error("Error de conexión");
-    } finally {
-      setLoading(false);
+      toast.error("Error cargando centros");
     }
   }
 
+  useEffect(() => {
+    load();
+  }, []);
+
+  // ================= CREATE =================
+
+  function openCreate() {
+    setEditing(null);
+    setNombre("");
+    setDialogOpen(true);
+  }
+
+  // ================= EDIT =================
+
+  function openEdit(item) {
+    setEditing(item);
+    setNombre(item.nombre);
+    setDialogOpen(true);
+  }
+
+  // ================= SAVE =================
+
+  async function save() {
+
+    if (!nombre.trim())
+      return toast.warning("Ingrese nombre");
+
+    try {
+
+      if (editing) {
+
+        await fetch(`/api/centros/${editing.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nombre })
+        });
+
+        toast.success("Centro actualizado");
+
+      } else {
+
+        await fetch("/api/centros", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nombre })
+        });
+
+        toast.success("Centro creado");
+      }
+
+      setDialogOpen(false);
+      load();
+
+    } catch {
+      toast.error("Error guardando");
+    }
+  }
+
+  // ================= DELETE =================
+
+  function openDelete(item) {
+    setDeleteTarget(item);
+    setDeleteOpen(true);
+  }
+
+  async function deleteConfirm() {
+
+    try {
+
+      await fetch(`/api/centros/${deleteTarget.id}`, {
+        method: "DELETE"
+      });
+
+      toast.success("Centro eliminado");
+
+      setDeleteOpen(false);
+      load();
+
+    } catch {
+      toast.error("Error eliminando");
+    }
+  }
+
+  // ================= UI =================
+
   return (
-    <Card>
+    <div className="space-y-5">
 
-      <CardHeader className="gap-2">
-        <CardTitle className="text-base">Horario por Centro</CardTitle>
+      {/* HEADER */}
+      <div className="flex justify-between items-center">
 
-        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <h2 className="text-xl font-semibold">Centros</h2>
 
-          <div className="grid gap-2 md:grid-cols-2 md:gap-3">
+        <Button onClick={openCreate}>
+          <Plus className="h-4 w-4 mr-2" />
+          Nuevo centro
+        </Button>
 
-            <div className="space-y-1">
-              <Label>Centro</Label>
+      </div>
 
-              <Select
-                disabled={!centros.length}
-                value={centroId != null ? String(centroId) : ""}
-                onValueChange={(v) => setCentroId(Number(v) || null)}
-              >
-                <SelectTrigger className="h-10 w-full rounded-md border bg-background px-3 text-sm">
-                  <SelectValue placeholder={centros.length ? "Seleccione un centro" : "(Crea un centro primero)"} />
-                </SelectTrigger>
+      {/* LISTA */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Listado</CardTitle>
+        </CardHeader>
 
-                <SelectContent>
-                  {centros.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        <CardContent className="space-y-2">
 
-            <div className="space-y-1">
-              <Label>Duración del slot (minutos)</Label>
-              <Input
-                type="number"
-                value={String(slotMinutes)}
-                onChange={(e) => setSlotMinutes(e.target.value)}
-                min={5}
-                max={240}
-              />
-              <p className="text-xs text-muted-foreground">
-                Rango permitido: 5 a 240.
-              </p>
-            </div>
+          {items.map(c => (
+            <Row
+              key={c.id}
+              item={c}
+              onEdit={() => openEdit(c)}
+              onDelete={() => openDelete(c)}
+            />
+          ))}
 
-          </div>
+          {!items.length && (
+            <p className="text-sm text-muted-foreground">
+              No hay centros registrados
+            </p>
+          )}
 
-          <div className="flex flex-wrap gap-2">
+        </CardContent>
+      </Card>
 
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                setWeek({
-                  lunes: { active: true, start: "08:00", end: "18:00" },
-                  martes: { active: true, start: "08:00", end: "18:00" },
-                  miercoles: { active: true, start: "08:00", end: "18:00" },
-                  jueves: { active: true, start: "08:00", end: "18:00" },
-                  viernes: { active: true, start: "08:00", end: "18:00" },
-                  sabado: { active: false, start: "", end: "" },
-                  domingo: { active: false, start: "", end: "" },
-                })
-              }
-            >
-              Set L-V 08:00–18:00
+      {/* DIALOG CREATE / EDIT */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+
+          <DialogHeader>
+            <DialogTitle>
+              {editing ? "Editar centro" : "Nuevo centro"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <Input
+            placeholder="Nombre del centro"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+          />
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancelar
             </Button>
 
-            <Button type="button" variant="outline" onClick={() => setWeek({ ...emptyWeek })}>
-              Desactivar todos
+            <Button onClick={save}>
+              Guardar
+            </Button>
+          </DialogFooter>
+
+        </DialogContent>
+      </Dialog>
+
+      {/* DELETE */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+
+          ¿Eliminar <b>{deleteTarget?.nombre}</b> ?
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+              Cancelar
             </Button>
 
-            {permEdit ? (
-              <Button onClick={saveConfig} disabled={loading || !centroId}>
-                {loading ? "Guardando..." : "Guardar"}
-              </Button>
-            ) : (
-              <Button disabled>Sin permiso</Button>
-            )}
+            <Button variant="destructive" onClick={deleteConfirm}>
+              Eliminar
+            </Button>
+          </DialogFooter>
 
-          </div>
+        </DialogContent>
+      </Dialog>
 
-        </div>
-      </CardHeader>
+    </div>
+  );
+}
 
-      <CardContent className="space-y-3">
 
-        {loading ? (
-          <p className="text-sm text-muted-foreground">Cargando...</p>
-        ) : (
-          <div className="grid gap-3">
-            {DAYS.map(({ key, label }) => {
+// ================= ROW =================
 
-              const day = week[key] || { active: false, start: "", end: "" };
+function Row({ item, onEdit, onDelete }) {
 
-              return (
-                <div key={key} className="rounded-md border p-3">
+  return (
+    <div className="border rounded-md p-2 flex justify-between items-center">
 
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <span>{item.nombre}</span>
 
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        checked={!!day.active}
-                        disabled={!permEdit}
-                        onCheckedChange={(v) => {
-                          const active = !!v;
-                          setWeek((p) => ({
-                            ...p,
-                            [key]: {
-                              ...(p[key] || { active: false, start: "", end: "" }),
-                              active,
-                              ...(active
-                                ? (!p[key]?.start || !p[key]?.end)
-                                  ? { start: "08:00", end: "18:00" }
-                                  : {}
-                                : { start: "", end: "" }),
-                            },
-                          }))
-                        }}
-                      />
+      <div className="flex gap-2">
 
-                      <div className="font-medium">{label}</div>
+        <Button size="icon" variant="outline" onClick={onEdit}>
+          <Pencil className="h-4 w-4" />
+        </Button>
 
-                      <Badge variant={day.active ? "default" : "secondary"}>
-                        {day.active ? "Activo" : "Inactivo"}
-                      </Badge>
-                    </div>
+        <Button size="icon" variant="destructive" onClick={onDelete}>
+          <Trash2 className="h-4 w-4" />
+        </Button>
 
-                    {day.active ? (
-                      <div className="grid gap-2 md:grid-cols-2 md:gap-3 md:w-[380px]">
+      </div>
 
-                        <div className="space-y-1">
-                          <Label className="text-xs">Inicio</Label>
-                          <Input
-                            type="time"
-                            value={day.start || ""}
-                            disabled={!permEdit}
-                            onChange={(e) =>
-                              setWeek((p) => ({
-                                ...p,
-                                [key]: { ...(p[key] || day), start: e.target.value },
-                              }))
-                            }
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <Label className="text-xs">Fin</Label>
-                          <Input
-                            type="time"
-                            value={day.end || ""}
-                            disabled={!permEdit}
-                            onChange={(e) =>
-                              setWeek((p) => ({
-                                ...p,
-                                [key]: { ...(p[key] || day), end: e.target.value },
-                              }))
-                            }
-                          />
-                        </div>
-
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground md:w-[380px]">
-                        No atiende este día.
-                      </p>
-                    )}
-
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-      </CardContent>
-
-    </Card>
+    </div>
   );
 }
