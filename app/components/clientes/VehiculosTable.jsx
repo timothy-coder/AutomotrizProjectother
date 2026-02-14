@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import ConfirmDeleteDialog from "@/app/components/clientes/ConfirmDeleteDialog";
-
+import { Plus,Eye, Pencil, Trash2 } from "lucide-react";
 export default function VehiculosTable({
   cliente,
   data,
@@ -28,7 +28,7 @@ export default function VehiculosTable({
 
         {onCreate && (
           <Button onClick={onCreate}>
-            Agregar vehículo
+           <Plus size={16} /> Agregar vehículo
           </Button>
         )}
       </div>
@@ -58,7 +58,7 @@ export default function VehiculosTable({
               <div className="flex gap-2 justify-end">
                 {onEdit && (
                   <Button size="sm" variant="outline" onClick={() => onEdit(v)}>
-                    Editar
+                    <Pencil size={16} />
                   </Button>
                 )}
 
@@ -68,7 +68,7 @@ export default function VehiculosTable({
                     variant="destructive"
                     onClick={() => askDelete(v)}
                   >
-                    Eliminar
+                    <Trash2 size={16} />
                   </Button>
                 )}
               </div>

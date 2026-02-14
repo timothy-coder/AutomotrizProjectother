@@ -103,8 +103,8 @@ export default function UsersTable({
             {canDelete && (
               <Button
                 size="icon"
-                variant="ghost"
-                className="text-red-500"
+                variant="destructive"
+                className="text-white"
                 onClick={() => onDelete(user)}
               >
                 <Trash2 size={18} />

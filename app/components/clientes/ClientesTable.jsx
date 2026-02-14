@@ -90,7 +90,7 @@ export default function ClientesTable({
             {onDelete && (
               <Button
                 size="sm"
-                variant="ghost"
+                variant="destructive"
                 onClick={() => onDelete(cliente)}
               >
                 <Trash2 size={16} />

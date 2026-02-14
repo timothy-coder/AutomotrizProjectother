@@ -120,7 +120,7 @@ export default function MarcasTable({
               {canDeleteMarca && (
                 <Button
                   size="sm"
-                  variant="ghost"
+                  variant="destructive"
                   onClick={() => onDeleteMarca?.(m)}
                 >
                   <Trash2 size={16} />

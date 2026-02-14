@@ -258,7 +258,7 @@ export default function InventarioPage() {
               {permDelete && (
                 <Button
                   size="sm"
-                  variant="ghost"
+                  variant="destructive"
                   onClick={() => {
                     setDeleteTarget(p);
                     setOpenDelete(true);

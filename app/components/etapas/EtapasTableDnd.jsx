@@ -56,7 +56,7 @@ function SortableRow({ item, onView, onEdit, onDelete }) {
         )}
 
         {onDelete && (
-          <Button size="icon" variant="ghost" onClick={() => onDelete(item)}>
+          <Button size="icon" variant="destructive" onClick={() => onDelete(item)}>
             <Trash2 size={16} />
           </Button>
         )}

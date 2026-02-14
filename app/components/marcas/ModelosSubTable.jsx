@@ -49,7 +49,7 @@ export default function ModelosSubTable({
                     {canDelete && (
                       <Button
                         size="sm"
-                        variant="ghost"
+                        variant="destructive"
                         onClick={() => onDelete?.(modelo)}
                       >
                         <Trash2 size={16} />

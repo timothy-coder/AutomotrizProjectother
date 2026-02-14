@@ -43,7 +43,7 @@ export default function TiposActividadesTable({
             </Button>
           )}
           {onDelete && (
-            <Button size="sm" variant="ghost" onClick={() => onDelete(row.original)}>
+            <Button size="sm" variant="destructive" onClick={() => onDelete(row.original)}>
               <Trash2 size={16} />
             </Button>
           )}
