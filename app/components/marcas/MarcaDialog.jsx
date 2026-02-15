@@ -75,7 +75,7 @@ export default function MarcaDialog({ open, onOpenChange, mode, marca, onSave })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg w-full overflow-hidden">
         <DialogHeader>
           <DialogTitle>
             {isView ? "Ver marca" : isEdit ? "Editar marca" : "Nueva marca"}
@@ -98,16 +98,16 @@ export default function MarcaDialog({ open, onOpenChange, mode, marca, onSave })
           <div className="space-y-2">
             <Label>Imagen (upload o URL)</Label>
 
-            <div className="flex flex-col md:flex-row gap-3">
+            <div className="flex flex-col md:flex-row gap-3 min-w-0">
               <div className="flex-1">
                 <Input
                   disabled={isView}
-                  placeholder="https://..."
                   value={form.image_url || ""}
                   onChange={(e) => {
                     update("image_url", e.target.value);
                     setPreview(e.target.value);
                   }}
+                  className="w-full truncate"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                   Puedes pegar una URL o subir un archivo.
@@ -139,7 +139,7 @@ export default function MarcaDialog({ open, onOpenChange, mode, marca, onSave })
                   N/A
                 </div>
               )}
-              <div className="text-xs text-muted-foreground break-all">
+              <div className="text-xs text-muted-foreground max-w-full overflow-hidden whitespace-nowrap text-ellipsis">
                 {form.image_url || "Sin URL"}
               </div>
             </div>

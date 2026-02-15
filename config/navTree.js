@@ -15,6 +15,9 @@ export const NAV_TREE = [
       { to: "/marcas", label: "Marcas", icon: Blinds, perm: ["marcas", "view"] },
       { to: "/inventario", label: "Inventario", icon: Boxes, perm: ["inventario", "view"] },
       { to: "/configuracion", label: "Configuración del sistema", icon: Settings, perm: ["configuracion", "view"] },
+      { to: "/mantenimiento", label: "Tipos de mantenimiento", icon: Settings, perm: ["mantenimiento", "view"] },
+      { to: "/combomantenimiento", label: "Combos de mantenimiento", icon: Settings, perm: ["combomantenimiento", "view"] },
+      { to: "/precios", label: "Precios", icon: Settings, perm: ["precios", "view"] },
     ],
   },
   {
