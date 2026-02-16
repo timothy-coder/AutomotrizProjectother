@@ -1,26 +1,17 @@
-import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-// GET todos
 export async function GET() {
-  const [rows] = await db.query(`
-    SELECT * FROM mantenimiento
-    ORDER BY name
-  `);
-  return NextResponse.json(rows);
+  const [rows] = await db.query("SELECT * FROM mantenimiento ORDER BY name");
+  return Response.json(rows);
 }
 
-// CREAR
 export async function POST(req) {
-  const { name } = await req.json();
-
-  if (!name)
-    return NextResponse.json({ message: "Nombre requerido" }, { status: 400 });
+  const { name, is_active } = await req.json();
 
   await db.query(
-    `INSERT INTO mantenimiento(name) VALUES(?)`,
-    [name]
+    "INSERT INTO mantenimiento (name, is_active) VALUES (?,?)",
+    [name, is_active]
   );
 
-  return NextResponse.json({ message: "Creado" });
+  return Response.json({ ok: true });
 }

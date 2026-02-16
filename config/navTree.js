@@ -1,6 +1,6 @@
 import {
   Users, Milestone, ListChecks, UserRound, Blinds, Boxes, Settings,
-  CalendarCheck, ClipboardList, Receipt, SquareDashedMousePointer, FileText,Home
+  CalendarCheck, ClipboardList, Receipt, SquareDashedMousePointer, FileText,Home,CarFront,Columns2,Columns3,Coins
 } from "lucide-react";
 export const HOME_ITEM = { to: "/home", label: "Home", icon: Home, perm: ["home", "view"] };
 export const NAV_TREE = [
@@ -14,10 +14,11 @@ export const NAV_TREE = [
       { to: "/clientes", label: "Clientes", icon: UserRound, perm: ["clientes", "view"] },
       { to: "/marcas", label: "Marcas", icon: Blinds, perm: ["marcas", "view"] },
       { to: "/inventario", label: "Inventario", icon: Boxes, perm: ["inventario", "view"] },
+      { to: "/combomantenimiento", label: "Mantenimiento", icon: Columns3, perm: ["combomantenimiento", "view"] },
+      { to: "/carrosparamantenimiento", label: "Gestion de Carroceria", icon: CarFront, perm: ["carrosparamantenimiento", "view"] },
+      { to: "/precios", label: "Precios", icon: Coins, perm: ["precios", "view"] },
       { to: "/configuracion", label: "Configuración del sistema", icon: Settings, perm: ["configuracion", "view"] },
-      { to: "/mantenimiento", label: "Tipos de mantenimiento", icon: Settings, perm: ["mantenimiento", "view"] },
-      { to: "/combomantenimiento", label: "Combos de mantenimiento", icon: Settings, perm: ["combomantenimiento", "view"] },
-      { to: "/precios", label: "Precios", icon: Settings, perm: ["precios", "view"] },
+      
     ],
   },
   {

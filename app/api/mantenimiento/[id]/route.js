@@ -1,25 +1,24 @@
-import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-// ACTUALIZAR
-export async function PUT(req, { params }) {
-  const { id } = params;
+export async function PUT(req, context) {
+  const { id } = await context.params;
   const { name, is_active } = await req.json();
 
-  await db.query(`
-    UPDATE mantenimiento
-    SET name=?, is_active=?
-    WHERE id=?
-  `, [name, is_active, id]);
+  await db.query(
+    "UPDATE mantenimiento SET name=?, is_active=? WHERE id=?",
+    [name, is_active, id]
+  );
 
-  return NextResponse.json({ message:"Actualizado" });
+  return Response.json({ ok: true });
 }
 
-// ELIMINAR
-export async function DELETE(req, { params }) {
-  const { id } = params;
+export async function DELETE(req, context) {
+  const { id } = await context.params;
 
-  await db.query(`DELETE FROM mantenimiento WHERE id=?`, [id]);
+  // eliminar submantenimientos primero
+  await db.query("DELETE FROM submantenimiento WHERE type_id=?", [id]);
 
-  return NextResponse.json({ message: "Eliminado" });
+  await db.query("DELETE FROM mantenimiento WHERE id=?", [id]);
+
+  return Response.json({ ok: true });
 }

@@ -1,273 +1,413 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import {
-  useReactTable,
-  getCoreRowModel,
-  flexRender
-} from "@tanstack/react-table";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Plus,Eye, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
-import {
-  Table, TableHeader, TableRow, TableHead, TableBody, TableCell
-} from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select, SelectTrigger, SelectContent, SelectItem, SelectValue
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue
 } from "@/components/ui/select";
 
 import { useAuth } from "@/context/AuthContext";
 import { hasPermission } from "@/lib/permissions";
 
-export default function SubmantenimientoPage() {
+export default function ComboMantenimientoPage() {
 
   const { permissions } = useAuth();
 
-  const permView   = hasPermission(permissions,"combomantenimiento","view");
+  const permView = hasPermission(permissions,"combomantenimiento","view");
   const permCreate = hasPermission(permissions,"combomantenimiento","create");
-  const permEdit   = hasPermission(permissions,"combomantenimiento","edit");
+  const permEdit = hasPermission(permissions,"combomantenimiento","edit");
   const permDelete = hasPermission(permissions,"combomantenimiento","delete");
 
-  const [data,setData] = useState([]);
-  const [tipos,setTipos] = useState([]);
+  const [mantenimientos,setMantenimientos]=useState([]);
+  const [sub,setSub]=useState([]);
+  const [expanded,setExpanded]=useState({});
 
-  const [dialog,setDialog] = useState({ open:false, mode:"create", item:null });
-  const [form,setForm] = useState({
+  const [dialog,setDialog]=useState({
+    open:false,
+    mode:"create-sub",
+    item:null
+  });
+
+  const [form,setForm]=useState({
     name:"",
     type_id:"",
     is_active:true
   });
 
-  // 🔹 LOAD DATA
-  async function loadData(){
-    const r = await fetch("/api/submantenimiento",{ cache:"no-store" });
-    setData(await r.json());
-  }
-
-  async function loadTipos(){
-    const r = await fetch("/api/mantenimiento");
-    setTipos(await r.json());
-  }
-
-  useEffect(()=>{
-    loadData();
-    loadTipos();
-  },[]);
-
-  // 🔹 SAVE
-  async function save(){
-
-    if(!form.name.trim() || !form.type_id){
-      toast.warning("Complete los campos");
-      return;
-    }
-
-    const method = dialog.mode==="edit" ? "PUT":"POST";
-    const url = dialog.mode==="edit"
-      ? `/api/submantenimiento/${dialog.item.id}`
-      : `/api/submantenimiento`;
-
-    await fetch(url,{
-      method,
-      headers:{ "Content-Type":"application/json" },
-      body:JSON.stringify({
-        name:form.name,
-        type_id:form.type_id,
-        is_active: form.is_active ? 1 : 0
-      })
-    });
-
-    toast.success("Guardado");
-    setDialog({ open:false });
-    loadData();
-  }
-
-  // 🔹 DELETE
-  async function remove(item){
-    if(!confirm("¿Eliminar submantenimiento?")) return;
-
-    await fetch(`/api/submantenimiento/${item.id}`,{ method:"DELETE" });
-    loadData();
-  }
-
-  // 🔹 SWITCH
-  async function toggleActive(item,value){
-    await fetch(`/api/submantenimiento/${item.id}/toggle`,{
-      method:"PATCH",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({ is_active:value ? 1 : 0 })
-    });
-
-    setData(prev =>
-      prev.map(r =>
-        r.id===item.id
-          ? { ...r, is_active:value ? 1 : 0 }
-          : r
-      )
-    );
-  }
-
-  // 🔹 TABLE
-  const columns = useMemo(()=>[
-    { accessorKey:"name", header:"Submantenimiento" },
-    { accessorKey:"mantenimiento", header:"Mantenimiento" },
-    {
-      accessorKey:"is_active",
-      header:"Activo",
-      cell:({ row }) => (
-        <Switch
-          checked={row.original.is_active===1}
-          onCheckedChange={(v)=>toggleActive(row.original,v)}
-          disabled={!permEdit}
-        />
-      )
-    },
-    {
-      header:"Acciones",
-      cell:({ row }) => (
-        <div className="flex gap-2">
-          {permEdit && (
-            <Button variant="ghost" size="sm" onClick={()=>{
-              setDialog({
-                open:true,
-                mode:"edit",
-                item:row.original
-              });
-              setForm({
-                name:row.original.name,
-                type_id:String(row.original.type_id),
-                is_active:row.original.is_active===1
-              });
-            }}>
-              <Pencil size={16} />
-            </Button>
-          )}
-
-          {permDelete && (
-            <Button size="sm" variant="destructive"
-              onClick={()=>remove(row.original)}>
-              <Trash2 size={16} />
-            </Button>
-          )}
-        </div>
-      )
-    }
-  ],[permEdit,permDelete]);
-
-  const table = useReactTable({
-    data,
-    columns,
-    getCoreRowModel:getCoreRowModel()
+  const [cascadeDialog,setCascadeDialog]=useState({
+    open:false,
+    mantenimiento:null
   });
+
+  const [deleteDialog,setDeleteDialog]=useState({
+    open:false,
+    type:null,
+    item:null
+  });
+
+  async function loadData(){
+    const m = await fetch("/api/mantenimiento",{cache:"no-store"}).then(r=>r.json());
+    const s = await fetch("/api/submantenimiento",{cache:"no-store"}).then(r=>r.json());
+    setMantenimientos(m);
+    setSub(s);
+  }
+
+  useEffect(()=>{ loadData(); },[]);
 
   if(!permView) return <p>Sin permiso</p>;
 
-  return (
-    <div className="space-y-5">
+  const grouped = mantenimientos.map(m=>({
+    ...m,
+    items: sub.filter(s=>s.type_id===m.id)
+  }));
 
+  const toggleExpand=id=>{
+    setExpanded(p=>({...p,[id]:!p[id]}));
+  };
+
+  // ================= SAVE =================
+  async function save(){
+
+    if(!form.name.trim()){
+      toast.warning("Ingrese nombre");
+      return;
+    }
+
+    try{
+
+      if(dialog.mode==="create-mant"){
+        await fetch("/api/mantenimiento",{
+          method:"POST",
+          headers:{ "Content-Type":"application/json"},
+          body:JSON.stringify({ name:form.name, is_active:form.is_active?1:0 })
+        });
+        toast.success("Creado");
+      }
+
+      if(dialog.mode==="edit-mant"){
+        await fetch(`/api/mantenimiento/${dialog.item.id}`,{
+          method:"PUT",
+          headers:{ "Content-Type":"application/json"},
+          body:JSON.stringify({ name:form.name, is_active:form.is_active?1:0 })
+        });
+        toast.success("Actualizado");
+      }
+
+      if(dialog.mode==="create-sub"){
+        await fetch("/api/submantenimiento",{
+          method:"POST",
+          headers:{ "Content-Type":"application/json"},
+          body:JSON.stringify({
+            name:form.name,
+            type_id:Number(form.type_id),
+            is_active:form.is_active?1:0
+          })
+        });
+        toast.success("Sub creado");
+      }
+
+      if(dialog.mode==="edit-sub"){
+        await fetch(`/api/submantenimiento/${dialog.item.id}`,{
+          method:"PUT",
+          headers:{ "Content-Type":"application/json"},
+          body:JSON.stringify({
+            name:form.name,
+            type_id:Number(form.type_id),
+            is_active:form.is_active?1:0
+          })
+        });
+        toast.success("Sub actualizado");
+      }
+
+      setDialog({open:false,mode:"create-sub",item:null});
+      loadData();
+
+    }catch{
+      toast.error("Error al guardar");
+    }
+  }
+
+  // ================= DELETE =================
+  function removeMant(m){
+    setDeleteDialog({open:true,type:"mant",item:m});
+  }
+
+  function removeSub(item){
+    setDeleteDialog({open:true,type:"sub",item});
+  }
+
+  async function confirmDelete(){
+    try{
+
+      if(deleteDialog.type==="mant"){
+        await fetch(`/api/mantenimiento/${deleteDialog.item.id}`,{method:"DELETE"});
+        toast.success("Mantenimiento eliminado");
+      }
+
+      if(deleteDialog.type==="sub"){
+        await fetch(`/api/submantenimiento/${deleteDialog.item.id}`,{method:"DELETE"});
+        toast.success("Sub eliminado");
+      }
+
+      setDeleteDialog({open:false,type:null,item:null});
+      loadData();
+
+    }catch{
+      toast.error("No se pudo eliminar");
+    }
+  }
+
+  // ================= SWITCH =================
+  async function toggleSubActive(item,value){
+    await fetch(`/api/submantenimiento/${item.id}/toggle`,{
+      method:"PATCH",
+      headers:{ "Content-Type":"application/json"},
+      body:JSON.stringify({is_active:value?1:0})
+    });
+
+    setSub(prev=>prev.map(s=>s.id===item.id?{...s,is_active:value?1:0}:s));
+  }
+
+  async function requestToggleMant(m,value){
+    const childs=sub.filter(s=>s.type_id===m.id);
+    if(!value && childs.length>0){
+      setCascadeDialog({open:true,mantenimiento:m});
+      return;
+    }
+    toggleMantActive(m,value,false);
+  }
+
+  async function toggleMantActive(m,value,cascade){
+    await fetch(`/api/mantenimiento/${m.id}/toggle`,{
+      method:"PATCH",
+      headers:{ "Content-Type":"application/json"},
+      body:JSON.stringify({is_active:value?1:0})
+    });
+
+    if(cascade){
+      await fetch(`/api/submantenimiento/toggle-by-type`,{
+        method:"PATCH",
+        headers:{ "Content-Type":"application/json"},
+        body:JSON.stringify({type_id:m.id,is_active:0})
+      });
+    }
+
+    loadData();
+  }
+
+  return (
+    <div className="space-y-6">
+
+      {/* HEADER */}
       <div className="flex justify-between items-center">
-        <h1 className="text-xl font-semibold">Combos de Mantenimiento</h1>
+        <h1 className="text-xl font-semibold">Mantenimiento</h1>
 
         {permCreate && (
           <Button onClick={()=>{
-            setForm({ name:"", type_id:"", is_active:true });
-            setDialog({ open:true, mode:"create" });
+            setForm({name:"",is_active:true});
+            setDialog({open:true,mode:"create-mant"});
           }}>
-            <Plus size={16} />Nuevo
+            <Plus size={16}/> Nuevo mantenimiento
           </Button>
         )}
       </div>
 
-      {/* TABLE */}
-      <div className="border rounded-md">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map(hg=>(
-              <TableRow key={hg.id}>
-                {hg.headers.map(h=>(
-                  <TableHead key={h.id}>
-                    {flexRender(h.column.columnDef.header,h.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
+      {/* LISTA */}
+      <div className="border rounded-md overflow-hidden">
+        {grouped.map(m=>(
+          <div key={m.id} className="border-b">
 
-          <TableBody>
-            {table.getRowModel().rows.map(row=>(
-              <TableRow key={row.id}>
-                {row.getVisibleCells().map(cell=>(
-                  <TableCell key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell,cell.getContext())}
-                  </TableCell>
+            <div className="flex justify-between p-3 bg-muted">
+              <div className="flex items-center gap-2 cursor-pointer"
+                   onClick={()=>toggleExpand(m.id)}>
+                {expanded[m.id]?<ChevronDown size={18}/>:<ChevronRight size={18}/>}
+                <span className="font-medium">{m.name}</span>
+                <span className="text-xs text-muted-foreground">({m.items.length})</span>
+              </div>
+
+              <div className="flex gap-2 items-center">
+
+                <Switch checked={m.is_active===1}
+                        onCheckedChange={v=>requestToggleMant(m,v)} />
+
+                {permEdit && (
+                  <Button size="sm" variant="ghost"
+                    onClick={()=>{
+                      setForm({name:m.name,is_active:m.is_active===1});
+                      setDialog({open:true,mode:"edit-mant",item:m});
+                    }}>
+                    <Pencil size={16}/>
+                  </Button>
+                )}
+
+                {permDelete && (
+                  <Button size="sm" variant="destructive"
+                          onClick={()=>removeMant(m)}>
+                    <Trash2 size={16}/>
+                  </Button>
+                )}
+
+                {permCreate && (
+                  <Button size="sm" variant="outline"
+                    onClick={()=>{
+                      setForm({name:"",type_id:String(m.id),is_active:true});
+                      setDialog({open:true,mode:"create-sub"});
+                      setExpanded(p=>({...p,[m.id]:true}));
+                    }}>
+                    <Plus size={14}/> Sub
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {expanded[m.id] && (
+              <div className="p-3 space-y-2">
+                {m.items.map(item=>(
+                  <div key={item.id} className="flex justify-between border rounded-md px-3 py-2">
+                    <div className="flex gap-3 items-center">
+                      
+                      {item.name}
+                    </div>
+
+                    <div className="flex gap-2 items-center">
+                      <Switch  checked={item.is_active===1}
+                              onCheckedChange={v=>toggleSubActive(item,v)} />
+                      <Button size="sm" variant="ghost"
+                        onClick={()=>{
+                          setForm({
+                            name:item.name,
+                            type_id:String(item.type_id),
+                            is_active:item.is_active===1
+                          });
+                          setDialog({open:true,mode:"edit-sub",item});
+                        }}>
+                        <Pencil size={16}/>
+                      </Button>
+
+                      <Button size="sm" variant="destructive"
+                        onClick={()=>removeSub(item)}>
+                        <Trash2 size={16}/>
+                      </Button>
+                    </div>
+                  </div>
                 ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
-      {/* DIALOG */}
-      <Dialog open={dialog.open} onOpenChange={(v)=>setDialog({ open:v })}>
+      {/* FORM DIALOG */}
+      <Dialog open={dialog.open} onOpenChange={v=>setDialog(p=>({...p,open:v}))}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {dialog.mode==="edit"?"Editar":"Nuevo"} Combo de mantenimiento
-            </DialogTitle>
+            <DialogTitle>Guardar</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-3">
-
             <div>
               <Label>Nombre</Label>
-              <Input
-                value={form.name}
-                onChange={e=>setForm(p=>({...p,name:e.target.value}))}
-              />
+              <Input value={form.name}
+                     onChange={e=>setForm(p=>({...p,name:e.target.value}))}/>
             </div>
 
-            <div>
-              <Label>Mantenimiento</Label>
-              <Select
-                value={form.type_id}
-                onValueChange={v=>setForm(p=>({...p,type_id:v}))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccione"/>
-                </SelectTrigger>
-                <SelectContent>
-                  {tipos.map(t=>(
-                    <SelectItem key={t.id} value={String(t.id)}>
-                      {t.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {dialog.mode?.includes("sub") && (
+              <div>
+                <Label>Mantenimiento</Label>
+                <Select value={String(form.type_id||"")}
+                        onValueChange={v=>setForm(p=>({...p,type_id:v}))}>
+                  <SelectTrigger><SelectValue placeholder="Seleccione"/></SelectTrigger>
+                  <SelectContent>
+                    {mantenimientos.map(m=>(
+                      <SelectItem key={m.id} value={String(m.id)}>{m.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={form.is_active}
-                onCheckedChange={v=>setForm(p=>({...p,is_active:v}))}
-              />
+            <div className="flex gap-2 items-center">
+              <Switch checked={form.is_active}
+                      onCheckedChange={v=>setForm(p=>({...p,is_active:v}))}/>
               <Label>Activo</Label>
             </div>
-
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={()=>setDialog({ open:false })}>
+            <Button variant="outline"
+                    onClick={()=>setDialog({open:false,mode:"create-sub",item:null})}>
               Cancelar
             </Button>
             <Button onClick={save}>Guardar</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
+      {/* DELETE DIALOG */}
+      <Dialog open={deleteDialog.open}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar eliminación</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {deleteDialog.type==="mant"
+              ? "Se eliminará el mantenimiento y sus submantenimientos."
+              : "Se eliminará el submantenimiento."}
+          </p>
+          <DialogFooter>
+            <Button variant="outline"
+                    onClick={()=>setDeleteDialog({open:false})}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete}>
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* CASCADE */}
+      <Dialog open={cascadeDialog.open}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Desactivar mantenimiento</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            ¿Desactivar también los submantenimientos?
+          </p>
+          <DialogFooter>
+            <Button variant="outline"
+              onClick={()=>{
+                toggleMantActive(cascadeDialog.mantenimiento,false,false);
+                setCascadeDialog({open:false});
+              }}>
+              Solo mantenimiento
+            </Button>
+            <Button
+              onClick={()=>{
+                toggleMantActive(cascadeDialog.mantenimiento,false,true);
+                setCascadeDialog({open:false});
+              }}>
+              Desactivar todo
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

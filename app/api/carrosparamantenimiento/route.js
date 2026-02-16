@@ -1,20 +1,32 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-// GET con nombres
 export async function GET() {
-  const [rows] = await db.query(`
-    SELECT c.*,
-           ma.name AS marca,
-           mo.name AS modelo
-    FROM carrosparamantenimiento c
-    JOIN marcas ma ON ma.id = c.marca_id
-    JOIN modelos mo ON mo.id = c.modelo_id
-    ORDER BY ma.name, mo.name
-  `);
+  try {
 
-  return NextResponse.json(rows);
+    const [rows] = await db.query(`
+      SELECT
+        cpm.id,
+        cpm.marca_id,
+        cpm.modelo_id,
+        cpm.year,
+        cpm.version,
+        marcas.name  AS marca_nombre,
+        modelos.name AS modelo_nombre
+      FROM carrosparamantenimiento cpm
+      LEFT JOIN marcas  ON marcas.id = cpm.marca_id
+      LEFT JOIN modelos ON modelos.id = cpm.modelo_id
+      ORDER BY marcas.name, modelos.name, cpm.year
+    `);
+
+    return NextResponse.json(rows);
+
+  } catch (e) {
+    console.log(e);
+    return NextResponse.json({ message:"Error" },{ status:500 });
+  }
 }
+
 
 // CREAR
 export async function POST(req) {
