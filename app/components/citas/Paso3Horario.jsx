@@ -8,31 +8,11 @@ import { DayPicker } from "react-day-picker";
 import { es } from "date-fns/locale";
 import "react-day-picker/dist/style.css";
 
-const DAY_KEY = ["sun","mon","tue","wed","thu","fri","sat"];
-
-function parseTimeToMinutes(t) {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
-}
-
-function minutesToTime(min) {
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
-}
-
-function intersectRanges(aStart, aEnd, bStart, bEnd) {
-  const start = Math.max(aStart, bStart);
-  const end = Math.min(aEnd, bEnd);
-  return start < end ? [start, end] : null;
-}
-
 export default function Paso3Horario({ onChange }) {
 
   const [centros, setCentros] = useState([]);
   const [talleres, setTalleres] = useState([]);
   const [asesores, setAsesores] = useState([]);
-  const [horarioCentro, setHorarioCentro] = useState(null);
 
   const [centroId, setCentroId] = useState(null);
   const [tallerId, setTallerId] = useState(null);
@@ -42,110 +22,136 @@ export default function Paso3Horario({ onChange }) {
   const [slot, setSlot] = useState(null);
   const [slots, setSlots] = useState([]);
 
-  /* ================= CARGAS ================= */
+  const [horario, setHorario] = useState(null);
 
+  const today = new Date();
+
+  // helpers
+  const parseTime = t => {
+    if (!t) return 0;
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + m;
+  };
+
+  const minutesToTime = m =>
+    `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+
+  const DAY_ES = ["domingo","lunes","martes","miercoles","jueves","viernes","sabado"];
+  const DAY_EN = ["sun","mon","tue","wed","thu","fri","sat"];
+
+  // cargar centros
   useEffect(() => {
-    fetch("/api/centros").then(r => r.json()).then(setCentros);
+    fetch("/api/centros")
+      .then(r => r.json())
+      .then(setCentros);
   }, []);
 
+  // cargar talleres
   useEffect(() => {
     if (!centroId) return;
     fetch(`/api/talleres?centro_id=${centroId}`)
       .then(r => r.json())
       .then(setTalleres);
-
-    fetch(`/api/horacitas_centro/by-centro/${centroId}`)
-      .then(r => r.json())
-      .then(setHorarioCentro);
   }, [centroId]);
 
+  // cargar asesores (sin filtro por rol)
   useEffect(() => {
     fetch("/api/usuarios")
       .then(r => r.json())
-      .then(json => {
-        const parsed = json.map(a => ({
-          ...a,
-          work_schedule:
-            typeof a.work_schedule === "string"
-              ? JSON.parse(a.work_schedule)
-              : a.work_schedule
-        }));
-        setAsesores(parsed);
+      .then(data => {
+        const validos = data.filter(u =>
+          u.is_active && u.work_schedule
+        );
+        setAsesores(validos);
       });
   }, []);
 
-  /* ================= VALIDAR DÍA ================= */
+  // cargar horario centro
+  useEffect(() => {
+    if (!centroId) return;
 
+    fetch(`/api/horacitas_centro/by-centro/${centroId}`)
+      .then(r => r.json())
+      .then(data => setHorario(data));
+  }, [centroId]);
+
+  // deshabilitar días no disponibles
   const isDayDisabled = (day) => {
-    if (!horarioCentro) return true;
+    if (!horario?.week_json) return true;
 
-    const names = ["domingo","lunes","martes","miercoles","jueves","viernes","sabado"];
-    const key = names[day.getDay()];
-    const cfg = horarioCentro.week_json?.[key];
+    const key = DAY_ES[day.getDay()];
+    const cfg = horario.week_json[key];
 
-    return !cfg?.active;
+    if (!cfg?.active) return true;
+
+    const todayMid = new Date();
+    todayMid.setHours(0,0,0,0);
+
+    return day < todayMid;
   };
 
-  /* ================= GENERAR SLOTS ================= */
-
+  // generar slots
   useEffect(() => {
-    if (!date || !horarioCentro) return;
+    if (!date || !horario || !tallerId) return;
 
-    const names = ["domingo","lunes","martes","miercoles","jueves","viernes","sabado"];
-    const key = names[date.getDay()];
-    const cfgCentro = horarioCentro.week_json?.[key];
+    const key = DAY_ES[date.getDay()];
+    const cfgCentro = horario.week_json[key];
 
     if (!cfgCentro?.active) {
       setSlots([]);
       return;
     }
 
-    let start = parseTimeToMinutes(cfgCentro.start);
-    let end = parseTimeToMinutes(cfgCentro.end);
+    let start = parseTime(cfgCentro.start);
+    let end = parseTime(cfgCentro.end);
 
-    // cruzar con horario del asesor
+    // cruzar con asesor
     if (asesorId !== "any") {
-      const asesor = asesores.find(a => Number(a.id) === Number(asesorId));
-      if (asesor) {
-        const keyEn = DAY_KEY[date.getDay()];
-        const cfgAsesor = asesor.work_schedule?.[keyEn];
+      const asesor = asesores.find(a => String(a.id) === asesorId);
+
+      if (asesor?.work_schedule) {
+        const schedule =
+          typeof asesor.work_schedule === "string"
+            ? JSON.parse(asesor.work_schedule)
+            : asesor.work_schedule;
+
+        const keyEn = DAY_EN[date.getDay()];
+        const cfgAsesor = schedule[keyEn];
 
         if (!cfgAsesor) {
           setSlots([]);
           return;
         }
 
-        const aStart = parseTimeToMinutes(cfgAsesor.start);
-        const aEnd = parseTimeToMinutes(cfgAsesor.end);
+        const aStart = parseTime(cfgAsesor.start);
+        const aEnd = parseTime(cfgAsesor.end);
 
-        const inter = intersectRanges(start, end, aStart, aEnd);
-        if (!inter) {
-          setSlots([]);
-          return;
-        }
-
-        start = inter[0];
-        end = inter[1];
+        start = Math.max(start, aStart);
+        end = Math.min(end, aEnd);
       }
     }
 
     const arr = [];
-    const step = horarioCentro.slot_minutes || 30;
+    const now = new Date();
 
-    for (let t = start; t + step <= end; t += step) {
+    for (let m = start; m < end; m += horario.slot_minutes) {
+
+      const slotDate = new Date(date);
+      slotDate.setHours(Math.floor(m / 60), m % 60, 0);
+
+      // bloquear horas pasadas
+      if (slotDate < now) continue;
+
       arr.push({
-        start: minutesToTime(t),
-        end: minutesToTime(t + step)
+        start: minutesToTime(m),
+        end: minutesToTime(m + horario.slot_minutes)
       });
     }
 
     setSlots(arr);
-    setSlot(null);
+  }, [date, asesorId, horario, tallerId]);
 
-  }, [date, horarioCentro, asesorId]);
-
-  /* ================= EMITIR ================= */
-
+  // emitir selección
   useEffect(() => {
     if (!slot || !date) return;
 
@@ -161,12 +167,10 @@ export default function Paso3Horario({ onChange }) {
 
   }, [slot]);
 
-  /* ================= UI ================= */
-
   return (
     <Card>
-      <CardHeader className="font-semibold text-lg">
-        PASO 3 — Fecha y hora
+      <CardHeader className="font-semibold">
+        PASO 3 — Seleccione fecha y hora
       </CardHeader>
 
       <CardContent className="space-y-6">
@@ -204,7 +208,7 @@ export default function Paso3Horario({ onChange }) {
         <div className="grid md:grid-cols-2 gap-6">
 
           {/* CALENDARIO */}
-          <div className="border rounded-xl p-3 shadow-sm">
+          <div className="border rounded-xl p-4 shadow-sm bg-white">
             <DayPicker
               mode="single"
               selected={date}
@@ -219,6 +223,7 @@ export default function Paso3Horario({ onChange }) {
           {/* DERECHA */}
           <div className="space-y-4">
 
+            {/* ASESOR */}
             <Select value={asesorId} onValueChange={setAsesorId}>
               <SelectTrigger>
                 <SelectValue placeholder="Seleccione asesor" />
@@ -233,14 +238,16 @@ export default function Paso3Horario({ onChange }) {
               </SelectContent>
             </Select>
 
+            {/* HORAS */}
             {slots.length > 0 && (
               <div>
-                <div className="font-medium mb-2">Horas disponibles</div>
+                <div className="font-medium mb-2">Seleccione la hora</div>
                 <div className="flex flex-wrap gap-2">
                   {slots.map(s => (
                     <Button
                       key={s.start}
                       type="button"
+                      size="sm"
                       variant={slot?.start === s.start ? "default" : "outline"}
                       onClick={() => setSlot(s)}
                     >
@@ -252,13 +259,13 @@ export default function Paso3Horario({ onChange }) {
             )}
 
             {slots.length === 0 && date && (
-              <div className="text-sm text-muted-foreground">
-                No hay horarios disponibles.
-              </div>
+              <p className="text-sm text-muted-foreground">
+                No hay horarios disponibles
+              </p>
             )}
-
           </div>
         </div>
+
       </CardContent>
     </Card>
   );

@@ -38,18 +38,25 @@ export default function CitaDatosCard({ value, onChange }) {
 
         <div>
           <Label>Origen</Label>
-          <Select onValueChange={(v)=>setField("origen_id", Number(v))}>
-            <SelectTrigger>
-              <SelectValue placeholder="Seleccione" />
-            </SelectTrigger>
-            <SelectContent>
-              {origenes.map(o => (
-                <SelectItem key={o.id} value={String(o.id)}>
-                  {o.nombre}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Select
+  value={value.origen_id ? String(value.origen_id) : ""}
+  onValueChange={(v) => setField("origen_id", Number(v))}
+>
+  <SelectTrigger>
+    <SelectValue placeholder="Seleccione" />
+  </SelectTrigger>
+
+  <SelectContent>
+    {origenes
+      .filter(o => o.is_active === 1) // ✅ solo activos
+      .map(o => (
+        <SelectItem key={o.id} value={String(o.id)}>
+          {o.name}
+        </SelectItem>
+      ))}
+  </SelectContent>
+</Select>
+
         </div>
 
         <div>

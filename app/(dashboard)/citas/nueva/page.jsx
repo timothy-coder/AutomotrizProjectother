@@ -19,7 +19,9 @@ export default function NuevaCitaPage() {
   const [clienteId, setClienteId] = useState(null);
   const [vehiculoId, setVehiculoId] = useState(null);
 
-  const [motivos, setMotivos] = useState([]);
+  const [motivos, setMotivos] = useState([
+  { motivo_id: null, submotivo_id: null, submotivos: [] }
+]);
   const [horario, setHorario] = useState(null);
   const [datos, setDatos] = useState({});
 
