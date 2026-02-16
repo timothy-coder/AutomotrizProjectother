@@ -4,278 +4,294 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from "@/components/ui/dialog";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
+  Card, CardContent, CardHeader, CardTitle
 } from "@/components/ui/card";
 
-import { Pencil, Trash2, Plus } from "lucide-react";
+import {
+  Pencil, Trash2, Plus, ChevronDown, ChevronRight
+} from "lucide-react";
 
 export default function MotivosTab() {
 
-  const [items, setItems] = useState([]);
+  const [motivos, setMotivos] = useState([]);
+  const [subs, setSubs] = useState([]);
+  const [expanded, setExpanded] = useState({});
+
   const [loading, setLoading] = useState(false);
 
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [dialogMotivo, setDialogMotivo] = useState(false);
+  const [dialogSub, setDialogSub] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState(false);
 
-  const [editing, setEditing] = useState(null);
-  const [nombre, setNombre] = useState("");
+  const [editingMotivo, setEditingMotivo] = useState(null);
+  const [editingSub, setEditingSub] = useState(null);
 
   const [deleteTarget, setDeleteTarget] = useState(null);
 
-  // ---------------- LOAD ----------------
+  const [nombre, setNombre] = useState("");
 
+  // ================= LOAD =================
   async function load() {
+    setLoading(true);
     try {
-      setLoading(true);
-      const r = await fetch("/api/motivos_citas", { cache: "no-store" });
-      const data = await r.json();
-      setItems(Array.isArray(data) ? data : []);
+      const m = await fetch("/api/motivos_citas").then(r => r.json());
+      const s = await fetch("/api/submotivos-citas").then(r => r.json());
+      setMotivos(m);
+      setSubs(s);
     } catch {
-      toast.error("Error cargando motivos");
+      toast.error("Error cargando datos");
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
 
-  // ---------------- CREATE / EDIT ----------------
+  const grouped = motivos.map(m => ({
+    ...m,
+    subs: subs.filter(s => s.motivo_id === m.id)
+  }));
 
-  function openCreate() {
-    setEditing(null);
+  const toggleExpand = id =>
+    setExpanded(p => ({ ...p, [id]: !p[id] }));
+
+  // ================= MOTIVOS =================
+  function openCreateMotivo() {
+    setEditingMotivo(null);
     setNombre("");
-    setDialogOpen(true);
+    setDialogMotivo(true);
   }
 
-  function openEdit(item) {
-    setEditing(item);
-    setNombre(item.nombre);
-    setDialogOpen(true);
+  function openEditMotivo(m) {
+    setEditingMotivo(m);
+    setNombre(m.nombre);
+    setDialogMotivo(true);
   }
 
-  async function save() {
+  async function saveMotivo() {
+    if (!nombre.trim()) return toast.warning("Ingrese nombre");
 
-    if (!nombre.trim())
-      return toast.warning("Ingrese nombre");
+    const url = editingMotivo
+      ? `/api/motivos_citas/${editingMotivo.id}`
+      : `/api/motivos_citas`;
 
-    try {
+    const method = editingMotivo ? "PUT" : "POST";
 
-      if (editing) {
+    await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nombre })
+    });
 
-        // EDIT
-        const r = await fetch(`/api/motivos_citas/${editing.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nombre })
-        });
-
-        if (!r.ok) throw new Error();
-
-        toast.success("Motivo actualizado");
-
-      } else {
-
-        // CREATE
-        const r = await fetch("/api/motivos_citas", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nombre })
-        });
-
-        if (!r.ok) throw new Error();
-
-        toast.success("Motivo creado");
-      }
-
-      setDialogOpen(false);
-      setNombre("");
-      setEditing(null);
-      load();
-
-    } catch {
-      toast.error("Error guardando motivo");
-    }
+    toast.success(editingMotivo ? "Actualizado" : "Creado");
+    setDialogMotivo(false);
+    load();
   }
 
-  // ---------------- DELETE ----------------
-
-  function openDelete(item) {
-    setDeleteTarget(item);
-    setDeleteOpen(true);
+  // ================= SUBMOTIVOS =================
+  function openCreateSub(motivo) {
+    setEditingSub({ motivo_id: motivo.id });
+    setNombre("");
+    setDialogSub(true);
   }
 
-  async function deleteConfirm() {
-    try {
-
-      const r = await fetch(`/api/motivos_citas/${deleteTarget.id}`, {
-        method: "DELETE"
-      });
-
-      if (!r.ok) throw new Error();
-
-      toast.success("Motivo eliminado");
-
-      setDeleteOpen(false);
-      setDeleteTarget(null);
-      load();
-
-    } catch {
-      toast.error("Error eliminando");
-    }
+  function openEditSub(s) {
+    setEditingSub(s);
+    setNombre(s.nombre);
+    setDialogSub(true);
   }
 
-  // ---------------- UI ----------------
+  async function saveSub() {
+    if (!nombre.trim()) return;
 
+    const body = {
+      motivo_id: editingSub.motivo_id,
+      nombre,
+      is_active: editingSub.is_active ?? 1
+    };
+
+    const url = editingSub.id
+      ? `/api/submotivos-citas/${editingSub.id}`
+      : `/api/submotivos-citas`;
+
+    const method = editingSub.id ? "PUT" : "POST";
+
+    await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+
+    toast.success("Guardado");
+    setDialogSub(false);
+    load();
+  }
+
+ 
+
+  // ================= DELETE =================
+  function openDelete(target) {
+    setDeleteTarget(target);
+    setDeleteDialog(true);
+  }
+
+  async function confirmDelete() {
+    const isSub = deleteTarget.motivo_id;
+
+    const url = isSub
+      ? `/api/submotivos-citas/${deleteTarget.id}`
+      : `/api/motivos_citas/${deleteTarget.id}`;
+
+    await fetch(url, { method: "DELETE" });
+
+    toast.success("Eliminado");
+    setDeleteDialog(false);
+    load();
+  }
+
+  // ================= UI =================
   return (
     <div className="space-y-4">
 
-      {/* HEADER */}
       <div className="flex justify-between items-center">
-
-        <h2 className="text-lg font-semibold">
-          Motivos de citas
-        </h2>
-
-        <Button onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nuevo
+        <h2 className="text-lg font-semibold">Motivos de citas</h2>
+        <Button onClick={openCreateMotivo}>
+          <Plus className="h-4 w-4 mr-2" /> Nuevo
         </Button>
-
       </div>
 
-      {/* LIST */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">
-            Lista de motivos
-          </CardTitle>
+          <CardTitle className="text-base">Lista</CardTitle>
         </CardHeader>
 
         <CardContent className="space-y-2">
 
-          {loading && (
-            <p className="text-sm text-muted-foreground">
-              Cargando...
-            </p>
-          )}
+          {grouped.map(m => (
+            <div key={m.id} className="border rounded-md">
 
-          {!loading && items.map(m => (
-
-            <div
-              key={m.id}
-              className="border rounded-md p-3 flex justify-between items-center"
-            >
-              <span>{m.nombre}</span>
-
-              <div className="flex gap-2">
-
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={() => openEdit(m)}
+              {/* HEADER */}
+              <div className="flex justify-between items-center p-3 bg-muted">
+                <div
+                  className="flex items-center gap-2 cursor-pointer"
+                  onClick={() => toggleExpand(m.id)}
                 >
-                  <Pencil className="h-4 w-4" />
-                </Button>
+                  {expanded[m.id]
+                    ? <ChevronDown size={18} />
+                    : <ChevronRight size={18} />}
+                  <span className="font-medium">{m.nombre}</span>
+                  <span className="text-xs text-muted-foreground">
+                    ({m.subs.length})
+                  </span>
+                </div>
 
-                <Button
-                  size="icon"
-                  variant="destructive"
-                  onClick={() => openDelete(m)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline"
+                    onClick={() => openCreateSub(m)}>
+                    <Plus size={14}/> Sub
+                  </Button>
 
+                  <Button size="icon" variant="outline"
+                    onClick={() => openEditMotivo(m)}>
+                    <Pencil size={16}/>
+                  </Button>
+
+                  <Button size="icon" variant="destructive"
+                    onClick={() => openDelete(m)}>
+                    <Trash2 size={16}/>
+                  </Button>
+                </div>
               </div>
 
-            </div>
+              {/* SUBS */}
+              {expanded[m.id] && (
+                <div className="p-3 space-y-2">
+                  {m.subs.map(s => (
+                    <div key={s.id}
+                      className="flex justify-between items-center border rounded-md px-3 py-2">
 
+                      <div className="flex items-center gap-3">
+                        
+                        {s.nombre}
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button size="icon" variant="outline"
+                          onClick={() => openEditSub(s)}>
+                          <Pencil size={16}/>
+                        </Button>
+                        <Button size="icon" variant="destructive"
+                          onClick={() => openDelete(s)}>
+                          <Trash2 size={16}/>
+                        </Button>
+                      </div>
+
+                    </div>
+                  ))}
+                </div>
+              )}
+
+            </div>
           ))}
 
         </CardContent>
       </Card>
 
-      {/* ---------- DIALOG CREATE / EDIT ---------- */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-
+      {/* DIALOG MOTIVO */}
+      <Dialog open={dialogMotivo} onOpenChange={setDialogMotivo}>
         <DialogContent>
-
           <DialogHeader>
             <DialogTitle>
-              {editing ? "Editar motivo" : "Nuevo motivo"}
+              {editingMotivo ? "Editar motivo" : "Nuevo motivo"}
             </DialogTitle>
           </DialogHeader>
 
-          <Input
-            placeholder="Nombre del motivo"
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-          />
+          <Input value={nombre} onChange={e => setNombre(e.target.value)} />
 
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDialogOpen(false)}
-            >
-              Cancelar
-            </Button>
-
-            <Button onClick={save}>
-              Guardar
-            </Button>
+            <Button variant="outline" onClick={() => setDialogMotivo(false)}>Cancelar</Button>
+            <Button onClick={saveMotivo}>Guardar</Button>
           </DialogFooter>
-
         </DialogContent>
       </Dialog>
 
-      {/* ---------- DELETE CONFIRM ---------- */}
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-
+      {/* DIALOG SUB */}
+      <Dialog open={dialogSub} onOpenChange={setDialogSub}>
         <DialogContent>
-
           <DialogHeader>
-            <DialogTitle>
-              Confirmar eliminación
-            </DialogTitle>
+            <DialogTitle>Submotivo</DialogTitle>
           </DialogHeader>
 
-          <p>
-            ¿Eliminar el motivo <b>{deleteTarget?.nombre}</b>?
-          </p>
+          <Input value={nombre} onChange={e => setNombre(e.target.value)} />
 
           <DialogFooter>
-
-            <Button
-              variant="outline"
-              onClick={() => setDeleteOpen(false)}
-            >
-              Cancelar
-            </Button>
-
-            <Button
-              variant="destructive"
-              onClick={deleteConfirm}
-            >
-              Eliminar
-            </Button>
-
+            <Button variant="outline" onClick={() => setDialogSub(false)}>Cancelar</Button>
+            <Button onClick={saveSub}>Guardar</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
+      {/* DELETE */}
+      <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar eliminación</DialogTitle>
+          </DialogHeader>
+
+          <p>¿Eliminar <b>{deleteTarget?.nombre}</b>?</p>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialog(false)}>Cancelar</Button>
+            <Button variant="destructive" onClick={confirmDelete}>Eliminar</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
