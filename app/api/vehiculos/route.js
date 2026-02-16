@@ -7,25 +7,31 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const cliente_id = searchParams.get("cliente_id");
 
-    if (!cliente_id) {
-      return NextResponse.json({ message: "cliente_id requerido" }, { status: 400 });
-    }
-
-    const [rows] = await db.query(
-      `
+    let sql = `
       SELECT v.*,
         m.name AS marca_nombre,
-        mo.name AS modelo_nombre
+        mo.name AS modelo_nombre,
+        CONCAT(c.nombre,' ',c.apellido) AS cliente_nombre
       FROM vehiculos v
       LEFT JOIN marcas m ON m.id = v.marca_id
       LEFT JOIN modelos mo ON mo.id = v.modelo_id
-      WHERE v.cliente_id=?
-      ORDER BY v.id DESC
-      `,
-      [cliente_id]
-    );
+      LEFT JOIN clientes c ON c.id = v.cliente_id
+    `;
+
+    const params = [];
+
+    // si envían cliente_id → filtra
+    if (cliente_id) {
+      sql += " WHERE v.cliente_id=?";
+      params.push(cliente_id);
+    }
+
+    sql += " ORDER BY v.id DESC";
+
+    const [rows] = await db.query(sql, params);
 
     return NextResponse.json(rows);
+
   } catch (e) {
     console.log(e);
     return NextResponse.json({ message: "Error" }, { status: 500 });

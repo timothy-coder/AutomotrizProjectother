@@ -1,6 +1,6 @@
 import {
   Users, Milestone, ListChecks, UserRound, Blinds, Boxes, Settings,
-  CalendarCheck, ClipboardList, Receipt, SquareDashedMousePointer, FileText,Home,CarFront,Columns2,Columns3,Coins
+  CalendarCheck, ClipboardList, Receipt, SquareDashedMousePointer, FileText,Home,CarFront,Columns2,Columns3,Coins,Calendar,MessageCircle
 } from "lucide-react";
 export const HOME_ITEM = { to: "/home", label: "Home", icon: Home, perm: ["home", "view"] };
 export const NAV_TREE = [
@@ -24,7 +24,20 @@ export const NAV_TREE = [
   {
     key: "citas",
     label: "Citas",
-    items: [{ to: "/citas", label: "Citas", icon: CalendarCheck, perm: ["citas", "view"] }],
+    items: [
+      { to: "/citas", label: "Citas", icon: Calendar, perm: ["citas", "view"] },
+       { to: "/recepcion", label: "Recepción", icon: CalendarCheck, perm: ["citas", "view"] },
+    ],
+  },
+   {
+    key: "cotizacion",
+    label: "Cotizacion",
+    items: [{ to: "/cotizacion", label: "Cotizacion", icon: Receipt, perm: ["cotizacion", "view"] }],
+  },
+  {
+    key: "mensajes",
+    label: "mensajes",
+    items: [{ to: "/mensajes", label: "Mensajes", icon: MessageCircle, perm: ["mensajes", "view"] }],
   },
   {
     key: "pyp",
