@@ -190,11 +190,33 @@ export default function ClientesPage() {
   data={vehiculos}
   onCreate={permEdit ? () => setVehiculoDialog({ open:true, mode:"create" }) : undefined}
   onEdit={permEdit ? v => setVehiculoDialog({ open:true, mode:"edit", data:v }) : undefined}
-  onDelete={permDelete ? async (v) => {
-    await fetch(`/api/vehiculos/${v.id}`, { method: "DELETE" });
-    await loadVehiculos(selectedCliente.id);
-    toast.success("Vehículo eliminado");
-  } : undefined}
+  onDelete={
+  permDelete
+    ? async (v) => {
+        try {
+          const res = await fetch(`/api/vehiculos/${v.id}`, {
+            method: "DELETE",
+          });
+
+          const data = await res.json();
+
+          if (!res.ok) {
+            toast.error(data.message || "No se pudo eliminar");
+            return;
+          }
+
+          toast.success("Vehículo eliminado");
+
+          loadVehiculos(selectedCliente.id);
+
+        } catch (err) {
+          console.error(err);
+          toast.error("Error eliminando vehículo");
+        }
+      }
+    : undefined
+}
+
 />
 
 

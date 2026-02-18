@@ -36,7 +36,7 @@ export const NAV_TREE = [
   },
   {
     key: "mensajes",
-    label: "mensajes",
+    label: "Mensajes",
     items: [{ to: "/mensajes", label: "Mensajes", icon: MessageCircle, perm: ["mensajes", "view"] }],
   },
   {

@@ -60,7 +60,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-svh w-full flex items-center justify-center px-4 bg-slate-950">
-      <Card className="w-full max-w-3xl overflow-hidden shadow-sm border-white/10 bg-slate-900">
+      <Card className="w-full max-w-3xl overflow-hidden shadow-sm border-white/10 bg-slate-950">
         <div className="flex flex-col md:flex-row">
           <aside className="w-full md:w-5/12 p-6 md:p-8 flex items-center justify-center border-b md:border-b-0 md:border-r border-white/10">
             <div className="text-center">

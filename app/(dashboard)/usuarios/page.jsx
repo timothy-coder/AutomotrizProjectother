@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRequirePerm } from "@/hooks/useRequirePerm";
 import { hasPermission } from "@/lib/permissions";
 import { useAuth } from "@/context/AuthContext";
-
+import { toast } from "sonner";
 import UsersTable from "@/app/components/users/UsersTable";
 import UserDialog from "@/app/components/users/UserDialog";
 

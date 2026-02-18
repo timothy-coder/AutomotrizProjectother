@@ -4,14 +4,24 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
 } from "@/components/ui/dialog";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-import { Pencil, Trash2, Plus } from "lucide-react";
+import {
+  Pencil,
+  Trash2,
+  Plus,
+  AlertTriangle,
+  Loader2
+} from "lucide-react";
 
 export default function CentrosTab() {
 
@@ -24,17 +34,15 @@ export default function CentrosTab() {
   const [nombre, setNombre] = useState("");
 
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   // ================= LOAD =================
 
   async function load() {
     try {
-
       const r = await fetch("/api/centros", { cache: "no-store" });
       const data = await r.json();
-
       setItems(Array.isArray(data) ? data : []);
-
     } catch {
       toast.error("Error cargando centros");
     }
@@ -63,32 +71,30 @@ export default function CentrosTab() {
   // ================= SAVE =================
 
   async function save() {
-
     if (!nombre.trim())
       return toast.warning("Ingrese nombre");
 
     try {
 
-      if (editing) {
-
-        await fetch(`/api/centros/${editing.id}`, {
-          method: "PUT",
+      const res = await fetch(
+        editing ? `/api/centros/${editing.id}` : `/api/centros`,
+        {
+          method: editing ? "PUT" : "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ nombre })
-        });
+        }
+      );
 
-        toast.success("Centro actualizado");
+      const data = await res.json();
 
-      } else {
-
-        await fetch("/api/centros", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nombre })
-        });
-
-        toast.success("Centro creado");
+      if (!res.ok) {
+        toast.error(data.message || "Error guardando");
+        return;
       }
+
+      toast.success(
+        editing ? "Centro actualizado" : "Centro creado correctamente"
+      );
 
       setDialogOpen(false);
       load();
@@ -106,20 +112,32 @@ export default function CentrosTab() {
   }
 
   async function deleteConfirm() {
+    if (!deleteTarget) return;
 
     try {
+      setDeleting(true);
 
-      await fetch(`/api/centros/${deleteTarget.id}`, {
+      const res = await fetch(`/api/centros/${deleteTarget.id}`, {
         method: "DELETE"
       });
 
-      toast.success("Centro eliminado");
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.message || "No se pudo eliminar");
+        return;
+      }
+
+      toast.success("Centro eliminado correctamente");
 
       setDeleteOpen(false);
+      setDeleteTarget(null);
       load();
 
     } catch {
-      toast.error("Error eliminando");
+      toast.error("Error eliminando el centro");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -130,14 +148,12 @@ export default function CentrosTab() {
 
       {/* HEADER */}
       <div className="flex justify-between items-center">
-
         <h2 className="text-xl font-semibold">Centros</h2>
 
         <Button onClick={openCreate}>
           <Plus className="h-4 w-4 mr-2" />
           Nuevo centro
         </Button>
-
       </div>
 
       {/* LISTA */}
@@ -183,7 +199,10 @@ export default function CentrosTab() {
           />
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setDialogOpen(false)}
+            >
               Cancelar
             </Button>
 
@@ -195,21 +214,56 @@ export default function CentrosTab() {
         </DialogContent>
       </Dialog>
 
-      {/* DELETE */}
+      {/* DELETE DIALOG PRO */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
 
-          ¿Eliminar <b>{deleteTarget?.nombre}</b> ?
+          <div className="flex flex-col items-center text-center space-y-4">
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
-              Cancelar
-            </Button>
+            <div className="bg-red-100 p-3 rounded-full">
+              <AlertTriangle className="w-6 h-6 text-red-600" />
+            </div>
 
-            <Button variant="destructive" onClick={deleteConfirm}>
-              Eliminar
-            </Button>
-          </DialogFooter>
+            <div>
+              <h3 className="text-lg font-semibold">
+                ¿Eliminar centro?
+              </h3>
+
+              <p className="text-sm text-muted-foreground mt-1">
+                Esta acción no se puede deshacer.
+              </p>
+
+              <p className="mt-2 font-medium text-red-600">
+                {deleteTarget?.nombre}
+              </p>
+            </div>
+
+            <div className="flex gap-3 w-full pt-2">
+
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setDeleteOpen(false)}
+                disabled={deleting}
+              >
+                Cancelar
+              </Button>
+
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={deleteConfirm}
+                disabled={deleting}
+              >
+                {deleting && (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                )}
+                Eliminar
+              </Button>
+
+            </div>
+
+          </div>
 
         </DialogContent>
       </Dialog>
@@ -218,11 +272,9 @@ export default function CentrosTab() {
   );
 }
 
-
 // ================= ROW =================
 
 function Row({ item, onEdit, onDelete }) {
-
   return (
     <div className="border rounded-md p-2 flex justify-between items-center">
 

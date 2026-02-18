@@ -1,55 +1,52 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-// GET /api/vehiculos/10
-export async function GET(req, { params }) {
+// ================= GET =================
+export async function GET(req, context) {
   try {
-    const { id } = await params;
+    const { id } = await context.params;
+    const vehicleId = Number(id);
 
     const [rows] = await db.query(
-      `
-      SELECT v.*,
-        m.name AS marca_nombre,
-        mo.name AS modelo_nombre
-      FROM vehiculos v
-      LEFT JOIN marcas m ON m.id = v.marca_id
-      LEFT JOIN modelos mo ON mo.id = v.modelo_id
-      WHERE v.id=?
-      `,
-      [id]
+      `SELECT v.*,
+              m.name AS marca_nombre,
+              mo.name AS modelo_nombre
+       FROM vehiculos v
+       LEFT JOIN marcas m ON m.id = v.marca_id
+       LEFT JOIN modelos mo ON mo.id = v.modelo_id
+       WHERE v.id=?`,
+      [vehicleId]
     );
 
-    const item = rows?.[0];
-    if (!item) return NextResponse.json({ message: "No existe" }, { status: 404 });
+    if (!rows.length) {
+      return NextResponse.json({ message: "No existe" }, { status: 404 });
+    }
 
-    return NextResponse.json(item);
+    return NextResponse.json(rows[0]);
   } catch (e) {
-    console.log(e);
+    console.error(e);
     return NextResponse.json({ message: "Error" }, { status: 500 });
   }
 }
 
-// PUT /api/vehiculos/10
-export async function PUT(req, { params }) {
+// ================= PUT =================
+export async function PUT(req, context) {
   try {
-    const { id } = await params;
+    const { id } = await context.params;
+    const vehicleId = Number(id);
+
     const body = await req.json();
 
-    const placas = (body.placas || "").trim();
-    const vin = (body.vin || "").trim();
-    const marca_id = body.marca_id == null || body.marca_id === "" ? null : Number(body.marca_id);
-    const modelo_id = body.modelo_id == null || body.modelo_id === "" ? null : Number(body.modelo_id);
-    const anio = body.anio == null || body.anio === "" ? null : Number(body.anio);
-    const color = (body.color || "").trim();
-    const kilometraje = body.kilometraje == null || body.kilometraje === "" ? null : Number(body.kilometraje);
-
-    if (!placas && !vin) {
-      return NextResponse.json({ message: "Ingrese placas o VIN" }, { status: 400 });
-    }
+    const placas = body.placas?.trim() || null;
+    const vin = body.vin?.trim() || null;
+    const marca_id = body.marca_id || null;
+    const modelo_id = body.modelo_id || null;
+    const anio = body.anio || null;
+    const color = body.color?.trim() || null;
+    const kilometraje = body.kilometraje || null;
 
     const [result] = await db.query(
-      `
-      UPDATE vehiculos SET
+      `UPDATE vehiculos SET
         placas=?,
         vin=?,
         marca_id=?,
@@ -57,45 +54,60 @@ export async function PUT(req, { params }) {
         anio=?,
         color=?,
         kilometraje=?
-      WHERE id=?
-      `,
+       WHERE id=?`,
       [
-        placas || null,
-        vin || null,
-        Number.isFinite(marca_id) ? marca_id : null,
-        Number.isFinite(modelo_id) ? modelo_id : null,
-        Number.isFinite(anio) ? anio : null,
-        color || null,
-        Number.isFinite(kilometraje) ? kilometraje : null,
-        id,
+        placas,
+        vin,
+        marca_id,
+        modelo_id,
+        anio,
+        color,
+        kilometraje,
+        vehicleId,
       ]
     );
 
-    if (result.affectedRows === 0) {
+    if (!result.affectedRows) {
       return NextResponse.json({ message: "No existe" }, { status: 404 });
     }
 
     return NextResponse.json({ message: "Vehículo actualizado" });
   } catch (e) {
-    console.log(e);
+    console.error(e);
     return NextResponse.json({ message: "Error" }, { status: 500 });
   }
 }
 
-// DELETE /api/vehiculos/10
-export async function DELETE(req, { params }) {
+// ================= DELETE =================
+export async function DELETE(req, context) {
   try {
-    const { id } = await params;
+    const { id } = await context.params;
+    const vehicleId = Number(id);
 
-    const [result] = await db.query(`DELETE FROM vehiculos WHERE id=?`, [id]);
+    if (!vehicleId) {
+      return NextResponse.json({ message: "ID inválido" }, { status: 400 });
+    }
 
-    if (result.affectedRows === 0) {
+    const [result] = await db.query(
+      "DELETE FROM vehiculos WHERE id=?",
+      [vehicleId]
+    );
+
+    if (!result.affectedRows) {
       return NextResponse.json({ message: "No existe" }, { status: 404 });
     }
 
     return NextResponse.json({ message: "Vehículo eliminado" });
   } catch (e) {
-    console.log(e);
+    console.error("DELETE ERROR:", e);
+
+    if (e.code === "ER_ROW_IS_REFERENCED_2") {
+      return NextResponse.json(
+        { message: "No se puede eliminar: tiene citas asociadas" },
+        { status: 409 }
+      );
+    }
+
     return NextResponse.json({ message: "Error" }, { status: 500 });
   }
 }

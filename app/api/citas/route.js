@@ -1,58 +1,60 @@
 import { db } from "@/lib/db";
+import { NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(request) {
+  try {
+    const { searchParams } = new URL(request.url);
 
-  const [rows] = await db.query(`
-    SELECT
-      c.*,
-      cl.nombre AS cliente,
-      v.placa,
-      u.nombre AS asesor
-    FROM citas c
-    JOIN clientes cl ON cl.id = c.cliente_id
-    LEFT JOIN vehiculos v ON v.id = c.vehiculo_id
-    LEFT JOIN usuarios u ON u.id = c.asesor_id
-    ORDER BY c.start_at DESC
-  `);
+    const centroId = searchParams.get("centro_id");
+    const start = searchParams.get("start");
+    const end = searchParams.get("end");
+    const asesorId = searchParams.get("asesor_id");
 
-  return Response.json(rows);
-}
-export async function POST(req) {
+    if (!centroId || !start || !end) {
+      return NextResponse.json([]);
+    }
 
-  const data = await req.json();
+    // 🔥 rango completo del día
+    const startDateTime = `${start} 00:00:00`;
+    const endDateTime   = `${end} 23:59:59`;
 
-  const [result] = await db.query(`
-    INSERT INTO citas (
-      centro_id,
-      taller_id,
-      cliente_id,
-      vehiculo_id,
-      asesor_id,
-      origen_id,
-      start_at,
-      end_at,
-      tipo_servicio,
-      servicio_valet,
-      nota_cliente,
-      nota_interna,
-      created_by
-    )
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
-  `, [
-    data.centro_id,
-    data.taller_id,
-    data.cliente_id,
-    data.vehiculo_id,
-    data.asesor_id,
-    data.origen_id,
-    data.start_at,
-    data.end_at,
-    data.tipo_servicio,
-    data.servicio_valet ? 1 : 0,
-    data.nota_cliente,
-    data.nota_interna,
-    data.created_by
-  ]);
+    let query = `
+      SELECT
+        c.id,
+        c.start_at,
+        c.end_at,
+        c.estado,
+        c.asesor_id,
 
-  return Response.json({ id: result.insertId });
+        CONCAT(cl.nombre,' ',cl.apellido) AS cliente,
+        IFNULL(v.placas,'SIN PLACA') AS placa,
+        IFNULL(u.fullname,'Sin asesor') AS asesor,
+        IFNULL(u.color,'#5e17eb') AS color
+
+      FROM citas c
+      LEFT JOIN clientes cl ON cl.id = c.cliente_id
+      LEFT JOIN usuarios u ON u.id = c.asesor_id
+      LEFT JOIN vehiculos v ON v.id = c.vehiculo_id
+
+      WHERE c.centro_id = ?
+      AND c.start_at BETWEEN ? AND ?
+    `;
+
+    const params = [centroId, startDateTime, endDateTime];
+
+    if (asesorId) {
+      query += " AND c.asesor_id = ?";
+      params.push(asesorId);
+    }
+
+    query += " ORDER BY c.start_at";
+
+    const [rows] = await db.query(query, params);
+
+    return NextResponse.json(rows || []);
+
+  } catch (error) {
+    console.error("❌ ERROR API CITAS:", error);
+    return NextResponse.json([]);
+  }
 }

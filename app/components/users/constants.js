@@ -24,6 +24,8 @@ export const SECTIONS = [
   { key: "combomantenimiento", label: "Combo Mantenimiento", actions: ["view", "create", "edit", "delete"] },
   { key: "carrosparamantenimiento", label: "Gestion de Carroceria", actions: ["view", "create", "edit", "delete"] },
   { key: "precios", label: "Precios", actions: ["view", "create", "edit", "delete"] },
-  
-  
+  { key: "mensajes", label: "Mensajes", actions: ["view", "create", "edit", "delete"] },
+
+
+
 ];
