@@ -26,7 +26,7 @@ export const NAV_TREE = [
     label: "Citas",
     items: [
       { to: "/citas", label: "Citas", icon: Calendar, perm: ["citas", "view"] },
-       { to: "/recepcion", label: "Recepción", icon: CalendarCheck, perm: ["citas", "view"] },
+       { to: "/recepcion", label: "Recepción", icon: CalendarCheck, perm: ["recepcion", "view"] },
     ],
   },
    {

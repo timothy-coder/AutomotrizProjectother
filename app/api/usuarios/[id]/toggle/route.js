@@ -1,21 +1,21 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-
-export async function PATCH(req, { params }) {
+export async function PATCH(req, context) {
+  const { id } = await context.params;
 
   try {
-
-    const { id } = params;
-
     await db.query(`
       UPDATE usuarios
       SET is_active = NOT is_active
-      WHERE id=?
+      WHERE id = ?
     `, [id]);
 
-    return NextResponse.json({ message: "Estado actualizado" });
+    return Response.json({ success: true });
 
-  } catch {
-    return NextResponse.json({ message: "Error" }, { status: 500 });
+  } catch (error) {
+    return Response.json(
+      { error: "Error al actualizar" },
+      { status: 500 }
+    );
   }
 }
