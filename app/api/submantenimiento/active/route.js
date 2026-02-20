@@ -7,6 +7,7 @@ export async function GET() {
       SELECT
         s.id,
         s.name,
+        s.description,
         s.type_id,
         m.name AS type_name
       FROM submantenimiento s

@@ -2,11 +2,11 @@ import { db } from "@/lib/db";
 
 export async function PUT(req, context) {
   const { id } = await context.params;
-  const { name, type_id, is_active } = await req.json();
+  const { name, type_id, is_active,description } = await req.json();
 
   await db.query(
-    "UPDATE submantenimiento SET name=?, type_id=?, is_active=? WHERE id=?",
-    [name, type_id, is_active, id]
+    "UPDATE submantenimiento SET name=?, type_id=?, is_active=?,description=? WHERE id=?",
+    [name, type_id, is_active,description, id]
   );
 
   return Response.json({ ok: true });

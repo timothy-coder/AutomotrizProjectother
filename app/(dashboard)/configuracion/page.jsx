@@ -9,6 +9,7 @@ import TalleresMostradoresTab from "@/app/components/configuracion/TalleresMostr
 import MotivosTab from "@/app/components/configuracion/MotivosTab";
 import OrigenesTab from "@/app/components/configuracion/OrigenesTab";
 import HorariosCentroTab from "@/app/components/configuracion/HorariosCentroTab";
+import TipoInventarioTab from "@/app/components/tipoInventario/TipoInventarioTab";
 
 export default function ConfiguracionPage() {
 
@@ -28,6 +29,8 @@ export default function ConfiguracionPage() {
           <TabsTrigger value="motivos">Motivos</TabsTrigger>
           <TabsTrigger value="origenes">Orígenes</TabsTrigger>
           <TabsTrigger value="horarios">Horarios</TabsTrigger>
+          <TabsTrigger value="tipoinventario">Tipo de Inventario</TabsTrigger>
+
 
         </TabsList>
 
@@ -70,8 +73,15 @@ export default function ConfiguracionPage() {
             </CardContent>
           </Card>
         </TabsContent>
-
+<TabsContent value="tipoinventario">
+          <Card>
+            <CardContent className="pt-6">
+              <TipoInventarioTab />
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
 
     </div>
   );
