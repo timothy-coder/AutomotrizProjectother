@@ -199,7 +199,7 @@ export default function CitasPage() {
 
     function openMenu(day, hour, e) {
         e.stopPropagation();
-        setMenuCell({ day, hour });
+        setMenuCell({ day: format(day, "yyyy-MM-dd"), hour });
     }
 
     function openCita(c) {
