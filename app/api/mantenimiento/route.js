@@ -9,7 +9,7 @@ export async function POST(req) {
   const { name,description, is_active } = await req.json();
 
   await db.query(
-    "INSERT INTO mantenimiento (name,description, is_active) VALUES (?,?)",
+    "INSERT INTO mantenimiento (name,description, is_active) VALUES (?,?,?)",
     [name,description, is_active]
   );
 

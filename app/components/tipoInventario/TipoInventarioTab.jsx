@@ -2,27 +2,50 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from "@/components/ui/tabs";
+import { Plus, Pencil, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem
+} from "@/components/ui/select";
 
-import { Plus, Pencil, Trash2, Info } from "lucide-react";
-
-import TipoInventarioDialog from "./TipoInventarioDialog";
+import { useAuth } from "@/context/AuthContext";
+import { hasPermission } from "@/lib/permissions";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function TipoInventarioTab() {
-  const [tab, setTab] = useState("lista");
+  const { permissions } = useAuth();
+
+  const permView = hasPermission(permissions, "configuracion", "view");
+  const permCreate = hasPermission(permissions, "configuracion", "create");
+  const permEdit = hasPermission(permissions, "configuracion", "edit");
+  const permDelete = hasPermission(permissions, "configuracion", "delete");
 
   const [tipos, setTipos] = useState([]);
-  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState("lista");
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [editItem, setEditItem] = useState(null);
+
+  const [form, setForm] = useState({
+    nombre: "",
+    description: "",
+    is_active: true
+  });
 
   async function loadTipos() {
     const res = await fetch("/api/tipo-inventario");
@@ -34,72 +57,106 @@ export default function TipoInventarioTab() {
     loadTipos();
   }, []);
 
-  function nuevo() {
+  if (!permView) return <p>Sin permiso</p>;
+
+  function openDialog() {
     setEditItem(null);
-    setOpen(true);
+    setForm({ nombre: "", description: "", is_active: true });
+    setDialogOpen(true);
   }
 
-  function editar(item) {
+  function editTipo(item) {
     setEditItem(item);
-    setOpen(true);
+    setForm({
+      nombre: item.nombre,
+      description: item.description,
+      is_active: item.is_active === 1
+    });
+    setDialogOpen(true);
   }
 
-  async function eliminar(id) {
-    if (!confirm("¿Eliminar este tipo?")) return;
+  async function save() {
+    if (!form.nombre.trim()) {
+      toast.warning("Ingrese nombre");
+      return;
+    }
 
-    const res = await fetch(`/api/tipo-inventario/${id}`, {
-      method: "DELETE",
-    });
-
-    if (res.ok) {
-      toast.success("Eliminado");
+    try {
+      if (editItem) {
+        await fetch(`/api/tipo-inventario/${editItem.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form)
+        });
+        toast.success("Tipo actualizado");
+      } else {
+        await fetch("/api/tipo-inventario", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form)
+        });
+        toast.success("Tipo creado");
+      }
       loadTipos();
-    } else {
-      toast.error("Error al eliminar");
+      setDialogOpen(false);
+    } catch {
+      toast.error("Error guardando");
+    }
+  }
+
+  async function deleteTipo(id) {
+    if (confirm("¿Eliminar este tipo de inventario?")) {
+      try {
+        await fetch(`/api/tipo-inventario/${id}`, { method: "DELETE" });
+        toast.success("Tipo eliminado");
+        loadTipos();
+      } catch {
+        toast.error("Error eliminando");
+      }
     }
   }
 
   return (
     <div className="space-y-4">
-
-      <Tabs value={tab} onValueChange={setTab}>
-
         <div className="flex justify-between items-center">
-          <TabsList>
-            <TabsTrigger value="lista">Tipos</TabsTrigger>
-            <TabsTrigger value="info">Información</TabsTrigger>
-          </TabsList>
+          
 
-          <Button size="sm" onClick={nuevo}>
-            <Plus className="w-4 h-4 mr-1" />
-            Nuevo
-          </Button>
+          {permCreate && (
+            <Button size="sm" onClick={openDialog}>
+              <Plus className="w-4 h-4 mr-1" />
+              Nuevo
+            </Button>
+          )}
         </div>
 
-        {/* LISTA */}
-        <TabsContent value="lista">
           <Card>
             <CardContent className="p-0">
-
               {tipos.map((t) => (
                 <div
                   key={t.id}
                   className="flex justify-between items-center border-b px-4 py-3 hover:bg-muted/40"
                 >
                   <span className="font-medium">{t.nombre}</span>
-
                   <div className="flex gap-2">
-                    <Button size="icon" variant="ghost" onClick={() => editar(t)}>
-                      <Pencil size={18} />
-                    </Button>
+                    {permEdit && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => editTipo(t)}
+                      >
+                        <Pencil size={18} />
+                      </Button>
+                    )}
 
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => eliminar(t.id)}
-                    >
-                      <Trash2 size={18} className="text-red-500" />
-                    </Button>
+                    {permDelete && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => deleteTipo(t.id)}
+                      >
+                        <Trash2 size={18} className="text-red-500" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -109,43 +166,37 @@ export default function TipoInventarioTab() {
                   No hay tipos registrados.
                 </p>
               )}
-
             </CardContent>
           </Card>
-        </TabsContent>
 
-        {/* INFO */}
-        <TabsContent value="info">
-          <Card>
-            <CardContent className="p-5 space-y-3">
-              <div className="flex items-center gap-2 font-semibold">
-                <Info size={18} />
-                Clasificación de inventario
-              </div>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editItem ? "Editar Tipo" : "Nuevo Tipo"}</DialogTitle>
+          </DialogHeader>
 
-              <p className="text-sm text-muted-foreground">
-                Los tipos permiten organizar los artículos del inventario.
-              </p>
+          <div className="space-y-4">
+            <div>
+              <Label>Nombre</Label>
+              <Input
+                value={form.nombre}
+                onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+              />
+            </div>
 
-              <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
-                <li>Repuestos</li>
-                <li>Herramientas</li>
-                <li>Lubricantes</li>
-                <li>Consumibles</li>
-                <li>Equipos</li>
-              </ul>
-            </CardContent>
-          </Card>
-        </TabsContent>
+          </div>
 
-      </Tabs>
-
-      <TipoInventarioDialog
-        open={open}
-        onOpenChange={setOpen}
-        item={editItem}
-        onSaved={loadTipos}
-      />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={save}>Guardar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

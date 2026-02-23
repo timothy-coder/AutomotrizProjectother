@@ -22,7 +22,7 @@ export default function ConfiguracionPage() {
 
       <Tabs defaultValue="centros">
 
-        <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full">
+        <TabsList className="grid grid-cols-2 md:grid-cols-6 w-full">
 
           <TabsTrigger value="centros">Centros</TabsTrigger>
           <TabsTrigger value="talleres">Talleres / Mostradores</TabsTrigger>
