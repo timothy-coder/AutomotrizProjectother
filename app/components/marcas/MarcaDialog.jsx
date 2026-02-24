@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react";
 
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 
 import { Input } from "@/components/ui/input";
@@ -68,10 +73,19 @@ export default function MarcaDialog({ open, onOpenChange, mode, marca, onSave })
     }
   }
 
-  function save() {
+  function handleSubmit(e) {
+    e.preventDefault();
+    e.stopPropagation();
     if (isView) return;
-    onSave?.(form);
+
+    onSave?.({
+      ...form,
+      name: (form.name || "").trim(),
+      image_url: (form.image_url || "").trim() || null,
+    });
   }
+
+  const canSave = !isView && (form.name || "").trim().length > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -85,73 +99,89 @@ export default function MarcaDialog({ open, onOpenChange, mode, marca, onSave })
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 mt-2">
-          <div>
-            <Label>Nombre</Label>
-            <Input
-              disabled={isView}
-              value={form.name || ""}
-              onChange={(e) => update("name", e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Imagen (upload o URL)</Label>
-
-            <div className="flex flex-col md:flex-row gap-3 min-w-0">
-              <div className="flex-1">
-                <Input
-                  disabled={isView}
-                  value={form.image_url || ""}
-                  onChange={(e) => {
-                    update("image_url", e.target.value);
-                    setPreview(e.target.value);
-                  }}
-                  className="w-full truncate"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Puedes pegar una URL o subir un archivo.
-                </p>
-              </div>
-
-              <div className="w-full md:w-40">
-                <Input
-                  disabled={isView}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleFileUpload(e.target.files?.[0])}
-                />
-                {uploading && (
-                  <p className="text-xs text-muted-foreground mt-1">Subiendo...</p>
-                )}
-              </div>
+        {/* ✅ Enter = Guardar */}
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4 mt-2">
+            <div>
+              <Label>Nombre</Label>
+              <Input
+                disabled={isView}
+                value={form.name || ""}
+                onChange={(e) => update("name", e.target.value)}
+              />
             </div>
 
-            <div className="flex items-center gap-3">
-              {preview ? (
-                <img
-                  src={preview}
-                  alt="preview"
-                  className="h-14 w-14 rounded-md object-cover border"
-                />
-              ) : (
-                <div className="h-14 w-14 rounded-md border grid place-items-center text-xs text-muted-foreground">
-                  N/A
+            <div className="space-y-2">
+              <Label>Imagen (upload o URL)</Label>
+
+              <div className="flex flex-col md:flex-row gap-3 min-w-0">
+                <div className="flex-1">
+                  <Input
+                    disabled={isView}
+                    value={form.image_url || ""}
+                    onChange={(e) => {
+                      update("image_url", e.target.value);
+                      setPreview(e.target.value);
+                    }}
+                    className="w-full truncate"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Puedes pegar una URL o subir un archivo.
+                  </p>
                 </div>
-              )}
-              <div className="text-xs text-muted-foreground max-w-full overflow-hidden whitespace-nowrap text-ellipsis">
-                {form.image_url || "Sin URL"}
+
+                <div className="w-full md:w-40">
+                  <Input
+                    disabled={isView}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileUpload(e.target.files?.[0])}
+                  />
+                  {uploading && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Subiendo...
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {preview ? (
+                  <img
+                    src={preview}
+                    alt="preview"
+                    className="h-14 w-14 rounded-md object-cover border"
+                  />
+                ) : (
+                  <div className="h-14 w-14 rounded-md border grid place-items-center text-xs text-muted-foreground">
+                    N/A
+                  </div>
+                )}
+
+                <div className="text-xs text-muted-foreground max-w-full overflow-hidden whitespace-nowrap text-ellipsis">
+                  {form.image_url || "Sin URL"}
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {isView ? "Cerrar" : "Cancelar"}
-          </Button>
-          {!isView && <Button onClick={save}>Guardar</Button>}
-        </DialogFooter>
+          <DialogFooter className="mt-6">
+            {/* ✅ importante: NO submit */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              {isView ? "Cerrar" : "Cancelar"}
+            </Button>
+
+            {!isView && (
+              <Button type="submit" disabled={!canSave}>
+                Guardar
+              </Button>
+            )}
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

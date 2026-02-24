@@ -311,49 +311,91 @@ export default function ComboMantenimientoPage() {
       </div>
 
       {/* FORM DIALOG */}
-      <Dialog open={dialog.open} onOpenChange={v => setDialog(p => ({ ...p, open: v }))}>
+      {/* FORM DIALOG */}
+      <Dialog open={dialog.open} onOpenChange={(v) => setDialog((p) => ({ ...p, open: v }))}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Guardar</DialogTitle>
+            <DialogTitle>
+              {dialog.mode === "create-mant"
+                ? "Nuevo mantenimiento"
+                : dialog.mode === "edit-mant"
+                  ? "Editar mantenimiento"
+                  : dialog.mode === "create-sub"
+                    ? "Nuevo submantenimiento"
+                    : "Editar submantenimiento"}
+            </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-3">
-            <div>
-              <Label>Nombre</Label>
-              <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
-            </div>
-
-            {dialog.mode?.includes("sub") && (
+          {/* ✅ Enter = Guardar */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              save();
+            }}
+          >
+            <div className="space-y-3">
               <div>
-                <Label>Mantenimiento</Label>
-                <Select value={String(form.type_id || "")} onValueChange={v => setForm(p => ({ ...p, type_id: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Seleccione" /></SelectTrigger>
-                  <SelectContent>
-                    {mantenimientos.map(m => (
-                      <SelectItem key={m.id} value={String(m.id)}>{m.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Nombre</Label>
+                <Input
+                  value={form.name}
+                  onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                />
               </div>
-            )}
 
-            <div>
-              <Label>Descripción</Label>
-              <Input value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} />
+              {dialog.mode?.includes("sub") && (
+                <div>
+                  <Label>Mantenimiento</Label>
+                  <Select
+                    value={String(form.type_id || "")}
+                    onValueChange={(v) => setForm((p) => ({ ...p, type_id: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {mantenimientos.map((m) => (
+                        <SelectItem key={m.id} value={String(m.id)}>
+                          {m.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div>
+                <Label>Descripción</Label>
+                <Input
+                  value={form.description}
+                  onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+                />
+              </div>
+
+              <div className="flex gap-2 items-center">
+                <Switch
+                  checked={form.is_active}
+                  onCheckedChange={(v) => setForm((p) => ({ ...p, is_active: v }))}
+                />
+                <Label>Activo</Label>
+              </div>
             </div>
 
-            <div className="flex gap-2 items-center">
-              <Switch checked={form.is_active} onCheckedChange={v => setForm(p => ({ ...p, is_active: v }))} />
-              <Label>Activo</Label>
-            </div>
-          </div>
+            <DialogFooter className="mt-6">
+              {/* ✅ importante: type="button" para que NO submit */}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDialog({ open: false, mode: "create-sub", item: null })}
+              >
+                Cancelar
+              </Button>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialog({ open: false, mode: "create-sub", item: null })}>
-              Cancelar
-            </Button>
-            <Button onClick={save}>Guardar</Button>
-          </DialogFooter>
+              <Button type="submit">
+                Guardar
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 

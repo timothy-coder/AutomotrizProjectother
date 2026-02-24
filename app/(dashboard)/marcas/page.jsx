@@ -14,7 +14,12 @@ import MarcasTable from "@/app/components/marcas/MarcasTable";
 import MarcaDialog from "@/app/components/marcas/MarcaDialog";
 import ModeloDialog from "@/app/components/marcas/ModeloDialog";
 import ConfirmDeleteDialog from "@/app/components/marcas/ConfirmDeleteDialog";
-import { Plus,Eye, Pencil, Trash2 } from "lucide-react";
+
+
+
+import { Plus } from "lucide-react";
+import ClasesSheet from "@/app/components/marcas/ClasesSheet";
+
 export default function MarcasPage() {
   useRequirePerm("marcas", "view");
 
@@ -30,18 +35,24 @@ export default function MarcasPage() {
 
   const [marcas, setMarcas] = useState([]);
   const [modelos, setModelos] = useState([]);
+  const [clases, setClases] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // dialogs
+  // dialogs marca
   const [marcaOpen, setMarcaOpen] = useState(false);
   const [marcaMode, setMarcaMode] = useState("create"); // create | edit | view
   const [marcaSelected, setMarcaSelected] = useState(null);
 
+  // dialogs modelo
   const [modeloOpen, setModeloOpen] = useState(false);
   const [modeloMode, setModeloMode] = useState("create"); // create | edit
   const [modeloSelected, setModeloSelected] = useState(null);
   const [modeloDefaultMarcaId, setModeloDefaultMarcaId] = useState(null);
 
+  // sheet clases
+  const [clasesSheetOpen, setClasesSheetOpen] = useState(false);
+
+  // delete confirm
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteKind, setDeleteKind] = useState("marca"); // marca | modelo
   const [deleteItem, setDeleteItem] = useState(null);
@@ -49,16 +60,24 @@ export default function MarcasPage() {
   async function loadAll() {
     try {
       setLoading(true);
-      const [rMarcas, rModelos] = await Promise.all([
+
+      const [rMarcas, rModelos, rClases] = await Promise.all([
         fetch("/api/marcas", { cache: "no-store" }),
         fetch("/api/modelos", { cache: "no-store" }),
+        fetch("/api/clases", { cache: "no-store" }),
       ]);
-      const [dMarcas, dModelos] = await Promise.all([rMarcas.json(), rModelos.json()]);
+
+      const [dMarcas, dModelos, dClases] = await Promise.all([
+        rMarcas.json(),
+        rModelos.json(),
+        rClases.json(),
+      ]);
 
       setMarcas(Array.isArray(dMarcas) ? dMarcas : []);
       setModelos(Array.isArray(dModelos) ? dModelos : []);
+      setClases(Array.isArray(dClases) ? dClases : []);
     } catch (e) {
-      toast.error("Error cargando marcas/modelos");
+      toast.error("Error cargando marcas/modelos/clases");
     } finally {
       setLoading(false);
     }
@@ -75,8 +94,7 @@ export default function MarcasPage() {
       if (!map.has(mid)) map.set(mid, []);
       map.get(mid).push(m);
     }
-    // ordenar dentro
-    for (const [k, list] of map.entries()) {
+    for (const [, list] of map.entries()) {
       list.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
     }
     return map;
@@ -160,6 +178,8 @@ export default function MarcasPage() {
         body: JSON.stringify({
           name: payload.name,
           marca_id: payload.marca_id,
+          clase_id: payload.clase_id ?? null,
+          anios: payload.anios ?? null,
         }),
       });
 
@@ -204,7 +224,6 @@ export default function MarcasPage() {
 
   return (
     <div className="space-y-5">
-
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Marcas & Modelos</h1>
@@ -218,9 +237,17 @@ export default function MarcasPage() {
             Recargar
           </Button>
 
+          <Button
+            variant="secondary"
+            onClick={() => setClasesSheetOpen(true)}
+            disabled={loading}
+          >
+            Clases
+          </Button>
+
           {permCreate && (
             <Button onClick={onNewMarca} disabled={loading}>
-              <Plus size={16} />Nueva marca
+              <Plus size={16} /> Nueva marca
             </Button>
           )}
         </div>
@@ -265,6 +292,7 @@ export default function MarcasPage() {
         mode={modeloMode}
         modelo={modeloSelected}
         marcas={marcas}
+        clases={clases}
         defaultMarcaId={modeloDefaultMarcaId}
         onSave={saveModelo}
       />
@@ -279,6 +307,13 @@ export default function MarcasPage() {
             : `¿Seguro que deseas eliminar el modelo "${deleteItem?.name}"?`
         }
         onConfirm={confirmDelete}
+      />
+
+      <ClasesSheet
+        open={clasesSheetOpen}
+        onOpenChange={setClasesSheetOpen}
+        canEdit={true}
+        canDelete={true}
       />
     </div>
   );

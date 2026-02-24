@@ -62,85 +62,81 @@ export default function EtapaDialog({
     setForm((f) => ({ ...f, [field]: value }));
   }
 
-  function handleSave() {
-    if (!isView) onSave(form);
+  function handleSubmit(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isView) onSave?.(form);
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-
         <DialogHeader>
           <DialogTitle>
-            {isView
-              ? "Ver etapa"
-              : isEdit
-              ? "Editar etapa"
-              : "Nueva etapa"}
+            {isView ? "Ver etapa" : isEdit ? "Editar etapa" : "Nueva etapa"}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 mt-4">
+        {/* ✅ form controla submit y evita guardado automático */}
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4 mt-4">
+            {/* NOMBRE */}
+            <div>
+              <Label>Nombre</Label>
+              <Input
+                disabled={isView}
+                value={form.nombre || ""}
+                onChange={(e) => update("nombre", e.target.value)}
+              />
+            </div>
 
-          {/* NOMBRE */}
-          <div>
-            <Label>Nombre</Label>
-            <Input
-              disabled={isView}
-              value={form.nombre || ""}
-              onChange={(e) => update("nombre", e.target.value)}
-            />
+            {/* DESCRIPCIÓN */}
+            <div>
+              <Label>Descripción</Label>
+              <Input
+                disabled={isView}
+                value={form.descripcion || ""}
+                onChange={(e) => update("descripcion", e.target.value)}
+              />
+            </div>
+
+            {/* TIPO */}
+            <div>
+              <Label>Tipo</Label>
+              <Select
+                disabled={isView}
+                value={String(form.tipo)}
+                onValueChange={(v) => update("tipo", Number(v))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar tipo" />
+                </SelectTrigger>
+
+                <SelectContent>
+                  <SelectItem value="1">Planchado y Pintura</SelectItem>
+                  <SelectItem value="2">Taller</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          {/* DESCRIPCIÓN */}
-          <div>
-            <Label>Descripción</Label>
-            <Input
-              disabled={isView}
-              value={form.descripcion || ""}
-              onChange={(e) => update("descripcion", e.target.value)}
-            />
-          </div>
-
-          {/* TIPO */}
-          <div>
-            <Label>Tipo</Label>
-
-            <Select
-              disabled={isView}
-              value={String(form.tipo)}
-              onValueChange={(v) => update("tipo", Number(v))}
+          <DialogFooter className="mt-6">
+            {/* ✅ importante: type="button" para que NO dispare submit */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar tipo" />
-              </SelectTrigger>
-
-              <SelectContent>
-                <SelectItem value="1">
-                  Planchado y Pintura
-                </SelectItem>
-
-                <SelectItem value="2">
-                  Taller
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {isView ? "Cerrar" : "Cancelar"}
-          </Button>
-
-          {!isView && (
-            <Button onClick={handleSave}>
-              Guardar
+              {isView ? "Cerrar" : "Cancelar"}
             </Button>
-          )}
-        </DialogFooter>
 
+            {!isView && (
+              <Button type="submit">
+                Guardar
+              </Button>
+            )}
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
