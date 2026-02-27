@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
+// ✅ GET: trae todo (para matriz / tabla)
 export async function GET() {
   try {
     const [rows] = await db.query(`
-      SELECT carrosparamantenimiento_id, submantenimiento_id, precio
+      SELECT 
+        id,
+        mantenimiento_id,
+        submantenimiento_id,
+        marca_id,
+        modelo_id,
+        precio
       FROM precios
     `);
 
@@ -15,11 +22,18 @@ export async function GET() {
   }
 }
 
+// ✅ POST: upsert por UNIQUE (mantenimiento_id, submantenimiento_id, marca_id, modelo_id)
 export async function POST(req) {
   try {
-    const { carrosparamantenimiento_id, submantenimiento_id, precio } = await req.json();
+    const {
+      mantenimiento_id,
+      submantenimiento_id,
+      marca_id,
+      modelo_id,
+      precio
+    } = await req.json();
 
-    if (!carrosparamantenimiento_id || !submantenimiento_id) {
+    if (!mantenimiento_id || !submantenimiento_id || !marca_id || !modelo_id) {
       return NextResponse.json({ message: "IDs requeridos" }, { status: 400 });
     }
 
@@ -27,11 +41,11 @@ export async function POST(req) {
 
     await db.query(
       `
-      INSERT INTO precios (carrosparamantenimiento_id, submantenimiento_id, precio)
-      VALUES (?,?,?)
+      INSERT INTO precios (mantenimiento_id, submantenimiento_id, marca_id, modelo_id, precio)
+      VALUES (?,?,?,?,?)
       ON DUPLICATE KEY UPDATE precio = VALUES(precio)
       `,
-      [carrosparamantenimiento_id, submantenimiento_id, p]
+      [mantenimiento_id, submantenimiento_id, marca_id, modelo_id, p]
     );
 
     return NextResponse.json({ ok: true });

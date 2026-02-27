@@ -268,6 +268,7 @@ export default function MarcasPage() {
             canCreateModelo={permCreateModel}
             canEditModelo={permEditModel}
             canDeleteModelo={permDeleteModel}
+            clases={clases}
             onViewMarca={onViewMarca}
             onEditMarca={onEditMarca}
             onDeleteMarca={askDeleteMarca}

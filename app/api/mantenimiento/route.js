@@ -6,11 +6,11 @@ export async function GET() {
 }
 
 export async function POST(req) {
-  const { name,description, is_active } = await req.json();
+  const { name, description, is_active, mantenimiento_id } = await req.json();
 
   await db.query(
-    "INSERT INTO mantenimiento (name,description, is_active) VALUES (?,?,?)",
-    [name,description, is_active]
+    "INSERT INTO mantenimiento (name, description, is_active, mantenimiento_id) VALUES (?, ?, ?, ?)",
+    [name, description, is_active, mantenimiento_id]
   );
 
   return Response.json({ ok: true });

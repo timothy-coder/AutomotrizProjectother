@@ -158,9 +158,6 @@ export default function MarcaDialog({ open, onOpenChange, mode, marca, onSave })
                   </div>
                 )}
 
-                <div className="text-xs text-muted-foreground max-w-full overflow-hidden whitespace-nowrap text-ellipsis">
-                  {form.image_url || "Sin URL"}
-                </div>
               </div>
             </div>
           </div>

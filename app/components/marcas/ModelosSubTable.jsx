@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Plus,Eye, Pencil, Trash2 } from "lucide-react";
+import { Plus, Eye, Pencil, Trash2 } from "lucide-react";
 export default function ModelosSubTable({
   marca,
   modelos = [],
@@ -26,6 +26,7 @@ export default function ModelosSubTable({
             <thead className="bg-muted">
               <tr>
                 <th className="p-2 text-left">Nombre</th>
+                <th className="p-2 text-left">Clase</th>
                 <th className="p-2 text-right">Acciones</th>
               </tr>
             </thead>
@@ -34,6 +35,7 @@ export default function ModelosSubTable({
               {modelos.map((modelo) => (
                 <tr key={modelo.id} className="border-t">
                   <td className="p-2">{modelo.name}</td>
+                  <td className="p-2">{modelo.clase_nombre}</td>
 
                   <td className="p-2 text-right space-x-2">
                     {canEdit && (

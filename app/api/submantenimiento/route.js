@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 
 // GET - Obtener los registros de submantenimiento
 export async function GET() {
-  const [rows] = await db.query("SELECT * FROM submantenimiento ORDER BY name");
+  const [rows] = await db.query("SELECT * FROM submantenimiento ORDER BY created_at");
   return Response.json(rows);
 }
 

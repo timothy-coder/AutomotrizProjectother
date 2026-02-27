@@ -3,26 +3,29 @@ import { db } from "@/lib/db";
 
 export async function POST(req) {
   try {
-    const { submantenimiento_id, precio } = await req.json();
+    const {
+      mantenimiento_id,
+      submantenimiento_id,
+      marca_id,
+      modelo_id,
+      precio
+    } = await req.json();
 
-    const [autos] = await db.query(`
-      SELECT id FROM carrosparamantenimiento
-    `);
-
-    for (const auto of autos) {
-      await db.query(`
-        INSERT INTO precios
-        (carrosparamantenimiento_id, submantenimiento_id, precio)
-        VALUES (?,?,?)
-        ON DUPLICATE KEY UPDATE
-        precio = VALUES(precio)
-      `, [auto.id, submantenimiento_id, precio]);
+    if (!mantenimiento_id || !submantenimiento_id || !marca_id || !modelo_id) {
+      return NextResponse.json({ message: "IDs requeridos" }, { status: 400 });
     }
 
-    return NextResponse.json({ message: "Columna actualizada" });
+    const p = precio === "" || precio == null ? null : Number(precio);
 
-  } catch (error) {
-    console.log(error);
-    return NextResponse.json({ message: "Error" }, { status: 500 });
+    await db.query(`
+      INSERT INTO precios (mantenimiento_id, submantenimiento_id, marca_id, modelo_id, precio)
+      VALUES (?,?,?,?,?)
+      ON DUPLICATE KEY UPDATE precio = VALUES(precio)
+    `, [mantenimiento_id, submantenimiento_id, marca_id, modelo_id, p]);
+
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.log(e);
+    return NextResponse.json({ message: "Error al guardar" }, { status: 500 });
   }
 }
