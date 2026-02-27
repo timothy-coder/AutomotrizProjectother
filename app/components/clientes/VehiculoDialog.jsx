@@ -41,7 +41,8 @@ export default function VehiculoDialog({
     modelo_id: "",
     anio: "",
     color: "",
-    kilometraje: ""
+    kilometraje: "",
+    fecha_ultima_visita: ""
   });
 
   const [marcas, setMarcas] = useState([]);
@@ -86,7 +87,8 @@ export default function VehiculoDialog({
         modelo_id: vehiculo.modelo_id ? String(vehiculo.modelo_id) : "",
         anio: vehiculo.anio || "",
         color: vehiculo.color || "",
-        kilometraje: vehiculo.kilometraje || ""
+        kilometraje: vehiculo.kilometraje || "",
+        fecha_ultima_visita: vehiculo.fecha_ultima_visita || ""
       });
 
     } else {
@@ -98,7 +100,8 @@ export default function VehiculoDialog({
         modelo_id: "",
         anio: "",
         color: "",
-        kilometraje: ""
+        kilometraje: "",
+        fecha_ultima_visita: ""
       });
     }
 
@@ -125,7 +128,8 @@ export default function VehiculoDialog({
       modelo_id: form.modelo_id ? Number(form.modelo_id) : null,
       anio: form.anio ? Number(form.anio) : null,
       color: form.color?.trim() || null,
-      kilometraje: form.kilometraje ? Number(form.kilometraje) : null
+      kilometraje: form.kilometraje ? Number(form.kilometraje) : null,
+      fecha_ultima_visita: form.fecha_ultima_visita?.trim() || null
     });
   }
 
@@ -214,6 +218,15 @@ export default function VehiculoDialog({
             value={form.kilometraje}
             onChange={e => update("kilometraje", e.target.value)}
           />
+
+          <div className="space-y-1">
+            <label className="text-sm text-muted-foreground">Fecha de última visita al taller</label>
+            <Input
+              type="date"
+              value={form.fecha_ultima_visita}
+              onChange={e => update("fecha_ultima_visita", e.target.value)}
+            />
+          </div>
 
         </div>
 

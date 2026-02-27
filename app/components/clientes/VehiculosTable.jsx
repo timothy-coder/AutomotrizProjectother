@@ -53,6 +53,11 @@ export default function VehiculosTable({
                     VIN: {v.vin}
                   </div>
                 ) : null}
+                {v.fecha_ultima_visita ? (
+                  <div className="text-xs text-muted-foreground truncate">
+                    Última visita: {new Date(v.fecha_ultima_visita).toLocaleDateString('es-ES')}
+                  </div>
+                ) : null}
               </div>
 
               <div className="flex gap-2 justify-end">

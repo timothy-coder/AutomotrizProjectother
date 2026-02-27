@@ -57,6 +57,7 @@ export async function POST(req) {
     const anio = body.anio == null || body.anio === "" ? null : Number(body.anio);
     const color = (body.color || "").trim();
     const kilometraje = body.kilometraje == null || body.kilometraje === "" ? null : Number(body.kilometraje);
+    const fecha_ultima_visita = (body.fecha_ultima_visita || "").trim() || null;
 
     if (!placas && !vin) {
       return NextResponse.json({ message: "Ingrese placas o VIN" }, { status: 400 });
@@ -66,8 +67,8 @@ export async function POST(req) {
       `
       INSERT INTO vehiculos(
         cliente_id, placas, vin, marca_id, modelo_id,
-        anio, color, kilometraje, created_at
-      ) VALUES (?,?,?,?,?,?,?,?, CURRENT_DATE)
+        anio, color, kilometraje, fecha_ultima_visita, created_at
+      ) VALUES (?,?,?,?,?,?,?,?,?, CURRENT_DATE)
       `,
       [
         cliente_id,
@@ -78,6 +79,7 @@ export async function POST(req) {
         Number.isFinite(anio) ? anio : null,
         color || null,
         Number.isFinite(kilometraje) ? kilometraje : null,
+        fecha_ultima_visita,
       ]
     );
 

@@ -44,6 +44,7 @@ export async function PUT(req, context) {
     const anio = body.anio || null;
     const color = body.color?.trim() || null;
     const kilometraje = body.kilometraje || null;
+    const fecha_ultima_visita = body.fecha_ultima_visita?.trim() || null;
 
     const [result] = await db.query(
       `UPDATE vehiculos SET
@@ -53,7 +54,8 @@ export async function PUT(req, context) {
         modelo_id=?,
         anio=?,
         color=?,
-        kilometraje=?
+        kilometraje=?,
+        fecha_ultima_visita=?
        WHERE id=?`,
       [
         placas,
@@ -63,6 +65,7 @@ export async function PUT(req, context) {
         anio,
         color,
         kilometraje,
+        fecha_ultima_visita,
         vehicleId,
       ]
     );
