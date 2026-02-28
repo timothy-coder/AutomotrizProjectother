@@ -32,7 +32,7 @@ export default function ProductDialog({
     precio_venta: "",
   });
 
-  const [addStock, setAddStock] = useState("");
+  const [stockTotal, setStockTotal] = useState("");
 
   useEffect(() => {
 
@@ -46,6 +46,7 @@ export default function ProductDialog({
         precio_compra: product.precio_compra ?? "",
         precio_venta: product.precio_venta ?? "",
       });
+      setStockTotal(String(product.stock_total ?? ""));
     } else {
       setForm({
         numero_parte: "",
@@ -54,9 +55,8 @@ export default function ProductDialog({
         precio_compra: "",
         precio_venta: "",
       });
+      setStockTotal("");
     }
-
-    setAddStock("");
 
   }, [open, product]);
 
@@ -64,13 +64,13 @@ export default function ProductDialog({
     setForm((p) => ({ ...p, [k]: v }));
   }
 
-  async function handleAddStock() {
+  async function handleUpdateStock() {
 
     if (!product?.id) return;
 
-    const qty = Number(addStock);
+    const qty = Number(stockTotal);
 
-    if (!qty || qty <= 0) {
+    if (!Number.isFinite(qty) || qty < 0) {
       return toast.warning("Cantidad inválida");
     }
 
@@ -79,7 +79,7 @@ export default function ProductDialog({
       const r = await fetch(`/api/productos/${product.id}/add-stock`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cantidad: qty })
+        body: JSON.stringify({ stock_total: qty })
       });
 
       const data = await r.json();
@@ -88,9 +88,7 @@ export default function ProductDialog({
         return toast.error(data.message || "Error");
       }
 
-      toast.success("Stock agregado");
-
-      setAddStock("");
+      toast.success("Stock actualizado");
 
       onRefresh?.();
 
@@ -192,17 +190,17 @@ export default function ProductDialog({
                 <div className="mt-3 flex gap-2 items-end">
 
                   <div className="flex-1">
-                    <Label>Agregar stock</Label>
+                    <Label>Stock total</Label>
                     <Input
                       type="number"
-                      value={addStock}
-                      onChange={(e) => setAddStock(e.target.value)}
-                      placeholder="Cantidad"
+                      value={stockTotal}
+                      onChange={(e) => setStockTotal(e.target.value)}
+                      placeholder="Cantidad total"
                     />
                   </div>
 
-                  <Button onClick={handleAddStock}>
-                    Agregar
+                  <Button onClick={handleUpdateStock}>
+                    Actualizar
                   </Button>
 
                 </div>
