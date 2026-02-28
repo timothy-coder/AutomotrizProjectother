@@ -55,11 +55,11 @@ export default function StockLocationDialog({
   useEffect(() => {
     if (!centroId) return;
 
-    fetch(`/api/talleres?centro_id=${centroId}`)
+    fetch(`/api/talleres/bycentro?centro_id=${centroId}`)
       .then(r => r.json())
       .then(setTalleres);
 
-    fetch(`/api/mostradores?centro_id=${centroId}`)
+    fetch(`/api/mostradores/bycentro?centro_id=${centroId}`)
       .then(r => r.json())
       .then(setMostradores);
 
@@ -95,9 +95,9 @@ export default function StockLocationDialog({
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            centro_id: centroId || null,
-            taller_id: tallerId || null,
-            mostrador_id: mostradorId || null,
+            centro_id: centroId ? Number(centroId) : null,
+            taller_id: tallerId ? Number(tallerId) : null,
+            mostrador_id: mostradorId ? Number(mostradorId) : null,
             stock: Number(stock)
           })
         });
@@ -109,9 +109,9 @@ export default function StockLocationDialog({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             producto_id: product.id,
-            centro_id: centroId || null,
-            taller_id: tallerId || null,
-            mostrador_id: mostradorId || null,
+            centro_id: centroId ? Number(centroId) : null,
+            taller_id: tallerId ? Number(tallerId) : null,
+            mostrador_id: mostradorId ? Number(mostradorId) : null,
             stock: Number(stock)
           })
         });

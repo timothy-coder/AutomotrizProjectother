@@ -9,7 +9,7 @@ export async function PUT(req, { params }) {
     const { id } = await params;
     const body = await req.json();
 
-    const { stock } = body;
+    const { centro_id, taller_id, mostrador_id, stock } = body;
 
     const [[row]] = await db.query(`
       SELECT producto_id FROM stock_parcial WHERE id=?
@@ -17,15 +17,16 @@ export async function PUT(req, { params }) {
 
     await db.query(`
       UPDATE stock_parcial
-      SET stock=?
+      SET centro_id=?, taller_id=?, mostrador_id=?, stock=?
       WHERE id=?
-    `, [stock, id]);
+    `, [centro_id || null, taller_id || null, mostrador_id || null, stock, id]);
 
     await recalcStock(row.producto_id);
 
     return NextResponse.json({ message: "Actualizado" });
 
-  } catch {
+  } catch (error) {
+    console.error("Error actualizando ubicación:", error);
     return NextResponse.json({ message: "Error" }, { status: 500 });
   }
 }
