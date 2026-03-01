@@ -19,6 +19,7 @@ import ConfirmDeleteDialog from "@/app/components/marcas/ConfirmDeleteDialog";
 
 import { Plus } from "lucide-react";
 import ClasesSheet from "@/app/components/marcas/ClasesSheet";
+import AlgoritmoVisitaSheet from "@/app/components/marcas/AlgoritmoVisitaSheet";
 
 export default function MarcasPage() {
   useRequirePerm("marcas", "view");
@@ -51,6 +52,7 @@ export default function MarcasPage() {
 
   // sheet clases
   const [clasesSheetOpen, setClasesSheetOpen] = useState(false);
+  const [algoritmoSheetOpen, setAlgoritmoSheetOpen] = useState(false);
 
   // delete confirm
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -236,15 +238,24 @@ export default function MarcasPage() {
           <Button variant="outline" onClick={loadAll} disabled={loading}>
             Recargar
           </Button>
-
-          <Button
-            variant="secondary"
-            onClick={() => setClasesSheetOpen(true)}
-            disabled={loading}
-          >
-            Clases
-          </Button>
-
+          {permCreate && (
+            <Button
+              variant="secondary"
+              onClick={() => setClasesSheetOpen(true)}
+              disabled={loading}
+            >
+              Clases
+            </Button>
+          )}
+          {permCreate && (
+            <Button
+              variant="secondary"
+              onClick={() => setAlgoritmoSheetOpen(true)}
+              disabled={loading}
+            >
+              F. de mantenimiento
+            </Button>
+          )}
           {permCreate && (
             <Button onClick={onNewMarca} disabled={loading}>
               <Plus size={16} /> Nueva marca
@@ -313,6 +324,13 @@ export default function MarcasPage() {
       <ClasesSheet
         open={clasesSheetOpen}
         onOpenChange={setClasesSheetOpen}
+        canEdit={true}
+        canDelete={true}
+      />
+
+      <AlgoritmoVisitaSheet
+        open={algoritmoSheetOpen}
+        onOpenChange={setAlgoritmoSheetOpen}
         canEdit={true}
         canDelete={true}
       />
