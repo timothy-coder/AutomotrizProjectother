@@ -88,7 +88,7 @@ export default function VehiculoDialog({
         anio: vehiculo.anio || "",
         color: vehiculo.color || "",
         kilometraje: vehiculo.kilometraje || "",
-        fecha_ultima_visita: vehiculo.fecha_ultima_visita || ""
+        fecha_ultima_visita: vehiculo.fecha_ultima_visita?.slice?.(0, 10) || ""
       });
 
     } else {
