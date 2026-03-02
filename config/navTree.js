@@ -1,6 +1,6 @@
 import {
   Users, Milestone, ListChecks, UserRound, Blinds, Boxes, Settings,
-  CalendarCheck, ClipboardList, Receipt, SquareDashedMousePointer, FileText,Home,CarFront,Columns2,Columns3,Coins,Calendar,MessageCircle
+  CalendarCheck, ClipboardList, Receipt, SquareDashedMousePointer, FileText, Home, CarFront, Columns2, Columns3, Coins, Calendar, MessageCircle
 } from "lucide-react";
 export const HOME_ITEM = { to: "/home", label: "Home", icon: Home, perm: ["home", "view"] };
 export const NAV_TREE = [
@@ -10,6 +10,7 @@ export const NAV_TREE = [
     items: [
       { to: "/usuarios", label: "Usuarios", icon: Users, perm: ["usuarios", "view"] },
       { to: "/etapas", label: "Etapas", icon: Milestone, perm: ["etapas", "view"] },
+      { to: "/etapasconversion", label: "Etapas de Conversion", icon: Milestone, perm: ["etapasconversion", "view"] },
       { to: "/tiposactividades", label: "Actividades", icon: ListChecks, perm: ["tiposactividades", "view"] },
       { to: "/clientes", label: "Clientes", icon: UserRound, perm: ["clientes", "view"] },
       { to: "/marcas", label: "Marcas", icon: Blinds, perm: ["marcas", "view"] },
@@ -17,7 +18,7 @@ export const NAV_TREE = [
       { to: "/combomantenimiento", label: "Mantenimiento", icon: Columns3, perm: ["combomantenimiento", "view"] },
       { to: "/precios", label: "Precios", icon: Coins, perm: ["precios", "view"] },
       { to: "/configuracion", label: "Configuración del sistema", icon: Settings, perm: ["configuracion", "view"] },
-      
+
     ],
   },
   {
@@ -25,10 +26,17 @@ export const NAV_TREE = [
     label: "Citas",
     items: [
       { to: "/citas", label: "Citas", icon: Calendar, perm: ["citas", "view"] },
-       { to: "/recepcion", label: "Recepción", icon: CalendarCheck, perm: ["recepcion", "view"] },
+      { to: "/recepcion", label: "Recepción", icon: CalendarCheck, perm: ["recepcion", "view"] },
     ],
   },
-   {
+  {
+    key: "agenda",
+    label: "Agenda",
+    items: [
+      { to: "/agenda", label: "Agenda", icon: Calendar, perm: ["agenda", "view"] },
+    ],
+  },
+  {
     key: "cotizacion",
     label: "Cotizacion",
     items: [{ to: "/cotizacion", label: "Cotizacion", icon: Receipt, perm: ["cotizacion", "view"] }],

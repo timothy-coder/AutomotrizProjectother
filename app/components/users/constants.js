@@ -11,6 +11,7 @@ export const SECTIONS = [
   
   { key: "usuarios", label: "Usuarios", actions: ["view", "create", "edit", "delete"] },
   { key: "etapas", label: "Etapas", actions: ["view", "create", "edit", "delete"] },
+  { key: "etapasconversion", label: "Etapas de Conversion", actions: ["view", "create", "edit", "delete"] },
   { key: "tiposactividades", label: "Actividades", actions: ["view", "create", "edit", "delete"] },
   { key: "clientes", label: "Clientes", actions: ["view", "create", "edit", "delete"] },
   { key: "marcas", label: "Marcas", actions: ["view", "create", "edit", "delete"] },
@@ -23,6 +24,8 @@ export const SECTIONS = [
   
   { key: "citas", label: "Citas", actions: ["view", "create", "edit", "viewall"] },
   { key: "recepcion", label: "Recepcion", actions: ["view", "create", "edit", "delete"] },
+
+  { key: "agenda", label: "Agenda", actions: ["view", "create", "edit", "viewall"] },
   { key: "picaje", label: "Picaje", actions: ["view", "create", "edit", "delete"] },
  
   { key: "mensajes", label: "Mensajes", actions: ["view", "create", "edit", "delete"] },
