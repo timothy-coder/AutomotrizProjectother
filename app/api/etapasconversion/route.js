@@ -23,66 +23,44 @@ export async function GET() {
 export async function POST(req) {
   try {
     const body = await req.json();
-
     const nombre = String(body?.nombre ?? "").trim();
     const descripcion =
-      body?.descripcion === null || body?.descripcion === undefined
+      body?.descripcion === undefined || body?.descripcion === null || String(body.descripcion).trim() === ""
         ? null
         : String(body.descripcion).trim();
 
-    const sort_order =
-      body?.sort_order === "" || body?.sort_order === undefined || body?.sort_order === null
-        ? null
-        : Number(body.sort_order);
-
-    const is_active =
-      body?.is_active === undefined || body?.is_active === null
-        ? 1
-        : Number(Boolean(body.is_active));
-
     const color =
-      body?.color === null || body?.color === undefined || String(body.color).trim() === ""
+      body?.color === undefined || body?.color === null || String(body.color).trim() === ""
         ? null
         : String(body.color).trim();
 
     if (!nombre) {
-      return NextResponse.json(
-        { message: "nombre es requerido" },
-        { status: 400 }
-      );
+      return NextResponse.json({ message: "nombre requerido" }, { status: 400 });
     }
 
-    if (color && !/^#[0-9A-Fa-f]{6}$/.test(color)) {
-      return NextResponse.json(
-        { message: "color debe ser HEX tipo #RRGGBB" },
-        { status: 400 }
-      );
-    }
+    // activo por defecto
+    const is_active = 1;
 
-    if (sort_order !== null && Number.isNaN(sort_order)) {
-      return NextResponse.json(
-        { message: "sort_order debe ser numérico o null" },
-        { status: 400 }
-      );
-    }
+    // al final: max(sort_order)+1 (si no hay, 1)
+    const [maxRows] = await db.query(
+      "SELECT COALESCE(MAX(sort_order), 0) AS maxOrder FROM etapasconversion"
+    );
+    const nextOrder = Number(maxRows?.[0]?.maxOrder ?? 0) + 1;
 
     const [result] = await db.query(
       `
-      INSERT INTO etapasconversion (nombre, descripcion, color, sort_order, is_active)
-      VALUES (?, ?, ?, ?, ?)
+        INSERT INTO etapasconversion (nombre, descripcion, color, sort_order, is_active)
+        VALUES (?, ?, ?, ?, ?)
       `,
-      [nombre, descripcion, color, sort_order, is_active]
+      [nombre, descripcion, color, nextOrder, is_active]
     );
 
     return NextResponse.json(
-      { id: result.insertId },
+      { id: result.insertId, sort_order: nextOrder, is_active },
       { status: 201 }
     );
   } catch (error) {
     console.log(error);
-    return NextResponse.json(
-      { message: "Error al crear etapa" },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: "Error al crear etapa" }, { status: 500 });
   }
 }

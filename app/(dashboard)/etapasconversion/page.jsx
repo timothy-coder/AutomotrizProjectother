@@ -129,7 +129,12 @@ function SortableRow({ item, onEdit, onDelete, onToggleActive }) {
           {Number(item.is_active) ? "Desactivar" : "Activar"}
         </Button>
 
-        <Button type="button" variant="outline" size="sm" onClick={() => onEdit(item)}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => onEdit(item)}
+        >
           <Pencil className="h-4 w-4 mr-2" />
           Editar
         </Button>
@@ -161,8 +166,6 @@ export default function EtapasConversionTab() {
     nombre: "",
     descripcion: "",
     color: "#3B82F6",
-    sort_order: "",
-    is_active: true,
   });
   const [saving, setSaving] = useState(false);
 
@@ -208,8 +211,6 @@ export default function EtapasConversionTab() {
       nombre: "",
       descripcion: "",
       color: "#3B82F6",
-      sort_order: "",
-      is_active: true,
     });
     setDialog({ open: true, mode: "create", data: null });
   }
@@ -219,8 +220,6 @@ export default function EtapasConversionTab() {
       nombre: item?.nombre ?? "",
       descripcion: item?.descripcion ?? "",
       color: item?.color ?? "#3B82F6",
-      sort_order: item?.sort_order ?? "",
-      is_active: Number(item?.is_active) ? true : false,
     });
     setDialog({ open: true, mode: "edit", data: item });
   }
@@ -239,16 +238,9 @@ export default function EtapasConversionTab() {
     const nombre = String(form.nombre ?? "").trim();
     const descripcion = String(form.descripcion ?? "").trim();
     const color = String(form.color ?? "").trim();
-    const is_active = form.is_active ? 1 : 0;
-
-    const sort_order =
-      form.sort_order === "" || form.sort_order === null || form.sort_order === undefined
-        ? null
-        : Number(form.sort_order);
 
     if (!nombre) return toast.error("nombre es requerido");
     if (!isHexColor(color)) return toast.error("color debe ser HEX (#RRGGBB)");
-    if (sort_order !== null && Number.isNaN(sort_order)) return toast.error("sort_order inválido");
 
     const isEdit = dialog.mode === "edit" && dialog.data?.id != null;
     const url = isEdit ? `/api/etapasconversion/${dialog.data.id}` : "/api/etapasconversion";
@@ -256,22 +248,45 @@ export default function EtapasConversionTab() {
 
     try {
       setSaving(true);
-      const r = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nombre,
-          descripcion: descripcion === "" ? null : descripcion,
-          color: color === "" ? null : color,
-          sort_order,
-          is_active,
-        }),
-      });
 
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) return toast.error(data?.message || "No se pudo guardar");
+      if (!isEdit) {
+        // CREATE: no mandamos sort_order ni is_active (API pone activo y al final)
+        const r = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nombre,
+            descripcion: descripcion === "" ? null : descripcion,
+            color: color === "" ? null : color,
+          }),
+        });
 
-      toast.success(isEdit ? "Etapa actualizada" : "Etapa creada");
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) return toast.error(data?.message || "No se pudo crear");
+
+        toast.success("Etapa creada");
+      } else {
+        // EDIT: conservar sort_order e is_active
+        const original = items.find((x) => Number(x.id) === Number(dialog.data.id));
+
+        const r = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nombre,
+            descripcion: descripcion === "" ? null : descripcion,
+            color: color === "" ? null : color,
+            sort_order: original?.sort_order ?? dialog.data.sort_order ?? null,
+            is_active: original?.is_active ?? dialog.data.is_active ?? 1,
+          }),
+        });
+
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) return toast.error(data?.message || "No se pudo actualizar");
+
+        toast.success("Etapa actualizada");
+      }
+
       setDialog({ open: false, mode: "create", data: null });
       await load();
     } catch (e) {
@@ -441,47 +456,21 @@ export default function EtapasConversionTab() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <div className="text-sm font-medium">Color</div>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="color"
-                    value={form.color || "#000000"}
-                    onChange={(e) => setForm((p) => ({ ...p, color: e.target.value }))}
-                    className="w-16 p-1"
-                  />
-                  <Input
-                    value={form.color}
-                    onChange={(e) => setForm((p) => ({ ...p, color: e.target.value }))}
-                    placeholder="#RRGGBB"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <div className="text-sm font-medium">Orden (opcional)</div>
+            <div className="space-y-1">
+              <div className="text-sm font-medium">Color</div>
+              <div className="flex items-center gap-2">
                 <Input
-                  type="number"
-                  value={form.sort_order}
-                  onChange={(e) => setForm((p) => ({ ...p, sort_order: e.target.value }))}
-                  min={1}
+                  type="color"
+                  value={form.color || "#000000"}
+                  onChange={(e) => setForm((p) => ({ ...p, color: e.target.value }))}
+                  className="w-16 p-1"
+                />
+                <Input
+                  value={form.color}
+                  onChange={(e) => setForm((p) => ({ ...p, color: e.target.value }))}
+                  placeholder="#RRGGBB"
                 />
               </div>
-            </div>
-
-            <div className="flex items-center justify-between border rounded-lg p-3">
-              <div className="text-sm">
-                <div className="font-medium">Activo</div>
-                <div className="text-xs text-muted-foreground">Activa o desactiva esta etapa</div>
-              </div>
-              <Button
-                type="button"
-                variant={form.is_active ? "default" : "outline"}
-                onClick={() => setForm((p) => ({ ...p, is_active: !p.is_active }))}
-              >
-                {form.is_active ? "Activo" : "Inactivo"}
-              </Button>
             </div>
           </div>
 

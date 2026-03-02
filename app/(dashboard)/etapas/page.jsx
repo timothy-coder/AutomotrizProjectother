@@ -4,23 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useRequirePerm } from "@/hooks/useRequirePerm";
 import { hasPermission } from "@/lib/permissions";
 
-import {
-  Card,
-  CardHeader,
-  CardContent,
-} from "@/components/ui/card";
-
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
-import {
-  Loader2,
-  RefreshCcw,
-  Plus,
-  Paintbrush,
-  Wrench,
-} from "lucide-react";
-
+import { Loader2, RefreshCcw, Plus, Paintbrush, Wrench } from "lucide-react";
 
 import EtapaDialog from "@/app/components/etapas/EtapaDialog";
 import ConfirmDeleteDialog from "@/app/components/etapas/ConfirmDeleteDialog";
@@ -28,7 +16,6 @@ import { useAuth } from "@/context/AuthContext";
 import EtapasTableDnd from "@/app/components/etapas/EtapasTableDnd";
 
 export default function EtapasPage() {
-
   useRequirePerm("etapas", "view");
 
   const { permissions } = useAuth();
@@ -47,18 +34,32 @@ export default function EtapasPage() {
   const [selected, setSelected] = useState(null);
   const [mode, setMode] = useState("create");
 
-  /* =========================
-     LOAD DATA
-  ==========================*/
-
   async function loadAll() {
     try {
       setLoading(true);
-      const res = await fetch("/api/etapas");
+      const res = await fetch("/api/etapas", { cache: "no-store" });
       const data = await res.json();
-      setItems(data || []);
+
+      const arr = Array.isArray(data) ? data : [];
+
+      // normaliza sort_order (si viene null)
+      const normalized = arr.map((x) => ({
+        ...x,
+        id: Number(x.id),
+        tipo: Number(x.tipo),
+        sort_order:
+          x.sort_order === null || x.sort_order === undefined
+            ? 999999
+            : Number(x.sort_order),
+      }));
+
+      // IMPORTANTE: aquí sí ordenamos UNA VEZ (al cargar)
+      normalized.sort((a, b) => a.tipo - b.tipo || a.sort_order - b.sort_order);
+
+      setItems(normalized);
     } catch (error) {
       toast.error("Error cargando etapas");
+      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -68,29 +69,16 @@ export default function EtapasPage() {
     loadAll();
   }, []);
 
-  /* =========================
-     FILTROS POR TIPO
-  ==========================*/
-
+  // NO HACER .sort() AQUÍ porque te rompe el DnD visual
   const pintura = useMemo(
-    () =>
-      items
-        .filter((x) => Number(x.tipo) === 1)
-        .sort((a, b) => a.sort_order - b.sort_order),
+    () => items.filter((x) => Number(x.tipo) === 1),
     [items]
   );
 
   const taller = useMemo(
-    () =>
-      items
-        .filter((x) => Number(x.tipo) === 2)
-        .sort((a, b) => a.sort_order - b.sort_order),
+    () => items.filter((x) => Number(x.tipo) === 2),
     [items]
   );
-
-  /* =========================
-     CREATE / EDIT
-  ==========================*/
 
   function onCreate(tipo) {
     setSelected({ tipo });
@@ -111,37 +99,45 @@ export default function EtapasPage() {
   }
 
   async function handleSave(data) {
-    try {
-      setSaving(true);
+  try {
+    setSaving(true);
 
-      if (mode === "edit") {
-        await fetch(`/api/etapas/${data.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data),
-        });
-        toast.success("Actualizado");
-      } else {
-        await fetch("/api/etapas", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data),
-        });
-        toast.success("Creado");
-      }
+    if (mode === "edit") {
+      const original = items.find((x) => Number(x.id) === Number(data.id));
 
-      setDialogOpen(false);
-      loadAll();
-    } catch {
-      toast.error("Error guardando");
-    } finally {
-      setSaving(false);
+      const payload = {
+        ...original,     // conserva tipo, sort_order, etc
+        ...data,         // aplica cambios del form
+        sort_order:
+          data.sort_order === undefined || data.sort_order === null || data.sort_order === ""
+            ? original?.sort_order
+            : Number(data.sort_order),
+      };
+
+      await fetch(`/api/etapas/${data.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      toast.success("Actualizado");
+    } else {
+      await fetch("/api/etapas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      toast.success("Creado");
     }
-  }
 
-  /* =========================
-     DELETE
-  ==========================*/
+    setDialogOpen(false);
+    loadAll();
+  } catch {
+    toast.error("Error guardando");
+  } finally {
+    setSaving(false);
+  }
+}
 
   function onDelete(row) {
     setSelected(row);
@@ -150,9 +146,7 @@ export default function EtapasPage() {
 
   async function confirmDelete() {
     try {
-      await fetch(`/api/etapas/${selected.id}`, {
-        method: "DELETE",
-      });
+      await fetch(`/api/etapas/${selected.id}`, { method: "DELETE" });
       toast.success("Eliminado");
       setDeleteOpen(false);
       loadAll();
@@ -161,12 +155,7 @@ export default function EtapasPage() {
     }
   }
 
-  /* =========================
-     REORDER
-  ==========================*/
-
   async function handleReorder(tipo, newList) {
-
     const itemsPayload = newList.map((item, index) => ({
       id: item.id,
       sort_order: index + 1,
@@ -180,36 +169,21 @@ export default function EtapasPage() {
       });
 
       toast.success("Orden actualizado");
-
     } catch {
       toast.error("Error actualizando orden");
       loadAll();
     }
   }
 
-  /* =========================
-     RENDER
-  ==========================*/
-
   return (
     <div className="space-y-5">
-
-      {/* HEADER */}
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-
         <div>
-          <h1 className="text-2xl font-semibold">
-            Etapas
-          </h1>
+          <h1 className="text-2xl font-semibold">Etapas</h1>
         </div>
 
         <div className="flex gap-2">
-
-          <Button
-            variant="outline"
-            onClick={loadAll}
-            disabled={loading || saving}
-          >
+          <Button variant="outline" onClick={loadAll} disabled={loading || saving}>
             Recargar
             {loading ? (
               <Loader2 className="ml-2 h-4 w-4 animate-spin" />
@@ -217,18 +191,14 @@ export default function EtapasPage() {
               <RefreshCcw className="ml-2 h-4 w-4" />
             )}
           </Button>
-
         </div>
       </div>
 
-      {/* PYP */}
       <Card className="border-border shadow-sm">
         <CardHeader className="pb-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Paintbrush className="h-5 w-5 text-primary" />
-            <h2 className="text-base font-semibold">
-              Planchado y Pintura
-            </h2>
+            <h2 className="text-base font-semibold">Planchado y Pintura</h2>
           </div>
 
           {permCreate && (
@@ -258,14 +228,11 @@ export default function EtapasPage() {
         </CardContent>
       </Card>
 
-      {/* TALLER */}
       <Card className="border-border shadow-sm">
         <CardHeader className="pb-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Wrench className="h-5 w-5 text-primary" />
-            <h2 className="text-base font-semibold">
-              Taller
-            </h2>
+            <h2 className="text-base font-semibold">Taller</h2>
           </div>
 
           {permCreate && (
@@ -295,7 +262,6 @@ export default function EtapasPage() {
         </CardContent>
       </Card>
 
-      {/* DIALOG */}
       <EtapaDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
@@ -304,7 +270,6 @@ export default function EtapasPage() {
         onSave={handleSave}
       />
 
-      {/* DELETE */}
       <ConfirmDeleteDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
@@ -313,7 +278,6 @@ export default function EtapasPage() {
         title="Eliminar etapa"
         description={`¿Seguro que deseas eliminar "${selected?.nombre}"?`}
       />
-
     </div>
   );
 }
