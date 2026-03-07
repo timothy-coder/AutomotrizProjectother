@@ -1,22 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useRequirePerm } from "@/hooks/useRequirePerm";
 import { useAuth } from "@/context/AuthContext";
 import { hasPermission } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Plus, RefreshCcw, Loader2 } from "lucide-react";
 
 import CotizacionesTable from "@/app/components/cotizaciones/CotizacionesTable";
-import CotizacionFormDialog from "@/app/components/cotizaciones/CotizacionFormDialog";
 import CotizacionDetailDialog from "@/app/components/cotizaciones/CotizacionDetailDialog";
 import CotizacionDeleteDialog from "@/app/components/cotizaciones/CotizacionDeleteDialog";
 
 export default function CotizacionTallerPage() {
   useRequirePerm("cotizacion", "view");
 
+  const router = useRouter();
   const { user, permissions } = useAuth();
   const permEdit = hasPermission(permissions, "cotizacion", "edit");
   const permCreate = hasPermission(permissions, "cotizacion", "create");
@@ -25,9 +26,7 @@ export default function CotizacionTallerPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Dialogs
-  const [formOpen, setFormOpen] = useState(false);
-  const [editData, setEditData] = useState(null);
+  // Dialogs (detail + delete only)
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailId, setDetailId] = useState(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -57,13 +56,11 @@ export default function CotizacionTallerPage() {
   }
 
   function handleEdit(item) {
-    setEditData(item);
-    setFormOpen(true);
+    router.push(`/cotizacion/taller/${item.id}`);
   }
 
   function handleCreate() {
-    setEditData(null);
-    setFormOpen(true);
+    router.push("/cotizacion/taller/nueva");
   }
 
   function handleDelete(item) {
@@ -127,16 +124,6 @@ export default function CotizacionTallerPage() {
           )}
         </CardContent>
       </Card>
-
-      {/* Form dialog */}
-      <CotizacionFormDialog
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        tipo="taller"
-        userId={user?.id}
-        editData={editData}
-        onSaved={loadItems}
-      />
 
       {/* Detail dialog */}
       <CotizacionDetailDialog

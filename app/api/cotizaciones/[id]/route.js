@@ -12,11 +12,17 @@ export async function GET(req, { params }) {
               cl.email AS cliente_email,
               cl.celular AS cliente_celular,
               u.fullname AS usuario_nombre,
-              ct.nombre AS tarifa_nombre
+              ct.nombre AS tarifa_nombre,
+              ce.nombre AS centro_nombre,
+              t.nombre AS taller_nombre,
+              mo.nombre AS mostrador_nombre
        FROM cotizaciones c
        LEFT JOIN clientes cl ON c.cliente_id = cl.id
        LEFT JOIN usuarios u ON c.usuario_id = u.id
        LEFT JOIN cotizacion_tarifas ct ON c.tarifa_id = ct.id
+       LEFT JOIN centros ce ON c.centro_id = ce.id
+       LEFT JOIN talleres t ON c.taller_id = t.id
+       LEFT JOIN mostradores mo ON c.mostrador_id = mo.id
        WHERE c.id = ?`,
       [id]
     );
@@ -64,26 +70,39 @@ export async function PUT(req, { params }) {
 
     const {
       tipo, cliente_id, usuario_id, descripcion,
+      centro_id, taller_id, mostrador_id,
       horas_trabajo, tarifa_id, tarifa_hora,
+      descuento_porcentaje, descuento_monto,
       productos, extras
     } = body;
 
     await conn.beginTransaction();
 
-    const subtotal_productos = (productos || []).reduce((sum, p) => sum + Number(p.subtotal || 0), 0);
+    const subtotal_productos = (productos || []).reduce((sum, p) => {
+      const base = Number(p.subtotal || 0);
+      const desc = Number(p.descuento_porcentaje || 0);
+      return sum + (base - base * desc / 100);
+    }, 0);
     const subtotal_mano_obra = Number(horas_trabajo || 0) * Number(tarifa_hora || 0);
     const subtotal_extras = (extras || []).reduce((sum, e) => sum + Number(e.monto || 0), 0);
-    const monto_total = subtotal_productos + subtotal_mano_obra + subtotal_extras;
+    const bruto = subtotal_productos + subtotal_mano_obra + subtotal_extras;
+    const descPct = Number(descuento_porcentaje || 0);
+    const descMonto = Number(descuento_monto || 0);
+    const monto_total = bruto - (bruto * descPct / 100) - descMonto;
 
     await conn.query(
       `UPDATE cotizaciones SET
         tipo=?, cliente_id=?, usuario_id=?, descripcion=?,
+        centro_id=?, taller_id=?, mostrador_id=?,
         subtotal_productos=?, subtotal_mano_obra=?, subtotal_extras=?,
+        descuento_porcentaje=?, descuento_monto=?,
         monto_total=?, horas_trabajo=?, tarifa_id=?, tarifa_hora=?
        WHERE id=?`,
       [
         tipo, cliente_id || null, usuario_id, descripcion || null,
+        centro_id || null, taller_id || null, mostrador_id || null,
         subtotal_productos, subtotal_mano_obra, subtotal_extras,
+        descPct, descMonto,
         monto_total, horas_trabajo || 0, tarifa_id || null, tarifa_hora || 0, id
       ]
     );
@@ -92,10 +111,11 @@ export async function PUT(req, { params }) {
     await conn.query("DELETE FROM cotizacion_productos WHERE cotizacion_id = ?", [id]);
     if (productos && productos.length > 0) {
       const prodValues = productos.map(p => [
-        id, p.producto_id, p.cantidad, p.precio_unitario, p.subtotal
+        id, p.producto_id, p.cantidad, p.precio_unitario, p.subtotal,
+        Number(p.descuento_porcentaje || 0)
       ]);
       await conn.query(
-        `INSERT INTO cotizacion_productos (cotizacion_id, producto_id, cantidad, precio_unitario, subtotal)
+        `INSERT INTO cotizacion_productos (cotizacion_id, producto_id, cantidad, precio_unitario, subtotal, descuento_porcentaje)
          VALUES ?`,
         [prodValues]
       );

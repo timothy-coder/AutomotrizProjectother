@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useRequirePerm } from "@/hooks/useRequirePerm";
 import { useAuth } from "@/context/AuthContext";
 import { hasPermission } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { RefreshCcw, Loader2 } from "lucide-react";
+import { Plus, RefreshCcw, Loader2 } from "lucide-react";
 
 import CotizacionesTable from "@/app/components/cotizaciones/CotizacionesTable";
 import CotizacionDetailDialog from "@/app/components/cotizaciones/CotizacionDetailDialog";
@@ -17,7 +18,9 @@ export default function CotizacionGeneralPage() {
   useRequirePerm("cotizacion", "view");
 
   const { permissions } = useAuth();
+  const router = useRouter();
   const permEdit = hasPermission(permissions, "cotizacion", "edit");
+  const permCreate = hasPermission(permissions, "cotizacion", "create");
   const permDelete = hasPermission(permissions, "cotizacion", "delete");
 
   const [items, setItems] = useState([]);
@@ -52,6 +55,14 @@ export default function CotizacionGeneralPage() {
     setDetailOpen(true);
   }
 
+  function handleEdit(item) {
+    router.push(`/cotizacion/${item.id}`);
+  }
+
+  function handleCreate() {
+    router.push("/cotizacion/nueva");
+  }
+
   function handleDelete(item) {
     setDeleteTarget(item);
     setDeleteOpen(true);
@@ -82,9 +93,16 @@ export default function CotizacionGeneralPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Cotizaciones — Vista general</h1>
-        <Button variant="outline" size="sm" onClick={loadItems} disabled={loading}>
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCcw className="w-4 h-4" />}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={loadItems} disabled={loading}>
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCcw className="w-4 h-4" />}
+          </Button>
+          {permCreate && (
+            <Button onClick={handleCreate}>
+              <Plus className="w-4 h-4 mr-2" /> Nueva Cotización
+            </Button>
+          )}
+        </div>
       </div>
 
       <Card>
@@ -98,8 +116,9 @@ export default function CotizacionGeneralPage() {
               items={items}
               showTipo={true}
               onView={handleView}
+              onEdit={handleEdit}
               onDelete={handleDelete}
-              permEdit={false}
+              permEdit={permEdit}
               permDelete={permDelete}
             />
           )}

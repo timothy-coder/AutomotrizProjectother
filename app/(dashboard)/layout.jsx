@@ -9,7 +9,7 @@ import Header from "../components/Header";
 
 export default function DashboardLayout({ children }) {
 
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -17,6 +17,11 @@ export default function DashboardLayout({ children }) {
     localStorage.removeItem("user");
     document.cookie = "token=; path=/;";
     window.location.href = "/login";
+  }
+
+  // Avoid hydration mismatch: wait until client has loaded user from localStorage
+  if (loading) {
+    return null;
   }
 
   return (

@@ -156,6 +156,24 @@ export default function CotizacionDetailDialog({
                   <span className="ml-2">{data.descripcion}</span>
                 </div>
               )}
+              {data.centro_nombre && (
+                <div>
+                  <span className="text-muted-foreground">Centro:</span>
+                  <span className="ml-2 font-medium">{data.centro_nombre}</span>
+                </div>
+              )}
+              {data.taller_nombre && (
+                <div>
+                  <span className="text-muted-foreground">Taller:</span>
+                  <span className="ml-2 font-medium">{data.taller_nombre}</span>
+                </div>
+              )}
+              {data.mostrador_nombre && (
+                <div>
+                  <span className="text-muted-foreground">Mostrador:</span>
+                  <span className="ml-2 font-medium">{data.mostrador_nombre}</span>
+                </div>
+              )}
             </div>
 
             {/* Products */}
@@ -170,19 +188,28 @@ export default function CotizacionDetailDialog({
                         <TableHead>Producto</TableHead>
                         <TableHead className="text-right">Cant.</TableHead>
                         <TableHead className="text-right">P. Unit.</TableHead>
+                        <TableHead className="text-center">Desc.</TableHead>
                         <TableHead className="text-right">Subtotal</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {data.productos.map((p) => (
-                        <TableRow key={p.id}>
-                          <TableCell className="font-mono text-sm">{p.numero_parte}</TableCell>
-                          <TableCell>{p.producto_nombre}</TableCell>
-                          <TableCell className="text-right">{p.cantidad}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(p.precio_unitario)}</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(p.subtotal)}</TableCell>
-                        </TableRow>
-                      ))}
+                      {data.productos.map((p) => {
+                        const base = Number(p.cantidad) * Number(p.precio_unitario);
+                        const d = Number(p.descuento_porcentaje || 0);
+                        const sub = base - base * d / 100;
+                        return (
+                          <TableRow key={p.id}>
+                            <TableCell className="font-mono text-sm">{p.numero_parte}</TableCell>
+                            <TableCell>{p.producto_nombre}</TableCell>
+                            <TableCell className="text-right">{p.cantidad}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(p.precio_unitario)}</TableCell>
+                            <TableCell className="text-center">
+                              {d > 0 ? <Badge variant="secondary">{d}%</Badge> : "\u2014"}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(sub)}</TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -195,7 +222,7 @@ export default function CotizacionDetailDialog({
               <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1">
                 <div className="flex justify-between">
                   <span>Tarifa:</span>
-                  <span>{data.tarifa_nombre || "Personalizada"} — {formatCurrency(data.tarifa_hora)}/hr</span>
+                  <span>{data.tarifa_nombre || "\u2014"} \u2014 {formatCurrency(data.tarifa_hora)}/hr</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Horas:</span>
@@ -247,6 +274,23 @@ export default function CotizacionDetailDialog({
                 <span>Subtotal extras:</span>
                 <span>{formatCurrency(data.subtotal_extras)}</span>
               </div>
+              {(Number(data.descuento_porcentaje || 0) > 0 || Number(data.descuento_monto || 0) > 0) && (
+                <>
+                  <hr />
+                  <div className="flex justify-between text-sm text-red-600">
+                    <span>
+                      Descuento
+                      {Number(data.descuento_porcentaje || 0) > 0 && ` (${data.descuento_porcentaje}%)`}
+                      {Number(data.descuento_monto || 0) > 0 && ` + ${formatCurrency(data.descuento_monto)}`}
+                    </span>
+                    <span>-{formatCurrency(
+                      (Number(data.subtotal_productos) + Number(data.subtotal_mano_obra) + Number(data.subtotal_extras))
+                        * Number(data.descuento_porcentaje || 0) / 100
+                        + Number(data.descuento_monto || 0)
+                    )}</span>
+                  </div>
+                </>
+              )}
               <hr />
               <div className="flex justify-between text-lg font-bold">
                 <span>TOTAL:</span>
