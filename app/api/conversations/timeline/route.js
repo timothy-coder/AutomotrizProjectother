@@ -24,7 +24,8 @@ export async function GET(req) {
         al.action_type,
         al.intent,
         al.success,
-        al.error_message
+        al.error_message,
+        cs.conversation_summary as resumen
       FROM agent_actions_log al
       JOIN conversation_sessions cs ON al.session_id = cs.id
       WHERE al.session_id = ?
