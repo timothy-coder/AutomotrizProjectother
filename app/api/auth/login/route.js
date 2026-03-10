@@ -33,15 +33,15 @@ export async function POST(req) {
     const token = generateToken(user);
 
     return NextResponse.json({
-  token,
-  user: {
-    id: user.id,
-    fullname: user.fullname,
-    username: user.username,
-    role: user.role,
-    permissions: user.permissions   // ⭐ ESTA LÍNEA FALTABA
-  }
-});
+      token,
+      user: {
+        id: user.id,
+        fullname: user.fullname,
+        username: user.username,
+        role: user.role,
+        permissions: user.permissions   // ⭐ ESTA LÍNEA FALTABA
+      }
+    });
 
 
   } catch (error) {

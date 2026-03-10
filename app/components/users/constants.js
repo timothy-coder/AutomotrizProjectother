@@ -38,6 +38,6 @@ export const SECTIONS = [
   { key: "leads", label: "Leads", actions: ["view", "create", "edit", "delete"] },
   { key: "oportunidades", label: "Oportunidades", actions: ["view", "create", "edit", "delete"] },
   { key: "configpicaje", label: "Configuración de Picaje", actions: ["view", "create", "edit", "delete"] },
-  { key: "configinventario", label: "Configuración de Inventario", actions: ["view", "create", "edit", "delete"] }
-
+  { key: "configinventario", label: "Configuración de Inventario", actions: ["view", "create", "edit", "delete"] },
+  { key: "configcotizacion", label: "Configuración de Cotización", actions: ["view", "create", "edit", "delete"] }
 ];
