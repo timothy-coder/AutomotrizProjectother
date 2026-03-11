@@ -30,7 +30,6 @@ export const SECTIONS = [
   { key: "mensajes", label: "Mensajes", actions: ["view", "create", "edit", "delete"] },
   
   { key: "reportes", label: "Reportes", actions: ["view", "create", "edit", "delete"] },
-  { key: "picaje", label: "Picaje", actions: ["view", "create", "edit", "delete"] },
   { key: "ordenes", label: "Órdenes", actions: ["view", "create", "edit", "delete"] },
   { key: "cotizacion", label: "Cotización", actions: ["view", "create", "edit", "delete"] },
   { key: "prospeccion", label: "Configuracion de Prospecciones", actions: ["view", "create", "edit", "delete"] },
