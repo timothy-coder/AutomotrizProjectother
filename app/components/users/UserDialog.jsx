@@ -226,11 +226,16 @@ export default function UserDialog({
         const talleresValidos = new Set(talleresMerged.map((x) => Number(x.id)));
         const mostradoresValidos = new Set(mostradoresMerged.map((x) => Number(x.id)));
 
-        setForm((prev) => ({
-          ...prev,
-          talleres: normalizeIds(prev.talleres).filter((id) => talleresValidos.has(id)),
-          mostradores: normalizeIds(prev.mostradores).filter((id) => mostradoresValidos.has(id)),
-        }));
+        setForm((prev) => {
+          const prevTalleres = normalizeIds(prev.talleres);
+          const prevMostradores = normalizeIds(prev.mostradores);
+
+          return {
+            ...prev,
+            talleres: prevTalleres.filter((id) => talleresValidos.has(id)),
+            mostradores: prevMostradores.filter((id) => mostradoresValidos.has(id)),
+          };
+        });
       } catch (error) {
         console.error("Error cargando talleres/mostradores:", error);
         if (!active) return;
@@ -246,7 +251,7 @@ export default function UserDialog({
     return () => {
       active = false;
     };
-  }, [open, form.centros]);
+  }, [open, JSON.stringify(normalizeIds(form.centros))]);
 
   function updateField(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -339,29 +344,32 @@ export default function UserDialog({
 
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="grid grid-cols-4 w-full">
-            <TabsTrigger value="general"
-            className="flex-1 rounded-lg border-b-2 border-transparent 
-                        text-gray-600 font-medium
-                        data-[state=active]:border-[#13223F] 
-                        data-[state=active]:text-[#13223F]">General</TabsTrigger>
-            <TabsTrigger value="horario"
-            className="flex-1 rounded-lg border-b-2 border-transparent 
-                        text-gray-600 font-medium
-                        data-[state=active]:border-[#13223F] 
-                        data-[state=active]:text-[#13223F]">Horario</TabsTrigger>
-            <TabsTrigger value="permisos"
-            className="flex-1 rounded-lg border-b-2 border-transparent 
-                        text-gray-600 font-medium
-                        data-[state=active]:border-[#13223F] 
-                        data-[state=active]:text-[#13223F]">Permisos</TabsTrigger>
-            <TabsTrigger value="sitios"
-            className="flex-1 rounded-lg border-b-2 border-transparent 
-                        text-gray-600 font-medium
-                        data-[state=active]:border-[#13223F] 
-                        data-[state=active]:text-[#13223F]">Sitios</TabsTrigger>
+            <TabsTrigger
+              value="general"
+              className="flex-1 rounded-lg border-b-2 border-transparent text-gray-600 font-medium data-[state=active]:border-[#13223F] data-[state=active]:text-[#13223F]"
+            >
+              General
+            </TabsTrigger>
+            <TabsTrigger
+              value="horario"
+              className="flex-1 rounded-lg border-b-2 border-transparent text-gray-600 font-medium data-[state=active]:border-[#13223F] data-[state=active]:text-[#13223F]"
+            >
+              Horario
+            </TabsTrigger>
+            <TabsTrigger
+              value="permisos"
+              className="flex-1 rounded-lg border-b-2 border-transparent text-gray-600 font-medium data-[state=active]:border-[#13223F] data-[state=active]:text-[#13223F]"
+            >
+              Permisos
+            </TabsTrigger>
+            <TabsTrigger
+              value="sitios"
+              className="flex-1 rounded-lg border-b-2 border-transparent text-gray-600 font-medium data-[state=active]:border-[#13223F] data-[state=active]:text-[#13223F]"
+            >
+              Sitios
+            </TabsTrigger>
           </TabsList>
 
-          {/* GENERAL */}
           <TabsContent
             value="general"
             className="mt-4 space-y-4 max-h-[50vh] overflow-y-auto"
@@ -486,7 +494,6 @@ export default function UserDialog({
             </div>
           </TabsContent>
 
-          {/* HORARIO */}
           <TabsContent value="horario" className="max-h-[50vh] overflow-y-auto">
             {DAYS.map((d) => {
               const enabled = !!form.work_schedule?.[d.key];
@@ -524,7 +531,6 @@ export default function UserDialog({
             })}
           </TabsContent>
 
-          {/* PERMISOS */}
           <TabsContent
             value="permisos"
             className="mt-4 max-h-[55vh] overflow-y-auto pr-2"
@@ -552,7 +558,6 @@ export default function UserDialog({
             ))}
           </TabsContent>
 
-          {/* SITIOS */}
           <TabsContent
             value="sitios"
             className="mt-4 space-y-4 max-h-[55vh] overflow-y-auto pr-2"
@@ -562,7 +567,6 @@ export default function UserDialog({
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {/* CENTROS */}
               <div className="border rounded-md p-3">
                 <div className="font-medium mb-3">Centros</div>
 
@@ -595,7 +599,6 @@ export default function UserDialog({
                 )}
               </div>
 
-              {/* TALLERES */}
               <div className="border rounded-md p-3">
                 <div className="font-medium mb-3">Talleres</div>
 
@@ -634,7 +637,6 @@ export default function UserDialog({
                 )}
               </div>
 
-              {/* MOSTRADORES */}
               <div className="border rounded-md p-3">
                 <div className="font-medium mb-3">Mostradores</div>
 
