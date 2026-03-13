@@ -134,7 +134,7 @@ export default function OportunidadesPage() {
   if (!canView) return null;
 
   return (
-    <div className="space-y-6">
+    <div className="p-10">
       <h1 className="text-2xl font-semibold">Oportunidades</h1>
 
       <Tabs defaultValue="listado" className="space-y-4">

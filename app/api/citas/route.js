@@ -14,20 +14,23 @@ export async function GET(request) {
       return NextResponse.json([]);
     }
 
-    // 🔥 rango completo del día
     const startDateTime = `${start} 00:00:00`;
     const endDateTime = `${end} 23:59:59`;
 
     let query = `
       SELECT
         c.id,
+        c.cliente_id,
+        c.centro_id,
+        c.taller_id,
+        c.vehiculo_id,
         c.start_at,
         c.end_at,
         c.estado,
         c.asesor_id,
         c.nota_cliente,
         c.nota_interna,
-        c.vehiculo_id,
+
         CONCAT(cl.nombre,' ',cl.apellido) AS cliente,
         IFNULL(cl.email,'--') AS correo,
         IFNULL(cl.celular,'--') AS celular,
@@ -73,6 +76,10 @@ export async function GET(request) {
     query += `
       GROUP BY
         c.id,
+        c.cliente_id,
+        c.centro_id,
+        c.taller_id,
+        c.vehiculo_id,
         c.start_at,
         c.end_at,
         c.estado,
