@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
    ?origen_id=1
    ?etapasconversion_id=1
    ?asignado_a=2
-   ?creado_por=3
+   ?created_by=3
 ========================= */
 export async function GET(req) {
   try {
@@ -17,7 +17,7 @@ export async function GET(req) {
     const origen_id = searchParams.get("origen_id");
     const etapasconversion_id = searchParams.get("etapasconversion_id");
     const asignado_a = searchParams.get("asignado_a");
-    const creado_por = searchParams.get("creado_por");
+    const created_by = searchParams.get("created_by");
 
     let query = `
       SELECT
@@ -29,18 +29,18 @@ export async function GET(req) {
         o.suborigen_id,
         o.detalle,
         o.etapasconversion_id,
-        o.creado_por,
+        o.created_by,
         o.asignado_a,
         o.created_at,
         o.updated_at,
 
-        c.name AS cliente_name,
+        c.nombre AS cliente_name,
         m.name AS marca_name,
         mo.name AS modelo_name,
         oc.name AS origen_name,
         sc.name AS suborigen_name,
-        ec.name AS etapa_name,
-        u1.fullname AS creado_por_name,
+        ec.nombre AS etapa_name,
+        u1.fullname AS created_by_name,
         u2.fullname AS asignado_a_name
 
       FROM oportunidades o
@@ -50,7 +50,7 @@ export async function GET(req) {
       LEFT JOIN origenes_citas oc ON oc.id = o.origen_id
       LEFT JOIN suborigenes_citas sc ON sc.id = o.suborigen_id
       LEFT JOIN etapasconversion ec ON ec.id = o.etapasconversion_id
-      LEFT JOIN usuarios u1 ON u1.id = o.creado_por
+      LEFT JOIN usuarios u1 ON u1.id = o.created_by
       LEFT JOIN usuarios u2 ON u2.id = o.asignado_a
       WHERE 1 = 1
     `;
@@ -77,9 +77,9 @@ export async function GET(req) {
       params.push(asignado_a);
     }
 
-    if (creado_por) {
-      query += ` AND o.creado_por = ?`;
-      params.push(creado_por);
+    if (created_by) {
+      query += ` AND o.created_by = ?`;
+      params.push(created_by);
     }
 
     query += ` ORDER BY o.id DESC`;
@@ -117,7 +117,7 @@ export async function POST(req) {
 
     const detalle = (body.detalle || "").trim() || null;
     const etapasconversion_id = Number(body.etapasconversion_id);
-    const creado_por = Number(body.creado_por);
+    const created_by = Number(body.created_by);
 
     const asignado_a =
       body.asignado_a === null ||
@@ -132,12 +132,12 @@ export async function POST(req) {
       !modelo_id ||
       !origen_id ||
       !etapasconversion_id ||
-      !creado_por
+      !created_by
     ) {
       return NextResponse.json(
         {
           message:
-            "cliente_id, marca_id, modelo_id, origen_id, etapasconversion_id y creado_por son obligatorios",
+            "cliente_id, marca_id, modelo_id, origen_id, etapasconversion_id y created_by son obligatorios",
         },
         { status: 400 }
       );
@@ -221,7 +221,7 @@ export async function POST(req) {
 
     const [creador] = await db.query(
       `SELECT id FROM usuarios WHERE id = ? LIMIT 1`,
-      [creado_por]
+      [created_by]
     );
     if (!creador.length) {
       return NextResponse.json(
@@ -255,7 +255,7 @@ export async function POST(req) {
         suborigen_id,
         detalle,
         etapasconversion_id,
-        creado_por,
+        created_by,
         asignado_a
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -268,7 +268,7 @@ export async function POST(req) {
         suborigen_id,
         detalle,
         etapasconversion_id,
-        creado_por,
+        created_by,
         asignado_a,
       ]
     );
