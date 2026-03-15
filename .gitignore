@@ -44,3 +44,7 @@ next-env.d.ts
 *.sql
 /migrations/*.sql
 bd.sql
+
+# n8n workflows (Claude Code)
+.mcp.json
+/claude_code/

@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__n8n__search_nodes",
+      "mcp__n8n__validate_workflow",
+      "mcp__n8n__n8n_health_check",
+      "mcp__n8n__n8n_list_workflows",
+      "mcp__n8n__n8n_create_workflow",
+      "mcp__n8n__n8n_get_workflow",
+      "mcp__n8n__n8n_update_full_workflow",
+      "mcp__n8n__n8n_update_partial_workflow",
+      "Bash(curl -s -X POST \"https://n8n.app20.tech/api/v1/workflows/bLiHWW2H3X5EQ11d/activate\" -H \"X-N8N-API-KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjYjE5NzUxMi1kZWQ1LTQ5YTAtYTA3Mi0yMDY4ZjI2NjVmODgiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzQwNjE0MTY5fQ.fM0Isd5o6Xfd6Y88gU-HLWqTNvxZpDhQxkIgf88IpiM\" -H \"Content-Type: application/json\")",
+      "Bash(curl -s -X POST \"https://n8n.app20.tech/api/v1/workflows/PvHfC4zbqUcqXdiB/activate\" -H \"X-N8N-API-KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjYjE5NzUxMi1kZWQ1LTQ5YTAtYTA3Mi0yMDY4ZjI2NjVmODgiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzQwNjE0MTY5fQ.fM0Isd5o6Xfd6Y88gU-HLWqTNvxZpDhQxkIgf88IpiM\" -H \"Content-Type: application/json\")",
+      "Bash(N8N_KEY=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjYjE5NzUxMi1kZWQ1LTQ5YTAtYTA3Mi0yMDY4ZjI2NjVmODgiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiODE4ODJkZTUtYTBiNC00ZmE1LTgyMzQtZDNhNmI0Nzc2YTIwIiwiaWF0IjoxNzczNTE1NTY0LCJleHAiOjE3ODEyNDA0MDB9._lNjIWiGlxVcnBp5TGFQ8hdTGOtjYEc27nTfZztv9vI\")",
+      "Bash(__NEW_LINE_c3c5b8d08d91b52f__ curl:*)",
+      "Bash(curl -s -X POST \"https://n8n.app20.tech/api/v1/workflows/PvHfC4zbqUcqXdiB/activate\" -H \"X-N8N-API-KEY: $N8N_KEY\")",
+      "Bash(node -e \":*)"
+    ]
+  }
+}

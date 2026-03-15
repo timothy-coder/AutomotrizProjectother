@@ -200,6 +200,8 @@ CONVERSATIONS_OUTBOX_MAX_RETRIES=5
 CONVERSATIONS_OUTBOX_SECRET=secreto-interno-para-job
 OUTBOX_PROCESS_URL=http://localhost:3000/api/conversations/outbox/process
 OUTBOX_PROCESS_LIMIT=20
+MASS_CAMPAIGNS_PROCESS_URL=http://localhost:3000/api/envios-masivos/process-scheduled
+MASS_CAMPAIGNS_PROCESS_LIMIT=10
 ```
 
 ### Automatizacion de reproceso outbox
@@ -227,6 +229,71 @@ Ejemplo n8n (Cron -> HTTP Request):
 - URL: `${OUTBOX_PROCESS_URL}`
 - Header: `x-conversations-outbox-secret: ${CONVERSATIONS_OUTBOX_SECRET}`
 - Body JSON: `{ "limit": 20 }`
+
+### Automatizacion de campañas programadas
+
+Script incluido:
+
+```bash
+npm run mass:process
+```
+
+Este comando llama al endpoint de campañas programadas y encola las que ya vencieron por fecha/hora.
+
+Ejemplo PowerShell cada 1 minuto (mientras corre tu app Next):
+
+```powershell
+while ($true) {
+	node --env-file=.env.local scripts/process-mass-campaigns.cjs
+	Start-Sleep -Seconds 60
+}
+```
+
+Ejemplo n8n (Cron -> HTTP Request):
+
+- Método: `POST`
+- URL: `${MASS_CAMPAIGNS_PROCESS_URL}?limit=10`
+- Header: `x-conversations-outbox-secret: ${CONVERSATIONS_OUTBOX_SECRET}`
+
+### Tracking de campañas en webhook
+
+El webhook de conversaciones ahora sincroniza estado de destinatarios de campaña cuando recibe callback de proveedor.
+
+Body recomendado de status callback desde n8n:
+
+```json
+{
+	"event_type": "status",
+	"external_message_id": "wamid.xxxxxx",
+	"status": "delivered",
+	"campaign_id": 12,
+	"campaign_recipient_id": 341,
+	"payload": {
+		"provider": "meta",
+		"channel": "whatsapp"
+	}
+}
+```
+
+Para respuestas del cliente (inbound), si el mensaje llega en el mismo `session_id` dentro de 24 horas desde `sent_at`, el destinatario de campaña se marca como `responded` automáticamente.
+
+Si el inbound incluye una acción CTA (`contact` o `stop_promotions`), el webhook la registra en `campaign_recipient_actions`.
+Cuando la acción es `stop_promotions`, también se activa opt-out en `campaign_opt_outs` para excluir ese cliente de futuras audiencias masivas.
+
+Ejemplo de inbound con CTA de baja:
+
+```json
+{
+	"event_type": "message",
+	"phone": "+51999999999",
+	"text": "No deseo más promociones",
+	"external_message_id": "wamid.inbound.123",
+	"payload": {
+		"button_action": "stop_promotions",
+		"button_id": "stop_12_341"
+	}
+}
+```
 
 ### Migracion recomendada para tracking
 

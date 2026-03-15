@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "outbox:process": "node --env-file=.env.local scripts/process-conversations-outbox.cjs"
+    "outbox:process": "node --env-file=.env.local scripts/process-conversations-outbox.cjs",
+    "mass:process": "node --env-file=.env.local scripts/process-mass-campaigns.cjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
