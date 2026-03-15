@@ -4,6 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 import { Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import ConversationWorkspace from "@/app/components/conversations/ConversationWorkspace";
 import { useAuth } from "@/context/AuthContext";
 
@@ -28,6 +37,14 @@ export default function ConversationsPage() {
   const [ownerFilter, setOwnerFilter] = useState("all");
   const [assignmentFilter, setAssignmentFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkChannel, setBulkChannel] = useState("whatsapp");
+  const [bulkText, setBulkText] = useState("");
+  const [bulkSending, setBulkSending] = useState(false);
+  const [bulkError, setBulkError] = useState("");
+  const [bulkSummary, setBulkSummary] = useState(null);
+  const [selectedSessionIds, setSelectedSessionIds] = useState([]);
+  const [bulkTargetMode, setBulkTargetMode] = useState("filtered");
 
   async function load() {
     try {
@@ -227,6 +244,88 @@ export default function ConversationsPage() {
     });
   }, [sessions, search, channelFilter, statusFilter, ownerFilter, assignmentFilter, priorityFilter, user]);
 
+  useEffect(() => {
+    const filteredIdSet = new Set(filteredSessions.map((s) => Number(s.session_id)));
+    setSelectedSessionIds((prev) => prev.filter((id) => filteredIdSet.has(Number(id))));
+  }, [filteredSessions]);
+
+  const selectedSessions = useMemo(() => {
+    const selectedIdSet = new Set(selectedSessionIds.map((id) => Number(id)));
+    return filteredSessions.filter((s) => selectedIdSet.has(Number(s.session_id)));
+  }, [filteredSessions, selectedSessionIds]);
+
+  const allFilteredSelected =
+    filteredSessions.length > 0 && selectedSessions.length === filteredSessions.length;
+
+  function toggleSessionSelection(sessionId) {
+    const normalized = Number(sessionId);
+    setSelectedSessionIds((prev) => {
+      if (prev.includes(normalized)) {
+        return prev.filter((id) => id !== normalized);
+      }
+      return [...prev, normalized];
+    });
+  }
+
+  function toggleSelectAllFiltered() {
+    if (allFilteredSelected) {
+      setSelectedSessionIds([]);
+      return;
+    }
+
+    setSelectedSessionIds(filteredSessions.map((s) => Number(s.session_id)));
+  }
+
+  async function sendBulkMessage() {
+    const text = bulkText.trim();
+    if (!text || bulkSending) return;
+
+    const targetSessions = bulkTargetMode === "selected" ? selectedSessions : filteredSessions;
+
+    if (!targetSessions.length) {
+      setBulkError(
+        bulkTargetMode === "selected"
+          ? "No hay conversaciones seleccionadas para enviar."
+          : "No hay conversaciones filtradas para enviar."
+      );
+      return;
+    }
+
+    setBulkSending(true);
+    setBulkError("");
+    setBulkSummary(null);
+
+    try {
+      const recipients = targetSessions.map((s) => ({
+        session_id: s.session_id,
+        phone: s.celular || s.phone || null,
+      }));
+
+      const res = await fetch("/api/conversations/bulk-messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text,
+          source_channel: bulkChannel,
+          source: "bulk_ui",
+          recipients,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.message || "No se pudo enviar la campaña básica");
+      }
+
+      setBulkSummary(data?.summary || null);
+      await load();
+    } catch (error) {
+      setBulkError(error?.message || "Error enviando masivo");
+    } finally {
+      setBulkSending(false);
+    }
+  }
+
   return (
     <div className="h-full min-h-0 flex flex-col gap-3">
 
@@ -315,8 +414,30 @@ export default function ConversationsPage() {
           <option value="overdue">Vencidas SLA</option>
         </select>
 
-        <div className="flex items-center text-xs text-gray-500 px-1">
-          {filteredSessions.length} conversaciones
+        <div className="flex items-center justify-between sm:col-span-3 text-xs text-gray-500 px-1 gap-2">
+          <span>
+            {filteredSessions.length} conversaciones · {selectedSessions.length} seleccionadas
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={toggleSelectAllFiltered}
+            disabled={filteredSessions.length === 0}
+          >
+            {allFilteredSelected ? "Limpiar selección" : "Seleccionar filtrados"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setBulkError("");
+              setBulkSummary(null);
+              setBulkTargetMode(selectedSessions.length > 0 ? "selected" : "filtered");
+              setBulkOpen(true);
+            }}
+          >
+            Envío masivo básico
+          </Button>
         </div>
       </div>
 
@@ -329,6 +450,16 @@ export default function ConversationsPage() {
                 className={`flex items-center justify-between p-4 border-b hover:bg-gray-50 ${selectedSession?.session_id === s.session_id ? "bg-gray-50" : ""}`}
               >
                 <div>
+                  <div className="mb-1">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={selectedSessionIds.includes(Number(s.session_id))}
+                      onChange={() => toggleSessionSelection(s.session_id)}
+                      aria-label={`Seleccionar conversacion ${s.session_id}`}
+                    />
+                  </div>
+
                   <div className="font-semibold">
                     {s.cliente_nombre || "Cliente"}
                   </div>
@@ -398,6 +529,76 @@ export default function ConversationsPage() {
         </div>
       </div>
 
+      <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Envío masivo básico</DialogTitle>
+            <DialogDescription>
+              Envia el mismo mensaje a las conversaciones filtradas actualmente.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <p className="text-xs text-gray-500">
+              Filtrados: {filteredSessions.length} · Seleccionados: {selectedSessions.length}
+            </p>
+
+            <select
+              className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+              value={bulkTargetMode}
+              onChange={(e) => setBulkTargetMode(e.target.value)}
+              disabled={bulkSending}
+            >
+              <option value="filtered">Enviar a filtrados</option>
+              <option value="selected">Enviar solo a seleccionados</option>
+            </select>
+
+            <select
+              className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+              value={bulkChannel}
+              onChange={(e) => setBulkChannel(e.target.value)}
+              disabled={bulkSending}
+            >
+              <option value="whatsapp">WhatsApp</option>
+              <option value="instagram">Instagram</option>
+              <option value="facebook">Facebook</option>
+            </select>
+
+            <Textarea
+              value={bulkText}
+              onChange={(e) => setBulkText(e.target.value)}
+              placeholder="Escribe el mensaje promocional a enviar..."
+              className="min-h-28"
+              disabled={bulkSending}
+            />
+
+            {bulkError && <p className="text-sm text-red-600">{bulkError}</p>}
+
+            {bulkSummary && (
+              <div className="text-xs rounded-md border bg-gray-50 p-2 text-gray-700">
+                Total: {bulkSummary.total || 0} · Enviados: {bulkSummary.sent || 0} · En cola: {bulkSummary.queued || 0} · Fallidos: {bulkSummary.failed || 0} · Omitidos: {bulkSummary.skipped || 0}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkOpen(false)} disabled={bulkSending}>
+              Cerrar
+            </Button>
+            <Button
+              onClick={sendBulkMessage}
+              disabled={
+                bulkSending
+                || !bulkText.trim()
+                || (bulkTargetMode === "selected" && selectedSessions.length === 0)
+                || (bulkTargetMode === "filtered" && filteredSessions.length === 0)
+              }
+            >
+              {bulkSending ? "Enviando..." : "Enviar a filtrados"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
