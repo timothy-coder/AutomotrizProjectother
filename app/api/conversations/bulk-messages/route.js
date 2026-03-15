@@ -5,7 +5,6 @@ import { authorizeConversation } from "@/lib/conversationsAuth";
 import {
   enqueueOutbound,
   isMissingTableError,
-  processOutboxItem,
 } from "@/lib/conversationsOutbox";
 
 const ALLOWED_CHANNELS = new Set(["whatsapp", "instagram", "facebook"]);
@@ -305,27 +304,14 @@ async function processBulkRecipient({
       };
     }
 
-    const processResult = await processOutboxItem(outbox.id);
-
-    if (processResult.ok) {
-      return {
-        index,
-        status: "sent",
-        channel,
-        session_id: session.id,
-        message_id: inserted.id,
-        outbox_id: outbox.id,
-      };
-    }
-
     return {
       index,
-      status: processResult.status === "failed" ? "failed" : "queued",
+      status: "queued",
       channel,
       session_id: session.id,
       message_id: inserted.id,
       outbox_id: outbox.id,
-      reason: processResult.reason || "Pendiente de reintento",
+      reason: "Encolado para envío asíncrono",
     };
   } catch (error) {
     if (isMissingTableError(error)) {
@@ -416,7 +402,7 @@ export async function POST(req) {
 
     const summary = {
       total: results.length,
-      sent: results.filter((r) => r.status === "sent").length,
+      sent: 0,
       queued: results.filter((r) => r.status === "queued").length,
       failed: results.filter((r) => r.status === "failed").length,
       skipped: results.filter((r) => r.status === "skipped").length,
@@ -424,10 +410,11 @@ export async function POST(req) {
 
     return NextResponse.json(
       {
-        message: "Envío masivo procesado",
+        message: "Envío masivo encolado",
         bulk_id: bulkId,
         source_channel: defaultChannel,
         summary,
+        next_step: "Procesar outbox con cron o POST /api/conversations/outbox/process",
         results,
       },
       { status: 200 }

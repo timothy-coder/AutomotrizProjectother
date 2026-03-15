@@ -61,8 +61,9 @@ Se agrego una base funcional para bandeja conversacional con envio manual y webh
 - `POST /api/conversations/bulk-messages`
 	- Envia el mismo mensaje a multiples destinatarios en una sola solicitud.
 	- Soporta `whatsapp`, `instagram` y `facebook`.
-	- Reutiliza outbox/reintentos y devuelve resumen (`sent`, `queued`, `failed`, `skipped`).
+	- Encola mensajes en outbox (no envia sincrono por request) y devuelve resumen (`queued`, `failed`, `skipped`).
 	- Para canales sociales intenta resolver `platform_id` desde `social_identities` por celular.
+	- El envio real ocurre de forma asincrona via cron/job usando `POST /api/conversations/outbox/process` o `npm run outbox:process`.
 
 Body ejemplo:
 

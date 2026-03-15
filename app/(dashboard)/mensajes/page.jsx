@@ -118,9 +118,26 @@ export default function ConversationsPage() {
     return "border bg-white";
   }
 
-  function formatMinutes(seconds) {
+  function formatDurationCompact(seconds) {
     if (seconds == null) return "--";
-    return `${Math.round(Number(seconds) / 60)}m`;
+
+    const totalSeconds = Math.max(0, Number(seconds) || 0);
+    const totalMinutes = Math.round(totalSeconds / 60);
+
+    if (totalMinutes < 60) {
+      return `${totalMinutes}m`;
+    }
+
+    const totalHours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    if (totalHours < 24) {
+      return minutes > 0 ? `${totalHours}h ${minutes}m` : `${totalHours}h`;
+    }
+
+    const days = Math.floor(totalHours / 24);
+    const hours = totalHours % 24;
+    return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
   }
 
   const metricsCards = useMemo(() => {
@@ -183,7 +200,7 @@ export default function ConversationsPage() {
       {
         key: "ftr",
         title: "1ra resp. prom.",
-        value: formatMinutes(metrics.avg_first_response_seconds),
+        value: formatDurationCompact(metrics.avg_first_response_seconds),
         tone: metrics.avg_first_response_seconds == null
           ? "neutral"
           : Number(metrics.avg_first_response_seconds) > 900
@@ -195,7 +212,7 @@ export default function ConversationsPage() {
       {
         key: "wait",
         title: "Espera máxima",
-        value: maxWaitMinutes == null ? "--" : `${maxWaitMinutes}m`,
+        value: formatDurationCompact(metrics.max_wait_seconds),
         tone: maxWaitMinutes == null
           ? "neutral"
           : maxWaitMinutes > 60
@@ -328,116 +345,120 @@ export default function ConversationsPage() {
 
   return (
     <div className="h-full min-h-0 flex flex-col gap-3">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-2 items-start">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por cliente, celular o mensaje"
+            className="sm:col-span-3"
+          />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-2">
-        {metricsCards.map((card) => (
-          <button
-            key={card.key}
-            type="button"
-            onClick={() => card.clickable && applyMetricFilter(card.key)}
-            className={`rounded-lg p-3 text-left transition ${severityClass(card.tone)} ${card.clickable ? "hover:shadow-sm cursor-pointer" : "cursor-default"}`}
+          <select
+            className="h-9 rounded-md border bg-transparent px-3 text-sm"
+            value={channelFilter}
+            onChange={(e) => setChannelFilter(e.target.value)}
           >
-            <p className="text-xs text-gray-600">{card.title}</p>
-            <p className="text-lg font-semibold">{card.value}</p>
-          </button>
-        ))}
-      </div>
+            <option value="all">Todos los canales</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="instagram">Instagram</option>
+            <option value="messenger">Messenger</option>
+            <option value="n8n">n8n</option>
+          </select>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar por cliente, celular o mensaje"
-          className="sm:col-span-3"
-        />
-
-        <select
-          className="h-9 rounded-md border bg-transparent px-3 text-sm"
-          value={channelFilter}
-          onChange={(e) => setChannelFilter(e.target.value)}
-        >
-          <option value="all">Todos los canales</option>
-          <option value="whatsapp">WhatsApp</option>
-          <option value="instagram">Instagram</option>
-          <option value="messenger">Messenger</option>
-          <option value="n8n">n8n</option>
-        </select>
-
-        <select
-          className="h-9 rounded-md border bg-transparent px-3 text-sm"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="all">Todos los estados</option>
-          <option value="received">Recibido</option>
-          <option value="queued">En cola</option>
-          <option value="sent">Enviado</option>
-          <option value="delivered">Entregado</option>
-          <option value="read">Leido</option>
-          <option value="failed">Fallido</option>
-          <option value="unread">No leidos</option>
-        </select>
-
-        <select
-          className="h-9 rounded-md border bg-transparent px-3 text-sm"
-          value={ownerFilter}
-          onChange={(e) => setOwnerFilter(e.target.value)}
-        >
-          <option value="all">Todas</option>
-          <option value="mine">Mis conversaciones</option>
-          <option value="unassigned">Sin asignar</option>
-        </select>
-
-        <select
-          className="h-9 rounded-md border bg-transparent px-3 text-sm"
-          value={assignmentFilter}
-          onChange={(e) => setAssignmentFilter(e.target.value)}
-        >
-          <option value="all">Todos los flujos</option>
-          <option value="active">Abiertas/Pendientes</option>
-          <option value="open">Abiertas</option>
-          <option value="pending">Pendientes</option>
-          <option value="closed">Cerradas</option>
-          <option value="unassigned">Sin asignar</option>
-        </select>
-
-        <select
-          className="h-9 rounded-md border bg-transparent px-3 text-sm"
-          value={priorityFilter}
-          onChange={(e) => setPriorityFilter(e.target.value)}
-        >
-          <option value="all">Todas las prioridades</option>
-          <option value="urgent">Urgente</option>
-          <option value="high">Alta</option>
-          <option value="normal">Normal</option>
-          <option value="low">Baja</option>
-          <option value="overdue">Vencidas SLA</option>
-        </select>
-
-        <div className="flex items-center justify-between sm:col-span-3 text-xs text-gray-500 px-1 gap-2">
-          <span>
-            {filteredSessions.length} conversaciones · {selectedSessions.length} seleccionadas
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={toggleSelectAllFiltered}
-            disabled={filteredSessions.length === 0}
+          <select
+            className="h-9 rounded-md border bg-transparent px-3 text-sm"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
           >
-            {allFilteredSelected ? "Limpiar selección" : "Seleccionar filtrados"}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setBulkError("");
-              setBulkSummary(null);
-              setBulkTargetMode(selectedSessions.length > 0 ? "selected" : "filtered");
-              setBulkOpen(true);
-            }}
+            <option value="all">Todos los estados</option>
+            <option value="received">Recibido</option>
+            <option value="queued">En cola</option>
+            <option value="sent">Enviado</option>
+            <option value="delivered">Entregado</option>
+            <option value="read">Leido</option>
+            <option value="failed">Fallido</option>
+            <option value="unread">No leidos</option>
+          </select>
+
+          <select
+            className="h-9 rounded-md border bg-transparent px-3 text-sm"
+            value={ownerFilter}
+            onChange={(e) => setOwnerFilter(e.target.value)}
           >
-            Envío masivo básico
-          </Button>
+            <option value="all">Todas</option>
+            <option value="mine">Mis conversaciones</option>
+            <option value="unassigned">Sin asignar</option>
+          </select>
+
+          <select
+            className="h-9 rounded-md border bg-transparent px-3 text-sm"
+            value={assignmentFilter}
+            onChange={(e) => setAssignmentFilter(e.target.value)}
+          >
+            <option value="all">Todos los flujos</option>
+            <option value="active">Abiertas/Pendientes</option>
+            <option value="open">Abiertas</option>
+            <option value="pending">Pendientes</option>
+            <option value="closed">Cerradas</option>
+            <option value="unassigned">Sin asignar</option>
+          </select>
+
+          <select
+            className="h-9 rounded-md border bg-transparent px-3 text-sm"
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value)}
+          >
+            <option value="all">Todas las prioridades</option>
+            <option value="urgent">Urgente</option>
+            <option value="high">Alta</option>
+            <option value="normal">Normal</option>
+            <option value="low">Baja</option>
+            <option value="overdue">Vencidas SLA</option>
+          </select>
+
+          <div className="flex items-center justify-between sm:col-span-3 text-xs text-gray-500 px-1 gap-2">
+            <span>
+              {filteredSessions.length} conversaciones · {selectedSessions.length} seleccionadas
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleSelectAllFiltered}
+              disabled={filteredSessions.length === 0}
+            >
+              {allFilteredSelected ? "Limpiar selección" : "Seleccionar filtrados"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setBulkError("");
+                setBulkSummary(null);
+                setBulkTargetMode(selectedSessions.length > 0 ? "selected" : "filtered");
+                setBulkOpen(true);
+              }}
+            >
+              Envío masivo básico
+            </Button>
+          </div>
+        </div>
+
+        <div className="border rounded-lg p-2 bg-white">
+          <p className="text-[11px] text-gray-500 px-1 mb-1">Indicadores rápidos</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-2 gap-1">
+            {metricsCards.map((card) => (
+              <button
+                key={card.key}
+                type="button"
+                onClick={() => card.clickable && applyMetricFilter(card.key)}
+                className={`rounded-md px-2 py-1 text-left transition ${severityClass(card.tone)} ${card.clickable ? "hover:shadow-sm cursor-pointer" : "cursor-default"}`}
+              >
+                <p className="text-[10px] text-gray-600 leading-tight">{card.title}</p>
+                <p className="text-sm font-semibold leading-tight">{card.value}</p>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
