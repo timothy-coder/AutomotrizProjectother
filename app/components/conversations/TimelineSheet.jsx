@@ -35,6 +35,7 @@ export default function TimelineSheet({
   const [slaDueAt, setSlaDueAt] = useState("");
   const [savingPriority, setSavingPriority] = useState(false);
   const [priorityError, setPriorityError] = useState("");
+  const [selectedChannel, setSelectedChannel] = useState("whatsapp");
   const scrollRef = useRef(null);
   const lastMarkedRef = useRef(0);
 
@@ -177,6 +178,7 @@ export default function TimelineSheet({
   useEffect(() => {
     if (!open || !session?.session_id) return;
     lastMarkedRef.current = 0;
+    setSelectedChannel((session?.source_channel || "whatsapp").toLowerCase());
     setAssignedAgentId(session?.assigned_agent_id ? String(session.assigned_agent_id) : "");
     setAssignmentStatus(session?.assignment_status || "unassigned");
     setPriorityLevel(session?.priority_level || "normal");
@@ -219,7 +221,7 @@ export default function TimelineSheet({
           text,
           direction: "outbound",
           source: "manual_ui",
-          source_channel: session?.source_channel || "whatsapp",
+          source_channel: selectedChannel || session?.source_channel || "whatsapp",
         }),
       });
 
@@ -385,6 +387,20 @@ export default function TimelineSheet({
         </div>
 
         <div className="mt-3 space-y-2 border-t pt-3">
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500 w-28">Canal de envio</label>
+            <select
+              className="h-9 rounded-md border bg-white px-3 text-sm"
+              value={selectedChannel}
+              onChange={(e) => setSelectedChannel(e.target.value)}
+              disabled={sending}
+            >
+              <option value="whatsapp">WhatsApp</option>
+              <option value="instagram">Instagram</option>
+              <option value="facebook">Facebook</option>
+            </select>
+          </div>
+
           <Textarea
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
