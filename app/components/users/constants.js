@@ -4,6 +4,7 @@ export const ACTIONS = [
   { key: "edit", label: "Editar" },
   { key: "delete", label: "Eliminar" },
   { key: "viewall", label: "Ver todas" },
+  { key: "asignar", label: "Asignar" },
 ];
 
 export const SECTIONS = [
@@ -34,8 +35,8 @@ export const SECTIONS = [
   { key: "cotizacion", label: "Cotización", actions: ["view", "create", "edit", "delete"] },
   { key: "prospeccion", label: "Configuracion de Prospecciones", actions: ["view", "create", "edit", "delete"] },
   { key: "configagenda", label: "Configuración de Agenda", actions: ["view", "create", "edit", "delete"] },
-  { key: "leads", label: "Leads", actions: ["view", "create", "edit", "delete"] },
-  { key: "oportunidades", label: "Oportunidades", actions: ["view", "create", "edit", "delete"] },
+  { key: "leads", label: "Leads", actions: ["view", "create", "edit","asignar","asignar"] },
+  { key: "oportunidades", label: "Oportunidades", actions: ["view", "create", "edit","asignar"] },
   { key: "configpicaje", label: "Configuración de Picaje", actions: ["view", "create", "edit", "delete"] },
   { key: "configinventario", label: "Configuración de Inventario", actions: ["view", "create", "edit", "delete"] },
   { key: "configcotizacion", label: "Configuración de Cotización", actions: ["view", "create", "edit", "delete"] }
