@@ -464,37 +464,36 @@ export default function ConversationWorkspace({
         ))}
       </div>
 
-      <div className="border-t p-4 space-y-2">
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-gray-500 w-28">Canal de envio</label>
-          <select
-            className="h-9 rounded-md border bg-white px-3 text-sm"
-            value={selectedChannel}
-            onChange={(e) => setSelectedChannel(e.target.value)}
+      <div className="border-t p-3 space-y-2">
+        <div className="flex flex-col sm:flex-row gap-2 items-stretch">
+          <Textarea
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder="Escribe un mensaje para el cliente..."
+            className="min-h-24 sm:flex-1"
             disabled={sending}
-          >
-            <option value="whatsapp">WhatsApp</option>
-            <option value="instagram">Instagram</option>
-            <option value="facebook">Facebook</option>
-          </select>
-        </div>
+          />
 
-        <Textarea
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          placeholder="Escribe un mensaje para el cliente..."
-          className="min-h-22.5"
-          disabled={sending}
-        />
+          <div className="sm:w-44 flex flex-col gap-2">
+            <select
+              className="h-9 rounded-md border bg-white px-3 text-sm"
+              value={selectedChannel}
+              onChange={(e) => setSelectedChannel(e.target.value)}
+              disabled={sending}
+            >
+              <option value="whatsapp">WhatsApp</option>
+              <option value="instagram">Instagram</option>
+              <option value="facebook">Facebook</option>
+            </select>
+
+            <Button className="w-full" onClick={sendMessage} disabled={sending || !newMessage.trim()}>
+              <Send className="h-4 w-4 mr-2" />
+              {sending ? "Enviando..." : "Enviar"}
+            </Button>
+          </div>
+        </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
-
-        <div className="flex justify-end">
-          <Button onClick={sendMessage} disabled={sending || !newMessage.trim()}>
-            <Send className="h-4 w-4 mr-2" />
-            {sending ? "Enviando..." : "Enviar"}
-          </Button>
-        </div>
       </div>
     </div>
   );

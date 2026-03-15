@@ -361,24 +361,24 @@ export default function ConversationsPage() {
   }
 
   return (
-    <div className="h-full min-h-0 flex flex-col gap-3">
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-2 items-start">
+    <div className="h-full min-h-0 flex flex-col gap-2">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-2 items-start">
         {pageError && (
           <div className="xl:col-span-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             {pageError}
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por cliente, celular o mensaje"
-            className="sm:col-span-3"
+            className="sm:col-span-3 h-9"
           />
 
           <select
-            className="h-9 rounded-md border bg-transparent px-3 text-sm"
+            className="h-8 rounded-md border bg-transparent px-2 text-xs"
             value={channelFilter}
             onChange={(e) => setChannelFilter(e.target.value)}
           >
@@ -390,7 +390,7 @@ export default function ConversationsPage() {
           </select>
 
           <select
-            className="h-9 rounded-md border bg-transparent px-3 text-sm"
+            className="h-8 rounded-md border bg-transparent px-2 text-xs"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
@@ -405,7 +405,7 @@ export default function ConversationsPage() {
           </select>
 
           <select
-            className="h-9 rounded-md border bg-transparent px-3 text-sm"
+            className="h-8 rounded-md border bg-transparent px-2 text-xs"
             value={ownerFilter}
             onChange={(e) => setOwnerFilter(e.target.value)}
           >
@@ -415,7 +415,7 @@ export default function ConversationsPage() {
           </select>
 
           <select
-            className="h-9 rounded-md border bg-transparent px-3 text-sm"
+            className="h-8 rounded-md border bg-transparent px-2 text-xs"
             value={assignmentFilter}
             onChange={(e) => setAssignmentFilter(e.target.value)}
           >
@@ -428,7 +428,7 @@ export default function ConversationsPage() {
           </select>
 
           <select
-            className="h-9 rounded-md border bg-transparent px-3 text-sm"
+            className="h-8 rounded-md border bg-transparent px-2 text-xs"
             value={priorityFilter}
             onChange={(e) => setPriorityFilter(e.target.value)}
           >
@@ -440,13 +440,14 @@ export default function ConversationsPage() {
             <option value="overdue">Vencidas SLA</option>
           </select>
 
-          <div className="flex items-center justify-between sm:col-span-3 text-xs text-gray-500 px-1 gap-2">
+          <div className="flex items-center justify-between sm:col-span-3 text-xs text-gray-500 px-1 gap-1.5">
             <span>
               {filteredSessions.length} conversaciones · {selectedSessions.length} seleccionadas
             </span>
             <Button
               variant="outline"
               size="sm"
+              className="h-8 px-2 text-xs"
               onClick={toggleSelectAllFiltered}
               disabled={filteredSessions.length === 0}
             >
@@ -455,6 +456,7 @@ export default function ConversationsPage() {
             <Button
               variant="outline"
               size="sm"
+              className="h-8 px-2 text-xs"
               onClick={() => {
                 setBulkError("");
                 setBulkSummary(null);
@@ -467,25 +469,25 @@ export default function ConversationsPage() {
           </div>
         </div>
 
-        <div className="border rounded-lg p-2 bg-white">
-          <p className="text-[11px] text-gray-500 px-1 mb-1">Indicadores rápidos</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-2 gap-1">
+        <div className="border rounded-lg p-1.5 bg-white">
+          <p className="text-[10px] text-gray-500 px-1 mb-1">Indicadores</p>
+          <div className="grid grid-cols-2 gap-1">
             {metricsCards.map((card) => (
               <button
                 key={card.key}
                 type="button"
                 onClick={() => card.clickable && applyMetricFilter(card.key)}
-                className={`rounded-md px-2 py-1 text-left transition ${severityClass(card.tone)} ${card.clickable ? "hover:shadow-sm cursor-pointer" : "cursor-default"}`}
+                className={`rounded-md px-1.5 py-1 text-left transition ${severityClass(card.tone)} ${card.clickable ? "hover:shadow-sm cursor-pointer" : "cursor-default"}`}
               >
-                <p className="text-[10px] text-gray-600 leading-tight">{card.title}</p>
-                <p className="text-sm font-semibold leading-tight">{card.value}</p>
+                <p className="text-[9px] text-gray-600 leading-tight truncate">{card.title}</p>
+                <p className="text-[13px] font-semibold leading-tight">{card.value}</p>
               </button>
             ))}
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)] gap-3 flex-1 min-h-0">
+      <div className="grid grid-cols-1 lg:grid-cols-[330px_minmax(0,1fr)] gap-2 flex-1 min-h-0">
         <div className={`${selectedSession ? "hidden lg:flex" : "flex"} border rounded-xl overflow-hidden bg-white shadow min-h-0 h-full flex-col`}>
           <div className="overflow-y-auto flex-1 min-h-0">
             {filteredSessions.map((s) => (
