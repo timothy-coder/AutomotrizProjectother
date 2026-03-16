@@ -7,7 +7,7 @@ import { useRequirePerm } from "@/hooks/useRequirePerm";
 import ConversionTabPv from "@/app/components/configuracion/ConversionTabPv";
 import HorariosCentroTab from "@/app/components/configuracion/HorariosCentroTab";
 import TarifasTab from "@/app/components/configuracion/TarifasTab";
-
+import ConfiguracionEstadosTiempoTabpv from "@/app/components/configuracion/ConfiguracionEstadosTiempoTabpv";
 export default function ConfiguracionPage() {
 
   useRequirePerm("configuracion", "view");
@@ -25,6 +25,7 @@ export default function ConfiguracionPage() {
           <TabsTrigger value="conversion">Conversión</TabsTrigger>
           <TabsTrigger value="manoobra">Mano de Obra</TabsTrigger>
           <TabsTrigger value="panos">Paños</TabsTrigger>
+          <TabsTrigger value="estados-tiempo">Estados de Tiempo</TabsTrigger>
 
         </TabsList>
 
@@ -56,7 +57,13 @@ export default function ConfiguracionPage() {
             </CardContent>
           </Card>
         </TabsContent>
-
+        <TabsContent value="estados-tiempo">
+          <Card>
+            <CardContent className="pt-6">
+              <ConfiguracionEstadosTiempoTabpv />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
       </Tabs>
 

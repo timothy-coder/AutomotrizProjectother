@@ -24,6 +24,9 @@ export const NAV_TREE = [
     items: [
       { to: "/citas", label: "Citas", icon: Calendar, perm: ["citas", "view"] },
       { to: "/recepcion", label: "Recepción", icon: CalendarCheck, perm: ["recepcion", "view"] },
+      { to: "/oportunidadespv", label: "Oportunidades", icon: Calendar, perm: ["oportunidadespv", "view"] },
+      { to: "/leadspv", label: "Leads", icon: Calendar, perm: ["leadspv", "view"] },
+      
     ],
   },
   {
@@ -80,9 +83,10 @@ export const NAV_TREE = [
       { to: "/configuracion", label: "Configuración del sistema", icon: Settings, perm: ["configuracion", "view"] },
       { to: "/prospeccion", label: "Auto prospección", icon: Settings, perm: ["prospeccion", "view"] },
       { to: "/configagenda", label: "Configuración de Agenda", icon: Settings, perm: ["configagenda", "view"] },
+      { to: "/configcotizacion", label: "Configuración de Citas", icon: Settings, perm: ["configcotizacion", "view"] },
       { to: "/configinventario", label: "Configuración de Inventario", icon: Settings, perm: ["configinventario", "view"] },
       { to: "/configpicaje", label: "Configuración de Picaje", icon: Settings, perm: ["configpicaje", "view"] },
-      { to: "/configcotizacion", label: "Configuración de Cotización", icon: Settings, perm: ["configcotizacion", "view"] },
+      
     ],
   }
 ];

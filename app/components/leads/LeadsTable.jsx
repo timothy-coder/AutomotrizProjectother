@@ -8,7 +8,7 @@ import {
   getPaginationRowModel,
   flexRender,
 } from "@tanstack/react-table";
-import { ArrowUpDown, Pencil, UserPlus } from "lucide-react";
+import { ArrowUpDown, Pencil, UserPlus, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -18,6 +18,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
+import { useRouter } from "next/navigation";
 
 export default function LeadsTable({
   rows,
@@ -27,6 +28,7 @@ export default function LeadsTable({
   canEdit,
   canAssign,
 }) {
+  const router = useRouter();
   const [sorting, setSorting] = useState([]);
   const [estadosTiempo, setEstadosTiempo] = useState([]);
   const [filtroRango, setFiltroRango] = useState("dia"); // "dia", "semana", "mes"
@@ -165,6 +167,10 @@ export default function LeadsTable({
     return brightness < 128;
   }
 
+  const handleVerLead = (lead) => {
+    router.push(`/leads/${lead.id}`);
+  };
+
   const columns = useMemo(
     () => [
       {
@@ -249,6 +255,15 @@ export default function LeadsTable({
         header: "Acciones",
         cell: ({ row }) => (
           <div className="flex gap-2">
+            <Button
+              className="text-white bg-blue-600 hover:bg-blue-700"
+              size="sm"
+              onClick={() => handleVerLead(row.original)}
+            >
+              <Eye className="h-4 w-4 mr-1" />
+              Ver
+            </Button>
+
             {canEdit && (
               <Button variant="outline" size="sm" onClick={() => onEdit(row.original)}>
                 <Pencil className="h-4 w-4 mr-1" />
@@ -318,13 +333,13 @@ export default function LeadsTable({
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-6 text-center text-muted-foreground">
+                  <td colSpan={11} className="px-4 py-6 text-center text-muted-foreground">
                     Cargando...
                   </td>
                 </tr>
               ) : table.getRowModel().rows.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-6 text-center text-muted-foreground">
+                  <td colSpan={11} className="px-4 py-6 text-center text-muted-foreground">
                     No hay leads registrados
                   </td>
                 </tr>

@@ -24,7 +24,8 @@ export const SECTIONS = [
   
   { key: "citas", label: "Citas", actions: ["view", "create", "edit", "viewall"] },
   { key: "recepcion", label: "Recepcion", actions: ["view", "create", "edit", "delete"] },
-
+{ key: "leadspv", label: "Leads PV", actions: ["view", "create", "edit","asignar","asignar"] },
+  { key: "oportunidadespv", label: "Oportunidades PV", actions: ["view", "create", "edit","asignar"] },
   { key: "agenda", label: "Agenda", actions: ["view", "create", "edit", "viewall"] },
   { key: "picaje", label: "Picaje", actions: ["view", "create", "edit", "delete"] },
  
