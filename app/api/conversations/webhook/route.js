@@ -23,10 +23,6 @@ function isMissingColumnError(error) {
   return error?.code === "ER_BAD_FIELD_ERROR" || error?.errno === 1054;
 }
 
-function isMissingTableError(error) {
-  return error?.code === "ER_NO_SUCH_TABLE" || error?.errno === 1146;
-}
-
 function isOptOutSchemaMissing(error) {
   return isMissingTableError(error) || isMissingColumnError(error);
 }

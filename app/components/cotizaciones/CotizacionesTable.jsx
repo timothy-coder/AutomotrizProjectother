@@ -53,6 +53,37 @@ function calcExtraNeto(extra) {
   return Math.max(0, base - descuento);
 }
 
+function calcDescuentoDesglose(data) {
+  const subtotalProductos = Number(data?.subtotal_productos || 0);
+  const subtotalManoObra = Number(data?.subtotal_mano_obra || 0);
+  const subtotalAdicionales = Number(data?.subtotal_extras || 0);
+  const bruto = subtotalProductos + subtotalManoObra + subtotalAdicionales;
+  const pct = Number(data?.descuento_porcentaje || 0) / 100;
+  const montoFijo = Math.max(0, Number(data?.descuento_monto || 0));
+  const montoFijoAplicado = Math.min(montoFijo, bruto);
+  const factorFijo = bruto > 0 ? montoFijoAplicado / bruto : 0;
+  const tasaTotal = pct + factorFijo;
+
+  const descuentoProductos = subtotalProductos * tasaTotal;
+  const descuentoManoObra = subtotalManoObra * tasaTotal;
+  const descuentoAdicionales = subtotalAdicionales * tasaTotal;
+
+  const netoProductos = Math.max(0, subtotalProductos - descuentoProductos);
+  const netoManoObra = Math.max(0, subtotalManoObra - descuentoManoObra);
+  const netoAdicionales = Math.max(0, subtotalAdicionales - descuentoAdicionales);
+
+  return {
+    descuentoProductos,
+    descuentoManoObra,
+    descuentoAdicionales,
+    totalDescuento: descuentoProductos + descuentoManoObra + descuentoAdicionales,
+    netoProductos,
+    netoManoObra,
+    netoAdicionales,
+    netoSinIgv: netoProductos + netoManoObra + netoAdicionales,
+  };
+}
+
 export default function CotizacionesTable({
   items = [],
   showTipo = false,
@@ -170,26 +201,21 @@ export default function CotizacionesTable({
       }
 
       // Totals
-      const descPct = Number(data.descuento_porcentaje || 0);
-      const descMonto = Number(data.descuento_monto || 0);
+      const desglose = calcDescuentoDesglose(data);
       const totalsRows = [
-        ["Subtotal productos", formatCurrency(data.subtotal_productos, currencyCode)],
-        [`Subtotal ${manoLabel.toLowerCase()}`, formatCurrency(data.subtotal_mano_obra, currencyCode)],
+        ["Subtotal productos", formatCurrency(desglose.netoProductos, currencyCode)],
+        [`Subtotal ${manoLabel.toLowerCase()}`, formatCurrency(desglose.netoManoObra, currencyCode)],
+        ["Subtotal adicionales", formatCurrency(desglose.netoAdicionales, currencyCode)],
       ];
-      (data.extras || []).forEach((e) => {
-        totalsRows.push([`Adicional: ${e.descripcion}`, formatCurrency(calcExtraNeto(e), currencyCode)]);
-      });
-      if (descPct > 0 || descMonto > 0) {
-        const bruto = Number(data.subtotal_productos) + Number(data.subtotal_mano_obra) + Number(data.subtotal_extras);
-        const totalDesc = bruto * descPct / 100 + descMonto;
-        totalsRows.push(["Descuento", `-${formatCurrency(totalDesc, currencyCode)}`]);
+      if (desglose.totalDescuento > 0) {
+        totalsRows.push(["Desc. productos", `-${formatCurrency(desglose.descuentoProductos, currencyCode)}`]);
+        totalsRows.push([`Desc. ${manoLabel.toLowerCase()}`, `-${formatCurrency(desglose.descuentoManoObra, currencyCode)}`]);
+        totalsRows.push(["Desc. adicionales", `-${formatCurrency(desglose.descuentoAdicionales, currencyCode)}`]);
+        totalsRows.push(["Descuento total aplicado", `-${formatCurrency(desglose.totalDescuento, currencyCode)}`]);
       }
       if (Number(data.incluir_igv || 0) === 1) {
-        const neto = Math.max(0, Number(data.subtotal_productos) + Number(data.subtotal_mano_obra) + Number(data.subtotal_extras)
-          - (Number(data.subtotal_productos) + Number(data.subtotal_mano_obra) + Number(data.subtotal_extras)) * Number(data.descuento_porcentaje || 0) / 100
-          - Number(data.descuento_monto || 0));
         const pct = Number(data.impuesto_porcentaje || data.impuesto_porcentaje_config || 0);
-        totalsRows.push([`IGV (${pct}%)`, formatCurrency(neto * pct / 100, currencyCode)]);
+        totalsRows.push([`IGV (${pct}%)`, formatCurrency(desglose.netoSinIgv * pct / 100, currencyCode)]);
       }
       totalsRows.push(["TOTAL", formatCurrency(data.monto_total, currencyCode)]);
 
