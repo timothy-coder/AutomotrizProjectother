@@ -26,7 +26,10 @@ export async function POST(req) {
     const filepath = path.join(uploadDir, filename);
     await fs.writeFile(filepath, buffer);
 
-    return NextResponse.json({ url: `/uploads/${filename}` });
+    return NextResponse.json({
+      url: `/api/upload/files/${filename}`,
+      static_url: `/uploads/${filename}`,
+    });
   } catch (e) {
     console.log(e);
     return NextResponse.json({ message: "Error subiendo archivo" }, { status: 500 });

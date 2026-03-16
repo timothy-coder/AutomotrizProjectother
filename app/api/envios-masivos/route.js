@@ -48,6 +48,43 @@ function formatDateTimeForMySQL(dateObj) {
   return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
 }
 
+function getRequestOrigin(req) {
+  const forwardedProto = String(req.headers.get("x-forwarded-proto") || "")
+    .split(",")[0]
+    .trim();
+  const forwardedHost = String(req.headers.get("x-forwarded-host") || "")
+    .split(",")[0]
+    .trim();
+
+  if (forwardedProto && forwardedHost) {
+    return `${forwardedProto}://${forwardedHost}`;
+  }
+
+  const host = String(req.headers.get("host") || "").split(",")[0].trim();
+  if (host) {
+    const isLocalHost = host.includes("localhost") || host.startsWith("127.");
+    return `${isLocalHost ? "http" : "https"}://${host}`;
+  }
+
+  return req.nextUrl?.origin || "";
+}
+
+function toAbsoluteMediaUrl(rawUrl, req) {
+  const value = String(rawUrl || "").trim();
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value)) return value;
+
+  const mediaBaseUrl = (
+    process.env.MEDIA_PUBLIC_BASE_URL ||
+    process.env.APP_BASE_URL ||
+    getRequestOrigin(req) ||
+    ""
+  ).replace(/\/$/, "");
+
+  if (!mediaBaseUrl) return value;
+  return value.startsWith("/") ? `${mediaBaseUrl}${value}` : `${mediaBaseUrl}/${value}`;
+}
+
 export async function GET(req) {
   const auth = authorizeConversation(req, "view");
   if (!auth.ok) return auth.response;
@@ -178,6 +215,7 @@ export async function POST(req) {
     const message = String(content?.message || "").trim();
     const templateMode = String(content?.template_mode || "texto").trim();
     const imageUrl = String(content?.image_url || "").trim();
+    const normalizedImageUrl = toAbsoluteMediaUrl(imageUrl, req);
 
     if (!campaignName) {
       return NextResponse.json({ message: "campaign_name es requerido" }, { status: 400 });
@@ -260,7 +298,11 @@ export async function POST(req) {
         sendNow ? "running" : "scheduled",
         sendNow ? 1 : 0,
         sendNow ? null : formatDateTimeForMySQL(scheduledAtDate),
-        JSON.stringify({ ...content, template_mode: content?.template_mode || "texto" }),
+        JSON.stringify({
+          ...content,
+          image_url: normalizedImageUrl,
+          template_mode: content?.template_mode || "texto",
+        }),
         JSON.stringify(filters),
         createdByUserId,
       ]
