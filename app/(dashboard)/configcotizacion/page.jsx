@@ -3,10 +3,12 @@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { useRequirePerm } from "@/hooks/useRequirePerm";
-import DescuentosTab from "@/app/components/configuracion/DescuentosTab";
 
+import ConversionTabPv from "@/app/components/configuracion/ConversionTabPv";
+import HorariosCentroTab from "@/app/components/configuracion/HorariosCentroTab";
+import TarifasTab from "@/app/components/configuracion/TarifasTab";
 
-export default function ConfiguracionCotizacionPage() {
+export default function ConfiguracionPage() {
 
   useRequirePerm("configuracion", "view");
 
@@ -15,22 +17,46 @@ export default function ConfiguracionCotizacionPage() {
 
       <h1 className="text-2xl font-semibold">Configuración del sistema</h1>
 
-      <Tabs defaultValue="centros">
+      <Tabs defaultValue="horarios">
 
         <TabsList className="grid grid-cols-2 md:grid-cols-9 w-full">
 
-          <TabsTrigger value="centros">descuentos</TabsTrigger>
-
+          <TabsTrigger value="horarios">Horarios</TabsTrigger>
+          <TabsTrigger value="conversion">Conversión</TabsTrigger>
+          <TabsTrigger value="manoobra">Mano de Obra</TabsTrigger>
+          <TabsTrigger value="panos">Paños</TabsTrigger>
 
         </TabsList>
 
-        <TabsContent value="centros">
+        <TabsContent value="horarios">
           <Card>
             <CardContent className="pt-6">
-              <DescuentosTab />
+              <HorariosCentroTab />
             </CardContent>
           </Card>
         </TabsContent>
+        <TabsContent value="conversion">
+          <Card>
+            <CardContent className="pt-6">
+              <ConversionTabPv tipo="panos" />
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="manoobra">
+          <Card>
+            <CardContent className="pt-6">
+              <TarifasTab tipo="mano_obra" />
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="panos">
+          <Card>
+            <CardContent className="pt-6">
+              <TarifasTab tipo="panos" />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
 
       </Tabs>
 

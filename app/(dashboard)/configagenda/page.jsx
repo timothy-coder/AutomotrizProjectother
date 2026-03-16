@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useRequirePerm } from "@/hooks/useRequirePerm";
 
 import ConversionTab from "@/app/components/configuracion/ConversionTab";
-
+import ConfiguracionEstadosTiempoTab from "@/app/components/configuracion/ConfiguracionEstadosTiempoTab";
 import AgendaCentroTab from "@/app/components/configuracion/AgendaCentroTab";
 
 export default function ConfiguracionAgendaPage() {
@@ -23,7 +23,7 @@ export default function ConfiguracionAgendaPage() {
 
           <TabsTrigger value="horarios">Horarios Agenda</TabsTrigger>
           <TabsTrigger value="conversion">Etapas de Conversión</TabsTrigger>
-
+<TabsTrigger value="tiempos">Tiempos</TabsTrigger>
 
         </TabsList>
         <TabsContent value="horarios">
@@ -37,6 +37,13 @@ export default function ConfiguracionAgendaPage() {
           <Card>
             <CardContent className="pt-6">
               <ConversionTab />
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="tiempos">
+          <Card>
+            <CardContent className="pt-6">
+              <ConfiguracionEstadosTiempoTab />
             </CardContent>
           </Card>
         </TabsContent>

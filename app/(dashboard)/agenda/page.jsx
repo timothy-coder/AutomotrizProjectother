@@ -7,6 +7,11 @@ import {
     subWeeks,
     startOfWeek,
     addDays,
+    addMonths,
+    subMonths,
+    startOfMonth,
+    endOfMonth,
+    eachDayOfInterval,
 } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -19,7 +24,7 @@ import {
     SelectItem,
 } from "@/components/ui/select";
 
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { CalendarClock, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { hasPermission } from "@/lib/permissions";
 import OportunidadDialog from "@/app/components/oportunidades/OportunidadDialog";
@@ -47,13 +52,15 @@ export default function AgendaPage() {
     const [horario, setHorario] = useState(null);
     const [slots, setSlots] = useState([]);
     const [oportunidades, setOportunidades] = useState([]);
+    const [estadosTiempo, setEstadosTiempo] = useState([]);
 
     const [createdByFilter, setCreatedByFilter] = useState("all");
     const [assignedToFilter, setAssignedToFilter] = useState("all");
-    const [tipoFilter, setTipoFilter] = useState("all"); // all | op | ld
+    const [tipoFilter, setTipoFilter] = useState("all");
+    const [vistaFiltro, setVistaFiltro] = useState("semana"); // "semana", "mes"
 
     const [openOportunidadDialog, setOpenOportunidadDialog] = useState(false);
-    const [dialogType, setDialogType] = useState("op"); // op | ld
+    const [dialogType, setDialogType] = useState("op");
     const [dialogDefaults, setDialogDefaults] = useState({
         fecha: "",
         hora: "",
@@ -66,8 +73,31 @@ export default function AgendaPage() {
     const [weekStart, setWeekStart] = useState(
         startOfWeek(new Date(), { weekStartsOn: 1 })
     );
+    const [monthStart, setMonthStart] = useState(startOfMonth(new Date()));
 
-    const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+    // Calcular días según la vista
+    const days = useMemo(() => {
+        if (vistaFiltro === "semana") {
+            return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+        } else {
+            // mes
+            return eachDayOfInterval({
+                start: monthStart,
+                end: endOfMonth(monthStart),
+            });
+        }
+    }, [vistaFiltro, weekStart, monthStart]);
+
+    // Cargar configuración de estados de tiempo
+    useEffect(() => {
+        fetch("/api/configuracion-estados-tiempo", { cache: "no-store" })
+            .then((r) => r.json())
+            .then((data) => {
+                const lista = Array.isArray(data) ? data : [];
+                setEstadosTiempo(lista);
+            })
+            .catch(() => setEstadosTiempo([]));
+    }, []);
 
     useEffect(() => {
         function close(e) {
@@ -175,7 +205,7 @@ export default function AgendaPage() {
     async function loadOportunidades() {
         try {
             const fecha_desde = format(days[0], "yyyy-MM-dd");
-            const fecha_hasta = format(days[6], "yyyy-MM-dd");
+            const fecha_hasta = format(days[days.length - 1], "yyyy-MM-dd");
 
             const [resOp, resLd] = await Promise.all([
                 fetch(
@@ -232,7 +262,7 @@ export default function AgendaPage() {
     useEffect(() => {
         if (scopeLoading) return;
         loadOportunidades();
-    }, [weekStart, scopeLoading, tipoFilter]);
+    }, [weekStart, monthStart, vistaFiltro, scopeLoading, tipoFilter]);
 
     const createdByOptions = useMemo(() => {
         const map = new Map();
@@ -424,6 +454,59 @@ export default function AgendaPage() {
         return oportunidad?.etapa_name || oportunidad?.origen_name || "-";
     }
 
+    function getMinutosRestantes(fechaAgenda, horaAgenda) {
+        if (!fechaAgenda || !horaAgenda) return null;
+
+        try {
+            const fechaStr = String(fechaAgenda).trim().split("T")[0];
+            const horaStr = String(horaAgenda)
+                .trim()
+                .split(":")
+                .slice(0, 2)
+                .join(":");
+
+            const fechaHoraString = `${fechaStr}T${horaStr}:00`;
+
+            const ahora = new Date();
+            const agendaDateTime = new Date(fechaHoraString);
+
+            if (isNaN(agendaDateTime.getTime())) {
+                return null;
+            }
+
+            const diferencia = agendaDateTime.getTime() - ahora.getTime();
+            const minutos = Math.floor(diferencia / 1000 / 60);
+
+            return minutos;
+        } catch (error) {
+            console.error("Error calculando minutos:", error);
+            return null;
+        }
+    }
+
+    function getColorEstadoTiempo(minutosRestantes, etapasconversion_id) {
+        if (etapasconversion_id !== 1 && etapasconversion_id !== 2) {
+            return "#28a745";
+        }
+
+        if (minutosRestantes === null) {
+            return "#6b7280";
+        }
+
+        const estadoActivo = estadosTiempo.find(
+            (e) =>
+                e.activo &&
+                minutosRestantes >= e.minutos_desde &&
+                minutosRestantes <= e.minutos_hasta
+        );
+
+        if (estadoActivo) {
+            return estadoActivo.color_hexadecimal;
+        }
+
+        return "#6b7280";
+    }
+
     function openMenu(day, hour, e) {
         e.stopPropagation();
         setMenuCell({
@@ -433,6 +516,150 @@ export default function AgendaPage() {
     }
 
     const canShowGrid = !scopeLoading && !!centroId;
+
+    // Para vista de mes, mostramos un grid de 7x6 (semanas x días)
+    const renderMesView = () => {
+        const weeksInMonth = [];
+        let currentWeek = [];
+
+        // Añadir días vacíos del mes anterior
+        const firstDayOfMonth = days[0];
+        const startDay = firstDayOfMonth.getDay() === 0 ? 6 : firstDayOfMonth.getDay() - 1;
+
+        for (let i = 0; i < startDay; i++) {
+            currentWeek.push(null);
+        }
+
+        // Añadir días del mes
+        days.forEach((day) => {
+            currentWeek.push(day);
+            if (currentWeek.length === 7) {
+                weeksInMonth.push([...currentWeek]);
+                currentWeek = [];
+            }
+        });
+
+        // Rellenar última semana si es necesario
+        while (currentWeek.length < 7) {
+            currentWeek.push(null);
+        }
+        if (currentWeek.length > 0) {
+            weeksInMonth.push(currentWeek);
+        }
+
+        return (
+            <div className="border rounded overflow-hidden">
+                <div className="grid grid-cols-7">
+                    {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((day) => (
+                        <div key={day} className="p-2 text-center font-medium border-b bg-muted">
+                            {day}
+                        </div>
+                    ))}
+                </div>
+
+                {weeksInMonth.map((week, weekIdx) => (
+                    <div key={weekIdx} className="grid grid-cols-7">
+                        {week.map((day, dayIdx) => {
+                            if (!day) {
+                                return <div key={`empty-${dayIdx}`} className="border p-2 bg-gray-50 min-h-24" />;
+                            }
+
+                            const dayString = format(day, "yyyy-MM-dd");
+                            const dayOportunidades = filteredOportunidades.filter((o) =>
+                                normalizeDate(o.fecha_agenda) === dayString
+                            );
+
+                            return (
+                                <div
+                                    key={dayString}
+                                    className="border p-2 min-h-24 overflow-auto cursor-pointer hover:bg-blue-50 relative"
+                                    onClick={(e) => {
+                                        if (!permCreate) return;
+                                        openMenu(day, "10:00", e);
+                                    }}
+                                >
+                                    <div className="text-xs font-semibold mb-1">
+                                        {format(day, "d")}
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        {dayOportunidades.map((o) => {
+                                            const tipo = getTipoCodigo(o.oportunidad_id);
+                                            const minutosRestantes = getMinutosRestantes(
+                                                o.fecha_agenda,
+                                                o.hora_agenda
+                                            );
+                                            const colorTiempo = getColorEstadoTiempo(
+                                                minutosRestantes,
+                                                o.etapasconversion_id
+                                            );
+
+                                            return (
+                                                <div
+                                                    key={`${tipo}-${o.id}`}
+                                                    className="rounded text-[9px] p-1 truncate cursor-pointer"
+                                                    style={{
+                                                        ...getCardStyle(o),
+                                                        borderLeft: `3px solid ${colorTiempo}`,
+                                                    }}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setMenuCell(null);
+                                                        setSelectedOportunidad(o);
+                                                        setDialogType(tipo);
+                                                        setDialogDefaults({
+                                                            fecha: o.fecha_agenda || "",
+                                                            hora: o.hora_agenda || "",
+                                                            oportunidadPadreId: "",
+                                                        });
+                                                        setOpenOportunidadDialog(true);
+                                                    }}
+                                                >
+                                                    <div className="font-semibold truncate">
+                                                        {o.oportunidad_id}
+                                                    </div>
+                                                    <div className="truncate">
+                                                        {o.cliente_name || ""}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {menuCell &&
+                                        menuCell.day === dayString &&
+                                        permCreate && (
+                                            <div
+                                                ref={menuRef}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="absolute z-10 bg-white border rounded shadow p-2 top-2 left-2 w-48 space-y-1"
+                                            >
+                                                <button
+                                                    className="block w-full text-left hover:bg-gray-100 px-2 py-1 rounded text-sm"
+                                                    onClick={() => {
+                                                        setSelectedOportunidad(null);
+                                                        setDialogType("op");
+                                                        setDialogDefaults({
+                                                            fecha: dayString,
+                                                            hora: "10:00",
+                                                            oportunidadPadreId: "",
+                                                        });
+                                                        setMenuCell(null);
+                                                        setOpenOportunidadDialog(true);
+                                                    }}
+                                                >
+                                                    Nueva oportunidad
+                                                </button>
+                                            </div>
+                                        )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                ))}
+            </div>
+        );
+    };
 
     if (!permView) {
         return (
@@ -445,26 +672,61 @@ export default function AgendaPage() {
     return (
         <div className="space-y-4">
             <div className="flex flex-wrap gap-3 items-center">
-                <span className="font-semibold">
-                    {format(days[0], "dd MMM", { locale: es })} -{" "}
-                    {format(days[6], "dd MMM", { locale: es })}
-                </span>
+                {vistaFiltro === "semana" ? (
+                    <span className="font-semibold">
+                        {format(days[0], "dd MMM", { locale: es })} -{" "}
+                        {format(days[6], "dd MMM", { locale: es })}
+                    </span>
+                ) : (
+                    <span className="font-semibold">
+                        {format(monthStart, "MMMM yyyy", { locale: es })}
+                    </span>
+                )}
 
-                <Button size="icon" onClick={() => setWeekStart(subWeeks(weekStart, 1))}>
+                <Button
+                    size="icon"
+                    onClick={() => {
+                        if (vistaFiltro === "semana") {
+                            setWeekStart(subWeeks(weekStart, 1));
+                        } else {
+                            setMonthStart(subMonths(monthStart, 1));
+                        }
+                    }}
+                >
                     <ChevronLeft />
                 </Button>
 
-                <Button size="icon" onClick={() => setWeekStart(addWeeks(weekStart, 1))}>
+                <Button
+                    size="icon"
+                    onClick={() => {
+                        if (vistaFiltro === "semana") {
+                            setWeekStart(addWeeks(weekStart, 1));
+                        } else {
+                            setMonthStart(addMonths(monthStart, 1));
+                        }
+                    }}
+                >
                     <ChevronRight />
                 </Button>
 
                 <Button
-                    onClick={() =>
-                        setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))
-                    }
+                    onClick={() => {
+                        setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }));
+                        setMonthStart(startOfMonth(new Date()));
+                    }}
                 >
                     Hoy
                 </Button>
+
+                <Select value={vistaFiltro} onValueChange={setVistaFiltro}>
+                    <SelectTrigger className="w-[140px]">
+                        <SelectValue placeholder="Vista" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="semana">Por semana</SelectItem>
+                        <SelectItem value="mes">Por mes</SelectItem>
+                    </SelectContent>
+                </Select>
 
                 <Select
                     value={centroId ? String(centroId) : ""}
@@ -544,7 +806,7 @@ export default function AgendaPage() {
                             setSelectedOportunidad(null);
                             setDialogType("op");
                             setDialogDefaults({
-                                fecha: "",
+                                fecha: format(new Date(), "yyyy-MM-dd"),
                                 hora: "",
                                 oportunidadPadreId: "",
                             });
@@ -564,134 +826,153 @@ export default function AgendaPage() {
             )}
 
             {canShowGrid && (
-                <div className="border rounded overflow-hidden">
-                    <div className="grid grid-cols-[80px_repeat(7,1fr)]">
-                        <div />
-                        {days.map((d) => (
-                            <div
-                                key={d.toISOString()}
-                                className="p-2 text-center font-medium border-l capitalize"
-                            >
-                                {format(d, "EEEE dd", { locale: es })}
-                            </div>
-                        ))}
-                    </div>
-
-                    {slots.map((h) => (
-                        <div key={h} className="grid grid-cols-[80px_repeat(7,1fr)]">
-                            <div className="border-t p-2 text-sm text-gray-500">{h}</div>
-
-                            {days.map((d) => {
-                                const oportunidadesSlot = getOportunidades(d, h);
-                                const blocked = !enabled(d, h) || past(d, h);
-                                const dayString = format(d, "yyyy-MM-dd");
-
-                                return (
+                <>
+                    {vistaFiltro === "mes" ? (
+                        renderMesView()
+                    ) : (
+                        <div className="border rounded overflow-hidden">
+                            <div className="grid grid-cols-[80px_repeat(7,1fr)]">
+                                <div />
+                                {days.map((d) => (
                                     <div
-                                        key={`${dayString}-${h}`}
-                                        className={`border-t border-l min-h-24 relative ${blocked
-                                                ? "bg-gray-100 cursor-not-allowed"
-                                                : "hover:bg-[#5e17eb]/10 cursor-pointer"
-                                            }`}
-                                        onClick={(e) => {
-                                            if (blocked || !permCreate) return;
-                                            openMenu(d, h, e);
-                                        }}
+                                        key={d.toISOString()}
+                                        className="p-2 text-center font-medium border-l capitalize"
                                     >
-                                        <div className="absolute inset-1 overflow-auto space-y-1">
-                                            {oportunidadesSlot.map((o) => {
-                                                const tipo = getTipoCodigo(o.oportunidad_id);
-
-                                                return (
-                                                    <div
-                                                        key={`${tipo}-${o.id}`}
-                                                        className="rounded shadow border text-[10px] p-1 overflow-hidden cursor-pointer"
-                                                        style={getCardStyle(o)}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setMenuCell(null);
-                                                            setSelectedOportunidad(o);
-                                                            setDialogType(tipo);
-                                                            setDialogDefaults({
-                                                                fecha: o.fecha_agenda || "",
-                                                                hora: o.hora_agenda || "",
-                                                                oportunidadPadreId: "",
-                                                            });
-                                                            setOpenOportunidadDialog(true);
-                                                        }}
-                                                    >
-                                                        <div className="flex items-center justify-between gap-2">
-                                                            <div className="font-semibold">
-                                                                {o.oportunidad_id || "Registro"}
-                                                            </div>
-                                                            <span className="text-[9px] font-semibold uppercase">
-                                                                {tipo === "ld" ? "LD" : "OP"}
-                                                            </span>
-                                                        </div>
-
-                                                        <div className="truncate">
-                                                            {o.cliente_name || "Sin cliente"}
-                                                        </div>
-
-                                                        <div className="truncate">
-                                                            {o.marca_name || ""}
-                                                            {o.marca_name && o.modelo_name ? " - " : ""}
-                                                            {o.modelo_name || ""}
-                                                        </div>
-
-                                                        <div className="truncate">
-                                                            {getEtapaVisualText(o)}
-                                                        </div>
-
-                                                        <div className="truncate text-[9px]">
-                                                            {o.origen_name || ""}
-                                                        </div>
-
-                                                        <div className="truncate text-[9px]">
-                                                            {o.detalle || ""}
-                                                        </div>
-
-                                                        <div className="text-[9px] text-gray-500">
-                                                            {String(o.hora_agenda || "").slice(0, 8)}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-
-                                        {menuCell &&
-                                            menuCell.day === dayString &&
-                                            menuCell.hour === h &&
-                                            permCreate && (
-                                                <div
-                                                    ref={menuRef}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="absolute z-10 bg-white border rounded shadow p-2 top-2 left-2 w-48 space-y-1"
-                                                >
-                                                    <button
-                                                        className="block w-full text-left hover:bg-gray-100 px-2 py-1 rounded"
-                                                        onClick={() => {
-                                                            setSelectedOportunidad(null);
-                                                            setDialogType("op");
-                                                            setDialogDefaults({
-                                                                fecha: dayString,
-                                                                hora: h,
-                                                                oportunidadPadreId: "",
-                                                            });
-                                                            setMenuCell(null);
-                                                            setOpenOportunidadDialog(true);
-                                                        }}
-                                                    >
-                                                        Nueva oportunidad
-                                                    </button>
-                                                </div>
-                                            )}
+                                        {format(d, "EEEE dd", { locale: es })}
                                     </div>
-                                );
-                            })}
+                                ))}
+                            </div>
+
+                            {slots.map((h) => (
+                                <div key={h} className="grid grid-cols-[80px_repeat(7,1fr)]">
+                                    <div className="border-t p-2 text-sm text-gray-500">{h}</div>
+
+                                    {days.map((d) => {
+                                        const oportunidadesSlot = getOportunidades(d, h);
+                                        const blocked = !enabled(d, h) || past(d, h);
+                                        const dayString = format(d, "yyyy-MM-dd");
+
+                                        return (
+                                            <div
+                                                key={`${dayString}-${h}`}
+                                                className={`border-t border-l min-h-24 relative ${
+                                                    blocked
+                                                        ? "bg-gray-100 cursor-not-allowed"
+                                                        : "hover:bg-[#5e17eb]/10 cursor-pointer"
+                                                }`}
+                                                onClick={(e) => {
+                                                    if (blocked || !permCreate) return;
+                                                    openMenu(d, h, e);
+                                                }}
+                                            >
+                                                <div className="absolute inset-1 overflow-auto space-y-1">
+                                                    {oportunidadesSlot.map((o) => {
+                                                        const tipo = getTipoCodigo(o.oportunidad_id);
+                                                        const minutosRestantes = getMinutosRestantes(
+                                                            o.fecha_agenda,
+                                                            o.hora_agenda
+                                                        );
+                                                        const colorTiempo = getColorEstadoTiempo(
+                                                            minutosRestantes,
+                                                            o.etapasconversion_id
+                                                        );
+
+                                                        return (
+                                                            <div
+                                                                key={`${tipo}-${o.id}`}
+                                                                className="rounded shadow border text-[10px] p-1 overflow-hidden cursor-pointer"
+                                                                style={getCardStyle(o)}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setMenuCell(null);
+                                                                    setSelectedOportunidad(o);
+                                                                    setDialogType(tipo);
+                                                                    setDialogDefaults({
+                                                                        fecha: o.fecha_agenda || "",
+                                                                        hora: o.hora_agenda || "",
+                                                                        oportunidadPadreId: "",
+                                                                    });
+                                                                    setOpenOportunidadDialog(true);
+                                                                }}
+                                                            >
+                                                                <div className="flex items-center justify-between gap-2">
+                                                                    <div className="font-semibold flex items-center gap-3">
+                                                                        {o.oportunidad_id || "Registro"}
+                                                                        <CalendarClock
+                                                                            className="w-3 h-3 inline-block"
+                                                                            style={{ color: colorTiempo }}
+                                                                        />
+                                                                    </div>
+                                                                    <span className="text-[9px] font-semibold uppercase">
+                                                                        {tipo === "ld" ? "LD" : "OP"}
+                                                                    </span>
+                                                                </div>
+
+                                                                <div className="truncate">
+                                                                    {o.cliente_name || "Sin cliente"}
+                                                                </div>
+
+                                                                <div className="truncate">
+                                                                    {o.marca_name || ""}
+                                                                    {o.marca_name && o.modelo_name ? " - " : ""}
+                                                                    {o.modelo_name || ""}
+                                                                </div>
+
+                                                                <div className="truncate">
+                                                                    {getEtapaVisualText(o)}
+                                                                </div>
+
+                                                                <div className="truncate text-[9px]">
+                                                                    {o.origen_name || ""}
+                                                                </div>
+
+                                                                <div className="truncate text-[9px]">
+                                                                    {o.detalle || ""}
+                                                                </div>
+
+                                                                <div className="text-[9px] text-gray-500">
+                                                                    {String(o.hora_agenda || "").slice(0, 8)}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                {menuCell &&
+                                                    menuCell.day === dayString &&
+                                                    menuCell.hour === h &&
+                                                    permCreate && (
+                                                        <div
+                                                            ref={menuRef}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="absolute z-10 bg-white border rounded shadow p-2 top-2 left-2 w-48 space-y-1"
+                                                        >
+                                                            <button
+                                                                className="block w-full text-left hover:bg-gray-100 px-2 py-1 rounded"
+                                                                onClick={() => {
+                                                                    setSelectedOportunidad(null);
+                                                                    setDialogType("op");
+                                                                    setDialogDefaults({
+                                                                        fecha: dayString,
+                                                                        hora: h,
+                                                                        oportunidadPadreId: "",
+                                                                    });
+                                                                    setMenuCell(null);
+                                                                    setOpenOportunidadDialog(true);
+                                                                }}
+                                                            >
+                                                                Nueva oportunidad
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ))}
                         </div>
-                    ))}
-                </div>
+                    )}
+                </>
             )}
 
             <OportunidadDialog

@@ -233,8 +233,8 @@ export default function LeadsPage() {
       <Tabs defaultValue="general" className="space-y-4">
         <TabsList>
           <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="vista_usuarios">Vista por usuarios</TabsTrigger>
-          <TabsTrigger value="vista_etapas">Vista por etapas</TabsTrigger>
+          <TabsTrigger value="vista_usuarios">Tablero</TabsTrigger>
+          <TabsTrigger value="vista_etapas">Kanban</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general">
@@ -323,7 +323,7 @@ export default function LeadsPage() {
         <TabsContent value="vista_usuarios">
           <Card className="overflow-hidden">
             <CardHeader>
-              <CardTitle>Vista por usuarios</CardTitle>
+              <CardTitle>Tablero</CardTitle>
             </CardHeader>
             <CardContent className="overflow-hidden">
               <VistaPorUsuariosLeads
@@ -340,7 +340,7 @@ export default function LeadsPage() {
         <TabsContent value="vista_etapas">
           <Card className="overflow-hidden">
             <CardHeader>
-              <CardTitle>Vista por etapas</CardTitle>
+              <CardTitle>Kanban</CardTitle>
             </CardHeader>
             <CardContent className="overflow-hidden">
               <VistaPorEtapasLeads

@@ -171,7 +171,7 @@ export default function TarifasTab({ tipo }) {
               {items.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.nombre}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(item.precio_hora)}</TableCell>
+                  <TableCell className="text-right">{item.precio_hora}</TableCell>
                   <TableCell className="text-center">
                     <Badge variant={item.activo ? "default" : "secondary"}>
                       {item.activo ? "Activa" : "Inactiva"}
@@ -205,7 +205,7 @@ export default function TarifasTab({ tipo }) {
             <div className="space-y-2">
               <Label>Nombre *</Label>
               <Input
-                placeholder={`Ej: ${tipo === "mano_obra" ? "Mano de obra estándar" : "Paños básicos"}`}
+                placeholder={`Ej: {tipo === "mano_obra" ? "Mano de obra estándar" : "Paños básicos"}`}
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
               />

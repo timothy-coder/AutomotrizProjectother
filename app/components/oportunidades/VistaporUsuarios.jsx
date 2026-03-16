@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronsUpDown } from "lucide-react";
+import { format, startOfWeek, addDays } from "date-fns";
+import { es } from "date-fns/locale";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -24,16 +26,6 @@ function getUserLabel(u) {
 function getHoraLabel(hora) {
   if (!hora) return "";
   return String(hora).slice(0, 5);
-}
-
-function generateHours() {
-  const hours = [];
-  for (let h = 0; h <= 24; h++) {
-    const hh = String(h).padStart(2, "0");
-    hours.push(`${hh}:00`);
-    if (h !== 24) hours.push(`${hh}:30`);
-  }
-  return hours;
 }
 
 function renderTooltipContent(card) {
@@ -94,6 +86,18 @@ export default function VistaPorUsuarios({
 }) {
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [openUsers, setOpenUsers] = useState(false);
+  const [estadosTiempo, setEstadosTiempo] = useState([]);
+
+  // Cargar configuración de estados de tiempo
+  useEffect(() => {
+    fetch("/api/configuracion-estados-tiempo", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        const lista = Array.isArray(data) ? data : [];
+        setEstadosTiempo(lista);
+      })
+      .catch(() => setEstadosTiempo([]));
+  }, []);
 
   const usuariosActivos = useMemo(() => {
     const base = (usuarios || []).filter(
@@ -126,7 +130,11 @@ export default function VistaPorUsuarios({
     );
   }, [usuariosActivos, canViewAll, currentUserId]);
 
-  const horas = useMemo(() => generateHours(), []);
+  // Obtener días de la semana actual
+  const diasSemana = useMemo(() => {
+    const inicio = startOfWeek(new Date(), { weekStartsOn: 1 });
+    return Array.from({ length: 7 }, (_, i) => addDays(inicio, i));
+  }, []);
 
   const usuariosFiltrados = useMemo(() => {
     if (!canViewAll) {
@@ -153,15 +161,118 @@ export default function VistaPorUsuarios({
     );
   }, [visibleRows]);
 
-  const noLlegaron = useMemo(() => {
-    return visibleRows.filter((r) => {
-      const etapa = String(r?.etapa_name || "").toLowerCase().trim();
-      return (
-        (etapa.includes("no llegó") || etapa.includes("no llego")) &&
-        r?.hora_agenda
+  // Función para calcular minutos restantes
+  function getMinutosRestantes(fechaAgenda, horaAgenda) {
+    if (!fechaAgenda || !horaAgenda) return null;
+
+    try {
+      const fechaStr = String(fechaAgenda).trim().split("T")[0];
+      const horaStr = String(horaAgenda)
+        .trim()
+        .split(":")
+        .slice(0, 2)
+        .join(":");
+
+      const fechaHoraString = `${fechaStr}T${horaStr}:00`;
+      const ahora = new Date();
+      const agendaDateTime = new Date(fechaHoraString);
+
+      if (isNaN(agendaDateTime.getTime())) {
+        return null;
+      }
+
+      const diferencia = agendaDateTime.getTime() - ahora.getTime();
+      const minutos = Math.floor(diferencia / 1000 / 60);
+
+      return minutos;
+    } catch (error) {
+      console.error("Error calculando minutos:", error);
+      return null;
+    }
+  }
+
+  // Función para obtener el estado de tiempo
+  function getEstadoTiempo(minutosRestantes, etapasconversion_id) {
+    // Solo lógica dinámica si es "Nuevo" (etapasconversion_id === 1)
+    if (etapasconversion_id !== 1 && etapasconversion_id !== 2) {
+      return "suficiente";
+    }
+
+    if (minutosRestantes === null) {
+      return null;
+    }
+
+    const estadoActivo = estadosTiempo.find(
+      (e) =>
+        e.activo &&
+        minutosRestantes >= e.minutos_desde &&
+        minutosRestantes <= e.minutos_hasta
+    );
+
+    if (estadoActivo) {
+      return estadoActivo.estado; // "verde", "amarillo" o "rojo"
+    }
+
+    return null;
+  }
+
+  // Función para obtener color hexadecimal del estado
+  function getColorEstado(minutosRestantes, etapasconversion_id) {
+    // Solo lógica dinámica si es "Nuevo" (etapasconversion_id === 1)
+    if (etapasconversion_id !== 1 && etapasconversion_id !== 2) {
+      return "#28a745"; // verde por defecto
+    }
+
+    if (minutosRestantes === null) {
+      return "#6b7280"; // gris
+    }
+
+    const estadoActivo = estadosTiempo.find(
+      (e) =>
+        e.activo &&
+        minutosRestantes >= e.minutos_desde &&
+        minutosRestantes <= e.minutos_hasta
+    );
+
+    return estadoActivo?.color_hexadecimal || "#6b7280";
+  }
+
+  // Función para determinar si el color es oscuro
+  function esColorOscuro(color) {
+    const hex = color.replace("#", "");
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    return brightness < 128;
+  }
+
+  // Calcular resumen de estados
+  const resumenEstados = useMemo(() => {
+    const resumen = {
+      retrasado: 0,
+      cercaHora: 0,
+      tiempoSuficiente: 0,
+    };
+
+    oportunidadesAsignadas.forEach((card) => {
+      const minutosRestantes = getMinutosRestantes(
+        card.fecha_agenda,
+        card.hora_agenda
       );
+      const estado = getEstadoTiempo(minutosRestantes, card.etapasconversion_id);
+
+      if (estado === "rojo") {
+        resumen.retrasado++;
+      } else if (estado === "amarillo") {
+        resumen.cercaHora++;
+      } else if (estado === "verde" || estado === "suficiente") {
+        resumen.tiempoSuficiente++;
+      }
     });
-  }, [visibleRows]);
+
+    return resumen;
+  }, [oportunidadesAsignadas, estadosTiempo]);
 
   function toggleUser(id) {
     if (!canViewAll) return;
@@ -215,27 +326,51 @@ export default function VistaPorUsuarios({
           </div>
         )}
 
+        {/* Resumen de estados */}
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="rounded-lg border border-red-300 bg-red-50 p-3">
+            <div className="text-2xl font-bold text-red-600">
+              {resumenEstados.retrasado}
+            </div>
+            <div className="text-xs text-red-700 font-medium">Retrasados</div>
+          </div>
+          <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-3">
+            <div className="text-2xl font-bold text-yellow-600">
+              {resumenEstados.cercaHora}
+            </div>
+            <div className="text-xs text-yellow-700 font-medium">Cerca de la hora</div>
+          </div>
+          <div className="rounded-lg border border-green-300 bg-green-50 p-3">
+            <div className="text-2xl font-bold text-green-600">
+              {resumenEstados.tiempoSuficiente}
+            </div>
+            <div className="text-xs text-green-700 font-medium">Tiempo suficiente</div>
+          </div>
+        </div>
+
         <div className="rounded-2xl border">
           <div className="overflow-auto max-h-[75vh]">
             <div
-              className="grid min-w-[3200px]"
+              className="grid"
               style={{
-                gridTemplateColumns: `220px repeat(${horas.length}, minmax(120px, 1fr))`,
+                gridTemplateColumns: `220px repeat(7, 1fr)`,
               }}
             >
               <div className="sticky left-0 top-0 z-30 bg-background border-b border-r p-4 font-semibold text-xl">
                 Asesores
               </div>
 
-              {horas.map((hora) => (
+              {/* Encabezados de días de la semana */}
+              {diasSemana.map((dia) => (
                 <div
-                  key={hora}
-                  className="sticky top-0 z-20 bg-background border-b p-3 text-center text-sm font-medium"
+                  key={dia.toISOString()}
+                  className="sticky top-0 z-20 bg-background border-b p-3 text-center text-sm font-medium capitalize"
                 >
-                  {hora}
+                  {format(dia, "EEEE", { locale: es })}
                 </div>
               ))}
 
+              {/* Filas de usuarios */}
               {usuariosFiltrados.map((usuario, idx) => {
                 const colorDot =
                   idx % 3 === 0
@@ -246,105 +381,76 @@ export default function VistaPorUsuarios({
 
                 return (
                   <div key={usuario.id} className="contents">
-                    <div className="sticky left-0 z-10 bg-background border-r border-b p-4 flex items-center gap-3 min-h-[92px]">
+                    {/* Nombre del usuario */}
+                    <div className="sticky left-0 z-10 bg-background border-r border-b p-4 flex items-center gap-3 min-h-[120px]">
                       <span className={cn("h-2.5 w-2.5 rounded-full", colorDot)} />
                       <span className="text-sm leading-5">
                         {getUserLabel(usuario)}
                       </span>
                     </div>
 
-                    {horas.map((hora) => {
-                      const card = oportunidadesAsignadas.find(
+                    {/* Celdas por día de la semana */}
+                    {diasSemana.map((dia) => {
+                      const diaStr = format(dia, "yyyy-MM-dd");
+
+                      // Obtener todas las oportunidades del usuario en este día
+                      const dayOportunidades = oportunidadesAsignadas.filter(
                         (r) =>
                           String(r?.asignado_a ?? "") === String(usuario.id) &&
-                          getHoraLabel(r?.hora_agenda) === hora
+                          String(r?.fecha_agenda || "").startsWith(diaStr)
                       );
 
                       return (
                         <div
-                          key={`${usuario.id}-${hora}`}
-                          className="border-b border-r min-h-[92px] p-1"
+                          key={`${usuario.id}-${diaStr}`}
+                          className="border-b border-r min-h-[120px] p-2 bg-slate-50"
                         >
-                          {card ? (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  onClick={() => onOpenOportunidad?.(card)}
-                                  className="rounded-md border bg-white p-2 text-xs shadow-sm h-full w-full text-left transition hover:bg-slate-50"
-                                  style={{
-                                    borderTop: `4px solid ${
-                                      String(card?.etapa_name || "")
-                                        .toLowerCase()
-                                        .includes("no llegó") ||
-                                      String(card?.etapa_name || "")
-                                        .toLowerCase()
-                                        .includes("no llego")
-                                        ? "#ef4444"
-                                        : "#10b981"
-                                    }`,
-                                  }}
-                                >
-                                  <div className="font-bold truncate">
-                                    {card.oportunidad_id}
-                                  </div>
-                                  <div className="truncate">
-                                    {card.cliente_name || ""}
-                                  </div>
-                                  <div>{getHoraLabel(card.hora_agenda) || "-"}</div>
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top" className="max-w-[320px]">
-                                {renderTooltipContent(card)}
-                              </TooltipContent>
-                            </Tooltip>
-                          ) : null}
+                          <div className="space-y-2">
+                            {dayOportunidades.map((card) => {
+                              const colorEstado = getColorEstado(
+                                getMinutosRestantes(
+                                  card.fecha_agenda,
+                                  card.hora_agenda
+                                ),
+                                card.etapasconversion_id
+                              );
+                              const textOscuro = esColorOscuro(colorEstado);
+                              const textColor = textOscuro ? "#ffffff" : "#000000";
+
+                              return (
+                                <Tooltip key={card.id}>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      type="button"
+                                      onClick={() => onOpenOportunidad?.(card)}
+                                      className="rounded-md border p-2 text-xs shadow-sm w-full text-left transition hover:opacity-80"
+                                      style={{
+                                        backgroundColor: colorEstado,
+                                        color: textColor,
+                                        borderColor: colorEstado,
+                                      }}
+                                    >
+                                      <div className="font-bold truncate">
+                                        {card.oportunidad_id}
+                                      </div>
+                                      <div className="truncate text-[10px]">
+                                        {card.cliente_name || ""}
+                                      </div>
+                                      <div className="text-[10px]">
+                                        {getHoraLabel(card.hora_agenda) || "-"}
+                                      </div>
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-[320px]">
+                                    {renderTooltipContent(card)}
+                                  </TooltipContent>
+                                </Tooltip>
+                              );
+                            })}
+                          </div>
                         </div>
                       );
                     })}
-                  </div>
-                );
-              })}
-
-              <div className="sticky left-0 z-10 bg-background border-r p-4 flex items-center gap-3 min-h-[92px]">
-                <span className="text-red-500 text-xl">◔</span>
-                <span className="text-sm">No llegó</span>
-              </div>
-
-              {horas.map((hora) => {
-                const items = noLlegaron.filter(
-                  (r) => getHoraLabel(r?.hora_agenda) === hora
-                );
-
-                return (
-                  <div key={`no-llego-${hora}`} className="border-r p-1 min-h-[92px]">
-                    <div className="space-y-1">
-                      {items.map((card) => (
-                        <Tooltip key={card.id}>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              onClick={() => onOpenOportunidad?.(card)}
-                              className="rounded-md border bg-white p-2 text-xs shadow-sm w-full text-left transition hover:bg-slate-50"
-                              style={{ borderTop: "4px solid #ef4444" }}
-                            >
-                              <div className="font-bold truncate">
-                                {card.oportunidad_id}
-                              </div>
-                              <div className="truncate">
-                                {card.cliente_name || ""}
-                              </div>
-                              <div className="font-semibold uppercase">
-                                NO LLEGÓ
-                              </div>
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="max-w-[320px]">
-                            {renderTooltipContent(card)}
-                          </TooltipContent>
-                        </Tooltip>
-                      ))}
-                    </div>
                   </div>
                 );
               })}

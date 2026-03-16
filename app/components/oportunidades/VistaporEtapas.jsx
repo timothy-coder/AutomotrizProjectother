@@ -139,9 +139,7 @@ export default function VistaPorEtapas({
                                   className="mx-auto block w-[150px] rounded-full px-4 py-2 text-center text-white font-bold text-base shadow transition hover:opacity-90"
                                   style={{ backgroundColor: etapa.color }}
                                 >
-                                  {String(item.oportunidad_id || "")
-                                    .replace("OP-", "")
-                                    .replace("LD-", "")}
+                                  {String(item.oportunidad_id || "")}
                                 </button>
                               </TooltipTrigger>
                               <TooltipContent side="top" className="max-w-[320px]">
