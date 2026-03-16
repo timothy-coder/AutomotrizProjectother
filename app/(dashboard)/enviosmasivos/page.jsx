@@ -457,7 +457,7 @@ export default function EnviosMasivosPage() {
                 <th className="px-3 py-2">Tipo</th>
                 <th className="px-3 py-2">Fecha de envío</th>
                 <th className="px-3 py-2">Fecha de término</th>
-                <th className="px-3 py-2">Clientes impactados</th>
+                <th className="px-3 py-2">Indicadores</th>
                 <th className="px-3 py-2">Estatus</th>
                 <th className="px-3 py-2 text-right">Acciones</th>
               </tr>
@@ -471,7 +471,10 @@ export default function EnviosMasivosPage() {
                   <td className="px-3 py-2">{formatLocalDate(row.finished_at)}</td>
                   <td className="px-3 py-2">
                     <div>Enviados: {Number(row.sent_count || 0)}</div>
+                    <div>Entregados: {Number(row.delivered_count || 0)}</div>
                     <div>Respondieron: {Number(row.responded_count || 0)}</div>
+                    <div>Contacto CTA: {Number(row.contact_cta_count || 0)}</div>
+                    <div>Baja CTA: {Number(row.stop_cta_count || 0)}</div>
                   </td>
                   <td className="px-3 py-2">{getStatusLabel(row.status)}</td>
                   <td className="px-3 py-2 text-right">
@@ -927,7 +930,7 @@ export default function EnviosMasivosPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-3">
             <div className="rounded-md border p-3 text-sm">
               <p><span className="font-medium">Tipo:</span> {campaignDetail?.campaign?.campaign_type || "-"}</p>
               <p><span className="font-medium">Estado:</span> {getStatusLabel(campaignDetail?.campaign?.status)}</p>
@@ -943,6 +946,46 @@ export default function EnviosMasivosPage() {
               <p>Leídos: {Number(campaignDetail?.status_summary?.read || 0)}</p>
               <p>Respondieron: {Number(campaignDetail?.status_summary?.responded || 0)}</p>
               <p>Fallidos: {Number(campaignDetail?.status_summary?.failed || 0)}</p>
+            </div>
+
+            <div className="rounded-md border p-3 text-sm">
+              <p className="mb-1 font-medium">Acciones CTA</p>
+              <p>Solicitaron contacto: {Number(campaignDetail?.cta_summary?.contact || 0)}</p>
+              <p>Detener promociones: {Number(campaignDetail?.cta_summary?.stop_promotions || 0)}</p>
+              <p>Acciones no mapeadas: {Number(campaignDetail?.cta_summary?.unknown || 0)}</p>
+              <p>Total acciones: {Number(campaignDetail?.cta_summary?.total || 0)}</p>
+            </div>
+          </div>
+
+          <div className="rounded-md border">
+            <div className="border-b px-3 py-2 text-sm font-medium">Acciones CTA recientes</div>
+            <div className="max-h-60 overflow-y-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b text-xs uppercase text-muted-foreground">
+                    <th className="px-3 py-2">Cliente</th>
+                    <th className="px-3 py-2">Acción</th>
+                    <th className="px-3 py-2">Teléfono</th>
+                    <th className="px-3 py-2">Fecha</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(campaignDetail?.cta_actions_recent || []).map((action) => (
+                    <tr key={action.id} className="border-b">
+                      <td className="px-3 py-2">{action.recipient_name || [action.cliente_nombre, action.cliente_apellido].filter(Boolean).join(" ") || "-"}</td>
+                      <td className="px-3 py-2 capitalize">{String(action.action_type || "unknown").replace("_", " ")}</td>
+                      <td className="px-3 py-2">{action.phone_normalized || "-"}</td>
+                      <td className="px-3 py-2">{formatLocalDate(action.created_at)}</td>
+                    </tr>
+                  ))}
+
+                  {!Array.isArray(campaignDetail?.cta_actions_recent) || !campaignDetail?.cta_actions_recent.length ? (
+                    <tr>
+                      <td className="px-3 py-4 text-muted-foreground" colSpan={4}>Sin acciones CTA registradas.</td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
             </div>
           </div>
 

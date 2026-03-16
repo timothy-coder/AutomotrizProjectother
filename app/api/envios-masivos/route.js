@@ -11,6 +11,14 @@ import {
 
 const MAX_RECIPIENTS_PER_CAMPAIGN = 2000;
 
+function isMissingColumnError(error) {
+  return error?.code === "ER_BAD_FIELD_ERROR" || error?.errno === 1054;
+}
+
+function isMissingTableError(error) {
+  return error?.code === "ER_NO_SUCH_TABLE" || error?.errno === 1146;
+}
+
 function normalizeCampaignType(value) {
   const type = String(value || "").trim().toLowerCase();
   return ["ventas", "postventa"].includes(type) ? type : null;
@@ -45,8 +53,7 @@ export async function GET(req) {
   if (!auth.ok) return auth.response;
 
   try {
-    const [rows] = await db.query(
-      `
+    const queryWithCta = `
       SELECT
         c.id,
         c.campaign_uuid,
@@ -66,21 +73,81 @@ export async function GET(req) {
         c.updated_at,
         COALESCE(u.fullname, 'Sistema') AS created_by_name,
         COALESCE(agg.sent_count, 0) AS sent_count,
-        COALESCE(agg.responded_count, 0) AS responded_count
+        COALESCE(agg.delivered_count, 0) AS delivered_count,
+        COALESCE(agg.responded_count, 0) AS responded_count,
+        COALESCE(cta.contact_cta_count, 0) AS contact_cta_count,
+        COALESCE(cta.stop_cta_count, 0) AS stop_cta_count
       FROM whatsapp_mass_campaigns c
       LEFT JOIN usuarios u ON u.id = c.created_by_user_id
       LEFT JOIN (
         SELECT
           campaign_id,
           SUM(CASE WHEN status IN ('queued','sent','delivered','read','responded') THEN 1 ELSE 0 END) AS sent_count,
+          SUM(CASE WHEN status IN ('delivered','read','responded') THEN 1 ELSE 0 END) AS delivered_count,
+          SUM(CASE WHEN status = 'responded' THEN 1 ELSE 0 END) AS responded_count
+        FROM campaign_recipients
+        GROUP BY campaign_id
+      ) agg ON agg.campaign_id = c.id
+      LEFT JOIN (
+        SELECT
+          campaign_id,
+          SUM(CASE WHEN action_type = 'contact' THEN 1 ELSE 0 END) AS contact_cta_count,
+          SUM(CASE WHEN action_type = 'stop_promotions' THEN 1 ELSE 0 END) AS stop_cta_count
+        FROM campaign_recipient_actions
+        GROUP BY campaign_id
+      ) cta ON cta.campaign_id = c.id
+      ORDER BY c.id DESC
+      LIMIT 200
+    `;
+
+    const queryFallback = `
+      SELECT
+        c.id,
+        c.campaign_uuid,
+        c.campaign_name,
+        c.campaign_type,
+        c.channel,
+        c.send_type,
+        c.status,
+        c.send_now,
+        c.scheduled_at,
+        c.started_at,
+        c.finished_at,
+        c.total_impacted,
+        c.total_responded,
+        c.created_by_user_id,
+        c.created_at,
+        c.updated_at,
+        COALESCE(u.fullname, 'Sistema') AS created_by_name,
+        COALESCE(agg.sent_count, 0) AS sent_count,
+        COALESCE(agg.delivered_count, 0) AS delivered_count,
+        COALESCE(agg.responded_count, 0) AS responded_count,
+        0 AS contact_cta_count,
+        0 AS stop_cta_count
+      FROM whatsapp_mass_campaigns c
+      LEFT JOIN usuarios u ON u.id = c.created_by_user_id
+      LEFT JOIN (
+        SELECT
+          campaign_id,
+          SUM(CASE WHEN status IN ('queued','sent','delivered','read','responded') THEN 1 ELSE 0 END) AS sent_count,
+          SUM(CASE WHEN status IN ('delivered','read','responded') THEN 1 ELSE 0 END) AS delivered_count,
           SUM(CASE WHEN status = 'responded' THEN 1 ELSE 0 END) AS responded_count
         FROM campaign_recipients
         GROUP BY campaign_id
       ) agg ON agg.campaign_id = c.id
       ORDER BY c.id DESC
       LIMIT 200
-      `
-    );
+    `;
+
+    let rows = [];
+    try {
+      const [withCta] = await db.query(queryWithCta);
+      rows = withCta;
+    } catch (error) {
+      if (!(isMissingTableError(error) || isMissingColumnError(error))) throw error;
+      const [fallbackRows] = await db.query(queryFallback);
+      rows = fallbackRows;
+    }
 
     return NextResponse.json(rows);
   } catch (error) {
