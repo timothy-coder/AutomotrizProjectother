@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { randomUUID } from "crypto";
+import {
+  enqueueOutbound,
+  isMissingTableError,
+  processOutboxItem,
+} from "@/lib/conversationsOutbox";
 
 function normalizePhone(rawPhone) {
   return String(rawPhone || "")
@@ -8,12 +13,165 @@ function normalizePhone(rawPhone) {
     .trim();
 }
 
+function normalizePhoneForOptOut(rawPhone) {
+  const digits = String(rawPhone || "").replace(/\D/g, "").trim();
+  if (!digits) return null;
+  return `+${digits}`;
+}
+
+function normalizePhoneDigits(rawPhone) {
+  return String(rawPhone || "").replace(/\D/g, "").trim();
+}
+
+function getPhoneDigitsSql(columnName) {
+  return `REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${columnName}, '+', ''), ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
+}
+
 function isMissingColumnError(error) {
   return error?.code === "ER_BAD_FIELD_ERROR" || error?.errno === 1054;
 }
 
-function isMissingTableError(error) {
-  return error?.code === "ER_NO_SUCH_TABLE" || error?.errno === 1146;
+function isOptOutSchemaMissing(error) {
+  return isMissingTableError(error) || isMissingColumnError(error);
+}
+
+function getMessageActionType(rawBody = {}) {
+  const payload = rawBody?.payload || {};
+  const quickReply = payload?.quick_reply || rawBody?.quick_reply || {};
+  const interactive = payload?.interactive || rawBody?.interactive || {};
+
+  const candidates = [
+    rawBody?.button_action,
+    rawBody?.button_id,
+    rawBody?.action_type,
+    payload?.button_action,
+    payload?.button_id,
+    payload?.action_type,
+    quickReply?.payload,
+    interactive?.button_reply?.id,
+  ]
+    .map((value) => String(value || "").trim().toLowerCase())
+    .filter(Boolean);
+
+  if (candidates.some((value) => value.includes("stop_promotions"))) {
+    return "stop_promotions";
+  }
+
+  if (candidates.some((value) => value.includes("contact"))) {
+    return "contact";
+  }
+
+  if (candidates.length > 0) return "unknown";
+  return null;
+}
+
+async function storeCampaignRecipientAction({
+  campaignRecipientId,
+  campaignId,
+  sessionId,
+  clientId,
+  phone,
+  externalEventId,
+  actionType,
+  payload,
+}) {
+  if (!campaignRecipientId || !campaignId || !actionType) return;
+
+  try {
+    await db.query(
+      `
+      INSERT INTO campaign_recipient_actions
+        (campaign_id, campaign_recipient_id, session_id, client_id, phone_normalized, action_type, action_payload_json, external_event_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+      `,
+      [
+        campaignId,
+        campaignRecipientId,
+        sessionId || null,
+        clientId || null,
+        normalizePhoneForOptOut(phone) || null,
+        actionType,
+        JSON.stringify(payload || {}),
+        externalEventId || null,
+      ]
+    );
+  } catch (error) {
+    if (!isOptOutSchemaMissing(error)) throw error;
+
+    // Compatibilidad con esquema previo (payload JSON sin columnas client/phone/external_event_id).
+    try {
+      await db.query(
+        `
+        INSERT INTO campaign_recipient_actions
+          (campaign_id, campaign_recipient_id, session_id, action_type, payload, created_at)
+        VALUES (?, ?, ?, ?, ?, NOW())
+        `,
+        [
+          campaignId,
+          campaignRecipientId,
+          sessionId || null,
+          actionType,
+          JSON.stringify(payload || {}),
+        ]
+      );
+      return;
+    } catch (fallbackError) {
+      if (isOptOutSchemaMissing(fallbackError)) return;
+      throw fallbackError;
+    }
+  }
+}
+
+async function upsertCampaignOptOut({ clientId, phone, payload }) {
+  const normalizedPhone = normalizePhoneForOptOut(phone);
+  if (!normalizedPhone && !clientId) return;
+
+  const reason = String(payload?.reason || "cta_stop_promotions").slice(0, 120);
+  const source = String(payload?.source || "conversations_webhook").slice(0, 40);
+
+  try {
+    await db.query(
+      `
+      INSERT INTO campaign_opt_outs
+        (client_id, phone_normalized, source, reason, is_active, stopped_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, 1, NOW(), NOW(), NOW())
+      ON DUPLICATE KEY UPDATE
+        client_id = COALESCE(VALUES(client_id), campaign_opt_outs.client_id),
+        source = VALUES(source),
+        reason = VALUES(reason),
+        is_active = 1,
+        stopped_at = NOW(),
+        revoked_at = NULL,
+        updated_at = NOW()
+      `,
+      [clientId || null, normalizedPhone || null, source, reason]
+    );
+  } catch (error) {
+    if (!isOptOutSchemaMissing(error)) throw error;
+
+    // Compatibilidad con esquema previo (metadata JSON en lugar de source/reason).
+    try {
+      await db.query(
+        `
+        INSERT INTO campaign_opt_outs
+          (client_id, phone_normalized, is_active, stopped_at, metadata, created_at, updated_at)
+        VALUES (?, ?, 1, NOW(), ?, NOW(), NOW())
+        ON DUPLICATE KEY UPDATE
+          client_id = COALESCE(VALUES(client_id), campaign_opt_outs.client_id),
+          is_active = 1,
+          stopped_at = NOW(),
+          revoked_at = NULL,
+          metadata = VALUES(metadata),
+          updated_at = NOW()
+        `,
+        [clientId || null, normalizedPhone || null, JSON.stringify(payload || {})]
+      );
+      return;
+    } catch (fallbackError) {
+      if (isOptOutSchemaMissing(fallbackError)) return;
+      throw fallbackError;
+    }
+  }
 }
 
 function normalizePlatform(raw) {
@@ -112,6 +270,167 @@ function getSlaMinutes() {
   return Math.max(5, Math.min(raw, 1440));
 }
 
+function getCtaAutoReplyText(actionType) {
+  if (actionType === "contact") {
+    return "Gracias por tu respuesta. Un asesor se pondra en contacto contigo en breve.";
+  }
+
+  if (actionType === "stop_promotions") {
+    return "Entendido. Hemos registrado tu solicitud y dejaremos de enviarte promociones.";
+  }
+
+  return null;
+}
+
+async function getSessionPhone(sessionId) {
+  if (!sessionId) return null;
+
+  const [rows] = await db.query(
+    `
+    SELECT phone
+    FROM conversation_sessions
+    WHERE id = ?
+    LIMIT 1
+    `,
+    [sessionId]
+  );
+
+  return normalizePhone(rows?.[0]?.phone || "") || null;
+}
+
+async function insertAutoReplyLog({ sessionId, phone, text, sourceChannel, idempotencyKey }) {
+  try {
+    const [result] = await db.query(
+      `
+      INSERT INTO agent_actions_log (
+        session_id,
+        phone,
+        action_type,
+        intent,
+        request_text,
+        response_text,
+        message_direction,
+        message_status,
+        source_channel,
+        idempotency_key,
+        success,
+        error_message,
+        created_at
+      ) VALUES (?, ?, 'AUTO_REPLY', 'AUTO_REPLY', NULL, ?, 'outbound', 'queued', ?, ?, 1, NULL, NOW())
+      `,
+      [sessionId, phone || null, text, sourceChannel || null, idempotencyKey]
+    );
+
+    return { id: result.insertId, tracked: true };
+  } catch (error) {
+    if (!isMissingColumnError(error)) throw error;
+
+    const [legacyResult] = await db.query(
+      `
+      INSERT INTO agent_actions_log (
+        session_id,
+        phone,
+        action_type,
+        intent,
+        request_text,
+        response_text,
+        success,
+        error_message,
+        created_at
+      ) VALUES (?, ?, 'AUTO_REPLY', 'AUTO_REPLY', NULL, ?, 1, NULL, NOW())
+      `,
+      [sessionId, phone || null, text]
+    );
+
+    return { id: legacyResult.insertId, tracked: false };
+  }
+}
+
+async function updateSessionAfterOutbound({ sessionId, messageId }) {
+  await db.query(
+    `
+    UPDATE conversation_sessions
+    SET
+      updated_at = NOW(),
+      last_intent = 'AUTO_REPLY',
+      last_message_id = ?
+    WHERE id = ?
+    `,
+    [messageId, sessionId]
+  );
+}
+
+async function enqueueCtaAutoReply({
+  sessionId,
+  phone,
+  sourceChannel,
+  actionType,
+  externalMessageId,
+  campaignResponse,
+}) {
+  const text = getCtaAutoReplyText(actionType);
+  if (!text) return { attempted: false, reason: "No aplica auto-reply" };
+
+  const resolvedPhone = normalizePhone(phone) || await getSessionPhone(sessionId);
+  if (!resolvedPhone) {
+    return { attempted: false, reason: "No se pudo resolver telefono para auto-reply" };
+  }
+
+  const idempotencyKey = `cta_autoreply:${campaignResponse?.campaign_recipient_id || "na"}:${actionType}:${externalMessageId || randomUUID()}`;
+
+  const inserted = await insertAutoReplyLog({
+    sessionId,
+    phone: resolvedPhone,
+    text,
+    sourceChannel,
+    idempotencyKey,
+  });
+
+  await updateSessionAfterOutbound({
+    sessionId,
+    messageId: inserted.id,
+  });
+
+  const payload = {
+    session_id: sessionId,
+    phone: resolvedPhone,
+    text,
+    source: "campaign_cta_auto_reply",
+    source_channel: sourceChannel || "whatsapp",
+    idempotency_key: idempotencyKey,
+    external_message_id: null,
+    reply_to_external_message_id: externalMessageId || null,
+    campaign_id: campaignResponse?.campaign_id || null,
+    campaign_recipient_id: campaignResponse?.campaign_recipient_id || null,
+    cta_action: actionType,
+    created_at: new Date().toISOString(),
+  };
+
+  const outbox = await enqueueOutbound({
+    sessionId,
+    messageLogId: inserted.id,
+    phone: resolvedPhone,
+    source: "campaign_cta_auto_reply",
+    sourceChannel: sourceChannel || "whatsapp",
+    idempotencyKey,
+    externalMessageId: null,
+    payload,
+  });
+
+  if (!outbox.enabled || !outbox.id) {
+    return { attempted: false, reason: "Outbox no disponible" };
+  }
+
+  const processResult = await processOutboxItem(outbox.id);
+  return {
+    attempted: true,
+    outbox_id: outbox.id,
+    sent: Boolean(processResult?.ok),
+    outbox_status: processResult?.status || (processResult?.ok ? "sent" : "retrying"),
+    reason: processResult?.reason || null,
+  };
+}
+
 async function findByExternalMessageId(externalMessageId) {
   if (!externalMessageId) return null;
 
@@ -156,6 +475,210 @@ async function updateMessageStatusByExternalId(externalMessageId, status, provid
     return result?.affectedRows || 0;
   } catch (error) {
     if (isMissingColumnError(error)) return 0;
+    throw error;
+  }
+}
+
+async function recalcCampaignTotals(campaignId) {
+  if (!campaignId) return;
+
+  try {
+    await db.query(
+      `
+      UPDATE whatsapp_mass_campaigns
+      SET
+        total_impacted = (
+          SELECT COUNT(*)
+          FROM campaign_recipients
+          WHERE campaign_id = ?
+            AND status IN ('queued', 'sent', 'delivered', 'read', 'responded')
+        ),
+        total_responded = (
+          SELECT COUNT(*)
+          FROM campaign_recipients
+          WHERE campaign_id = ?
+            AND status = 'responded'
+        ),
+        updated_at = NOW()
+      WHERE id = ?
+      `,
+      [campaignId, campaignId, campaignId]
+    );
+  } catch (error) {
+    if (isMissingTableError(error) || isMissingColumnError(error)) return;
+    throw error;
+  }
+}
+
+async function syncCampaignRecipientStatus({
+  campaignRecipientId,
+  messageLogId,
+  status,
+  providerPayload,
+}) {
+  if (!campaignRecipientId && !messageLogId) return { updatedRows: 0, campaignIds: [] };
+
+  const nextStatus = status === "read"
+    ? "read"
+    : status === "delivered"
+      ? "delivered"
+      : status === "failed"
+        ? "failed"
+        : "sent";
+
+  try {
+    const whereParams = [];
+    const whereClauses = [];
+
+    if (campaignRecipientId) {
+      whereClauses.push("id = ?");
+      whereParams.push(campaignRecipientId);
+    }
+
+    if (messageLogId) {
+      whereClauses.push("message_log_id = ?");
+      whereParams.push(messageLogId);
+    }
+
+    const [result] = await db.query(
+      `
+      UPDATE campaign_recipients
+      SET
+        status = CASE
+          WHEN status = 'responded' THEN status
+          ELSE ?
+        END,
+        sent_at = CASE
+          WHEN sent_at IS NULL AND ? IN ('sent','delivered','read') THEN NOW()
+          ELSE sent_at
+        END,
+        delivered_at = CASE
+          WHEN ? = 'delivered' THEN NOW()
+          ELSE delivered_at
+        END,
+        read_at = CASE
+          WHEN ? = 'read' THEN NOW()
+          ELSE read_at
+        END,
+        last_error = CASE
+          WHEN ? = 'failed' THEN COALESCE(?, 'Proveedor reportó fallo')
+          ELSE NULL
+        END,
+        updated_at = NOW()
+      WHERE ${whereClauses.join(" OR ")}
+      `,
+      [
+        nextStatus,
+        nextStatus,
+        nextStatus,
+        nextStatus,
+        nextStatus,
+        providerPayload ? JSON.stringify(providerPayload) : null,
+        ...whereParams,
+      ]
+    );
+
+    const [campaignRows] = await db.query(
+      `
+      SELECT DISTINCT campaign_id
+      FROM campaign_recipients
+      WHERE ${whereClauses.join(" OR ")}
+      `,
+      whereParams
+    );
+
+    const campaignIds = (campaignRows || [])
+      .map((row) => Number(row.campaign_id || 0))
+      .filter((id) => id > 0);
+
+    for (const campaignId of campaignIds) {
+      // eslint-disable-next-line no-await-in-loop
+      await recalcCampaignTotals(campaignId);
+    }
+
+    return {
+      updatedRows: result?.affectedRows || 0,
+      campaignIds,
+    };
+  } catch (error) {
+    if (isMissingTableError(error) || isMissingColumnError(error)) {
+      return { updatedRows: 0, campaignIds: [] };
+    }
+    throw error;
+  }
+}
+
+async function markCampaignResponseWithinWindow({
+  sessionId,
+  inboundMessageId,
+  phone,
+  clientId,
+}) {
+  if (!inboundMessageId) return { matched: false };
+
+  try {
+    const whereClauses = [];
+    const whereParams = [];
+
+    if (sessionId) {
+      whereClauses.push("session_id = ?");
+      whereParams.push(sessionId);
+    }
+
+    if (clientId) {
+      whereClauses.push("client_id = ?");
+      whereParams.push(clientId);
+    }
+
+    const phoneDigits = normalizePhoneDigits(phone);
+    if (phoneDigits) {
+      whereClauses.push(`${getPhoneDigitsSql("phone_normalized")} = ?`);
+      whereParams.push(phoneDigits);
+    }
+
+    if (!whereClauses.length) return { matched: false };
+
+    const [rows] = await db.query(
+      `
+      SELECT id, campaign_id
+      FROM campaign_recipients
+      WHERE (${whereClauses.join(" OR ")})
+        AND sent_at IS NOT NULL
+        AND sent_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+        AND status IN ('queued', 'sent', 'delivered', 'read')
+      ORDER BY sent_at DESC, id DESC
+      LIMIT 1
+      `,
+      whereParams
+    );
+
+    const recipient = rows?.[0];
+    if (!recipient?.id) return { matched: false };
+
+    await db.query(
+      `
+      UPDATE campaign_recipients
+      SET
+        status = 'responded',
+        responded_at = NOW(),
+        first_inbound_message_id = COALESCE(first_inbound_message_id, ?),
+        updated_at = NOW()
+      WHERE id = ?
+      `,
+      [inboundMessageId, recipient.id]
+    );
+
+    await recalcCampaignTotals(Number(recipient.campaign_id));
+
+    return {
+      matched: true,
+      campaign_id: Number(recipient.campaign_id),
+      campaign_recipient_id: Number(recipient.id),
+    };
+  } catch (error) {
+    if (isMissingTableError(error) || isMissingColumnError(error)) {
+      return { matched: false };
+    }
     throw error;
   }
 }
@@ -308,6 +831,7 @@ export async function POST(req) {
 
     if (eventType === "status") {
       const status = (body?.status || "").trim();
+      const campaignRecipientId = Number(body?.campaign_recipient_id) || null;
       if (!externalMessageId || !status) {
         return NextResponse.json(
           { message: "external_message_id y status son requeridos" },
@@ -320,17 +844,27 @@ export async function POST(req) {
         return NextResponse.json({ message: "status inválido" }, { status: 400 });
       }
 
+      const trackedMessage = await findByExternalMessageId(externalMessageId);
       const affected = await updateMessageStatusByExternalId(
         externalMessageId,
         status,
         providerPayload
       );
 
+      const campaignSync = await syncCampaignRecipientStatus({
+        campaignRecipientId,
+        messageLogId: trackedMessage?.id || null,
+        status,
+        providerPayload,
+      });
+
       return NextResponse.json({
         message: "Estado procesado",
         external_message_id: externalMessageId,
         status,
         updated_rows: affected,
+        campaign_recipient_rows: campaignSync.updatedRows,
+        campaign_ids: campaignSync.campaignIds,
       });
     }
 
@@ -389,6 +923,73 @@ export async function POST(req) {
       providerPayload,
     });
 
+    const campaignResponse = await markCampaignResponseWithinWindow({
+      sessionId,
+      inboundMessageId: inserted.id,
+      phone,
+      clientId,
+    });
+
+    const actionType = getMessageActionType(body);
+    let ctaAutoReply = { attempted: false, reason: "No aplica" };
+
+    if (campaignResponse?.matched && actionType) {
+      const actionPayload = {
+        external_message_id: externalMessageId || null,
+        button_action: body?.button_action ?? body?.payload?.button_action ?? null,
+        button_id: body?.button_id ?? body?.payload?.button_id ?? null,
+        action_type: body?.action_type ?? body?.payload?.action_type ?? null,
+        quick_reply: body?.quick_reply ?? body?.payload?.quick_reply ?? null,
+        interactive: body?.interactive ?? body?.payload?.interactive ?? null,
+        source_channel: sourceChannel || null,
+        source: source || null,
+      };
+
+      await storeCampaignRecipientAction({
+        campaignRecipientId: campaignResponse.campaign_recipient_id,
+        campaignId: campaignResponse.campaign_id,
+        sessionId,
+        clientId,
+        phone,
+        externalEventId: externalMessageId || null,
+        actionType,
+        payload: actionPayload,
+      });
+
+      if (actionType === "stop_promotions") {
+        await upsertCampaignOptOut({
+          clientId,
+          phone,
+          payload: {
+            reason: "cta_stop_promotions",
+            source: "conversations_webhook",
+            campaign_id: campaignResponse.campaign_id,
+            campaign_recipient_id: campaignResponse.campaign_recipient_id,
+            external_message_id: externalMessageId || null,
+          },
+        });
+      }
+
+      if (actionType === "contact" || actionType === "stop_promotions") {
+        try {
+          ctaAutoReply = await enqueueCtaAutoReply({
+            sessionId,
+            phone,
+            sourceChannel,
+            actionType,
+            externalMessageId,
+            campaignResponse,
+          });
+        } catch (error) {
+          if (!isMissingTableError(error)) throw error;
+          ctaAutoReply = {
+            attempted: false,
+            reason: "Tabla outbox no disponible para auto-reply",
+          };
+        }
+      }
+    }
+
     const identityLink = await linkSocialIdentity({
       platform,
       platformId,
@@ -444,6 +1045,9 @@ export async function POST(req) {
         external_message_id: externalMessageId || null,
         tracking_enabled: inserted.tracked,
         idempotency_key: inserted.idempotencyKey,
+        campaign_response_matched: Boolean(campaignResponse?.matched),
+        campaign_response: campaignResponse,
+        cta_auto_reply: ctaAutoReply,
       },
       { status: 201 }
     );

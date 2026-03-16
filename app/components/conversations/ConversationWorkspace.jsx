@@ -14,6 +14,7 @@ export default function ConversationWorkspace({
   session,
   onConversationUpdated,
   onBack,
+  focusComposerSignal = 0,
 }) {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
@@ -32,6 +33,7 @@ export default function ConversationWorkspace({
   const [auditItems, setAuditItems] = useState([]);
   const [selectedChannel, setSelectedChannel] = useState("whatsapp");
   const scrollRef = useRef(null);
+  const composerRef = useRef(null);
   const lastMarkedRef = useRef(0);
   const stickToBottomRef = useRef(true);
 
@@ -240,6 +242,18 @@ export default function ConversationWorkspace({
       el.scrollTop = el.scrollHeight;
     }
   }, [messages]);
+
+  useEffect(() => {
+    if (!session?.session_id) return;
+    if (!focusComposerSignal) return;
+
+    const node = composerRef.current;
+    if (!node) return;
+
+    node.focus();
+    const end = node.value?.length || 0;
+    node.setSelectionRange(end, end);
+  }, [focusComposerSignal, session?.session_id]);
 
   async function sendMessage() {
     const text = newMessage.trim();
@@ -467,6 +481,7 @@ export default function ConversationWorkspace({
       <div className="border-t p-3 space-y-2">
         <div className="flex flex-col sm:flex-row gap-2 items-stretch">
           <Textarea
+            ref={composerRef}
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="Escribe un mensaje para el cliente..."

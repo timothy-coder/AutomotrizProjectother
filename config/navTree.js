@@ -51,7 +51,10 @@ export const NAV_TREE = [
   {
     key: "mensajes",
     label: "Mensajes",
-    items: [{ to: "/mensajes", label: "Mensajes", icon: MessageCircle, perm: ["mensajes", "view"] }],
+    items: [
+      { to: "/mensajes", label: "Mensajes", icon: MessageCircle, perm: ["mensajes", "view"] },
+      { to: "/enviosmasivos", label: "Envíos masivos", icon: MessageCircle, perm: ["mensajes", "view"] },
+    ],
   },
   {
     key: "pyp",

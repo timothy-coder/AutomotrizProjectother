@@ -1,3 +1,4 @@
+
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
@@ -18,7 +19,7 @@ export async function GET(req) {
         activo,
         created_at,
         updated_at
-      FROM configuracion_estados_tiempopv
+      FROM configuracion_estados_tiempo
       WHERE activo = 1
       ORDER BY minutos_desde DESC
     `;
@@ -97,7 +98,7 @@ export async function POST(req) {
 
     // Validar que el estado sea único
     const [existente] = await conn.query(
-      `SELECT id FROM configuracion_estados_tiempopv WHERE estado = ? LIMIT 1`,
+      `SELECT id FROM configuracion_estados_tiempo WHERE estado = ? LIMIT 1`,
       [estado]
     );
 
@@ -120,7 +121,7 @@ export async function POST(req) {
 
     const [result] = await conn.query(
       `
-      INSERT INTO configuracion_estados_tiempopv
+      INSERT INTO configuracion_estados_tiempo
       (nombre, estado, minutos_desde, minutos_hasta, color_hexadecimal, descripcion, activo)
       VALUES (?, ?, ?, ?, ?, ?, ?)
       `,

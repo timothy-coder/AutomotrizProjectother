@@ -48,6 +48,9 @@ export default function ConversationsPage() {
   const [selectedSessionIds, setSelectedSessionIds] = useState([]);
   const [bulkTargetMode, setBulkTargetMode] = useState("filtered");
   const [pageError, setPageError] = useState("");
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [summarySession, setSummarySession] = useState(null);
+  const [focusComposerSignal, setFocusComposerSignal] = useState(0);
 
   async function load() {
     try {
@@ -157,89 +160,26 @@ export default function ConversationsPage() {
     return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
   }
 
-  const metricsCards = useMemo(() => {
-    const overdue = Number(metrics.overdue_conversations || 0);
-    const unread = Number(metrics.total_unread_messages || 0);
-    const maxWaitMinutes = metrics.max_wait_seconds == null
-      ? null
-      : Math.round(Number(metrics.max_wait_seconds) / 60);
+  function getSummaryText(session) {
+    if (!session) return "Sin resumen disponible.";
 
-    return [
-      {
-        key: "total",
-        title: "Total",
-        value: Number(metrics.total_conversations || 0),
-        tone: "neutral",
-      },
-      {
-        key: "active",
-        title: "Activas",
-        value: Number(metrics.active_conversations || 0),
-        tone: Number(metrics.active_conversations || 0) > 0 ? "low" : "neutral",
-        clickable: true,
-      },
-      {
-        key: "unassigned",
-        title: "Sin asignar",
-        value: Number(metrics.unassigned_conversations || 0),
-        tone: Number(metrics.unassigned_conversations || 0) >= 5
-          ? "high"
-          : Number(metrics.unassigned_conversations || 0) > 0
-            ? "medium"
-            : "low",
-        clickable: true,
-      },
-      {
-        key: "overdue",
-        title: "SLA vencidas",
-        value: overdue,
-        tone: overdue >= 3 ? "high" : overdue > 0 ? "medium" : "low",
-        clickable: true,
-      },
-      {
-        key: "unread",
-        title: "No leídos",
-        value: unread,
-        tone: unread >= 20 ? "high" : unread > 0 ? "medium" : "low",
-        clickable: true,
-      },
-      {
-        key: "mine",
-        title: "Mis activas",
-        value: Number(metrics.my_active_conversations || 0),
-        tone: Number(metrics.my_active_conversations || 0) >= 8
-          ? "medium"
-          : Number(metrics.my_active_conversations || 0) > 0
-            ? "low"
-            : "neutral",
-        clickable: true,
-      },
-      {
-        key: "ftr",
-        title: "1ra resp. prom.",
-        value: formatDurationCompact(metrics.avg_first_response_seconds),
-        tone: metrics.avg_first_response_seconds == null
-          ? "neutral"
-          : Number(metrics.avg_first_response_seconds) > 900
-            ? "high"
-            : Number(metrics.avg_first_response_seconds) > 300
-              ? "medium"
-              : "low",
-      },
-      {
-        key: "wait",
-        title: "Espera máxima",
-        value: formatDurationCompact(metrics.max_wait_seconds),
-        tone: maxWaitMinutes == null
-          ? "neutral"
-          : maxWaitMinutes > 60
-            ? "high"
-            : maxWaitMinutes > 20
-              ? "medium"
-              : "low",
-      },
-    ];
-  }, [metrics]);
+    if (session?.resumen) return String(session.resumen);
+
+    const rawContext = String(session?.ultimo_contexto || "").trim();
+    if (rawContext) {
+      try {
+        const parsed = JSON.parse(rawContext);
+        if (typeof parsed === "string") return parsed;
+        if (parsed?.resumen) return String(parsed.resumen);
+        if (parsed?.summary) return String(parsed.summary);
+        if (parsed?.context_summary) return String(parsed.context_summary);
+      } catch {
+        return rawContext;
+      }
+    }
+
+    return String(session?.ultimomensaje || "Sin resumen disponible.");
+  }
 
   const filteredSessions = useMemo(() => {
     return sessions.filter((s) => {
@@ -278,6 +218,17 @@ export default function ConversationsPage() {
     });
   }, [sessions, search, channelFilter, statusFilter, ownerFilter, assignmentFilter, priorityFilter, user]);
 
+  const scopedSessions = useMemo(() => {
+    if (!selectedSession?.session_id) return filteredSessions;
+
+    const scoped = filteredSessions.filter(
+      (s) => Number(s?.session_id) === Number(selectedSession.session_id)
+    );
+
+    if (scoped.length > 0) return scoped;
+    return [selectedSession];
+  }, [filteredSessions, selectedSession]);
+
   useEffect(() => {
     const filteredIdSet = new Set(filteredSessions.map((s) => Number(s.session_id)));
     setSelectedSessionIds((prev) => prev.filter((id) => filteredIdSet.has(Number(id))));
@@ -290,6 +241,105 @@ export default function ConversationsPage() {
 
   const allFilteredSelected =
     filteredSessions.length > 0 && selectedSessions.length === filteredSessions.length;
+
+  const metricsCards = useMemo(() => {
+    const total = scopedSessions.length;
+    const active = scopedSessions.filter((s) => {
+      const status = String(s?.assignment_status || "unassigned").toLowerCase();
+      return status === "open" || status === "pending";
+    }).length;
+
+    const unassigned = scopedSessions.filter((s) => !Number(s?.assigned_agent_id || 0)).length;
+    const overdue = scopedSessions.filter((s) => Number(s?.is_overdue || 0) === 1).length;
+    const unread = scopedSessions.reduce((acc, s) => acc + Number(s?.unread_count || 0), 0);
+
+    const currentUserId = Number(user?.id || 0);
+    const mine = scopedSessions.filter((s) => {
+      const assignedId = Number(s?.assigned_agent_id || 0);
+      const status = String(s?.assignment_status || "unassigned").toLowerCase();
+      return currentUserId > 0 && assignedId === currentUserId && (status === "open" || status === "pending");
+    }).length;
+
+    const maxWaitMinutes = metrics.max_wait_seconds == null
+      ? null
+      : Math.round(Number(metrics.max_wait_seconds) / 60);
+
+    return [
+      {
+        key: "total",
+        title: "Total",
+        value: total,
+        tone: "neutral",
+      },
+      {
+        key: "active",
+        title: "Activas",
+        value: active,
+        tone: active > 0 ? "low" : "neutral",
+        clickable: true,
+      },
+      {
+        key: "unassigned",
+        title: "Sin asignar",
+        value: unassigned,
+        tone: unassigned >= 5
+          ? "high"
+          : unassigned > 0
+            ? "medium"
+            : "low",
+        clickable: true,
+      },
+      {
+        key: "overdue",
+        title: "SLA vencidas",
+        value: overdue,
+        tone: overdue >= 3 ? "high" : overdue > 0 ? "medium" : "low",
+        clickable: true,
+      },
+      {
+        key: "unread",
+        title: "No leídos",
+        value: unread,
+        tone: unread >= 20 ? "high" : unread > 0 ? "medium" : "low",
+        clickable: true,
+      },
+      {
+        key: "mine",
+        title: "Mis activas",
+        value: mine,
+        tone: mine >= 8
+          ? "medium"
+          : mine > 0
+            ? "low"
+            : "neutral",
+        clickable: true,
+      },
+      {
+        key: "ftr",
+        title: "1ra resp. prom.",
+        value: formatDurationCompact(metrics.avg_first_response_seconds),
+        tone: metrics.avg_first_response_seconds == null
+          ? "neutral"
+          : Number(metrics.avg_first_response_seconds) > 900
+            ? "high"
+            : Number(metrics.avg_first_response_seconds) > 300
+              ? "medium"
+              : "low",
+      },
+      {
+        key: "wait",
+        title: "Espera máxima",
+        value: formatDurationCompact(metrics.max_wait_seconds),
+        tone: maxWaitMinutes == null
+          ? "neutral"
+          : maxWaitMinutes > 60
+            ? "high"
+            : maxWaitMinutes > 20
+              ? "medium"
+              : "low",
+      },
+    ];
+  }, [metrics, scopedSessions, user]);
 
   function toggleSessionSelection(sessionId) {
     const normalized = Number(sessionId);
@@ -493,7 +543,12 @@ export default function ConversationsPage() {
             {filteredSessions.map((s) => (
               <div
                 key={s.session_id}
-                className={`flex items-center justify-between p-4 border-b hover:bg-gray-50 ${selectedSession?.session_id === s.session_id ? "bg-gray-50" : ""}`}
+                onClick={() => openTimeline(s)}
+                onDoubleClick={() => {
+                  openTimeline(s);
+                  setFocusComposerSignal((prev) => prev + 1);
+                }}
+                className={`flex items-center justify-between p-4 border-b hover:bg-gray-50 cursor-pointer ${selectedSession?.session_id === s.session_id ? "bg-gray-50" : ""}`}
               >
                 <div>
                   <div className="mb-1">
@@ -501,6 +556,7 @@ export default function ConversationsPage() {
                       type="checkbox"
                       className="h-4 w-4"
                       checked={selectedSessionIds.includes(Number(s.session_id))}
+                      onClick={(e) => e.stopPropagation()}
                       onChange={() => toggleSessionSelection(s.session_id)}
                       aria-label={`Seleccionar conversacion ${s.session_id}`}
                     />
@@ -550,7 +606,11 @@ export default function ConversationsPage() {
                   <Button
                     variant="outline"
                     size="icon"
-                    onClick={() => openTimeline(s)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSummarySession(s);
+                      setSummaryOpen(true);
+                    }}
                   >
                     <Eye className="w-4 h-4" />
                   </Button>
@@ -571,6 +631,7 @@ export default function ConversationsPage() {
             session={selectedSession}
             onConversationUpdated={load}
             onBack={() => setSelectedSession(null)}
+            focusComposerSignal={focusComposerSignal}
           />
         </div>
       </div>
@@ -641,6 +702,27 @@ export default function ConversationsPage() {
               }
             >
               {bulkSending ? "Enviando..." : "Enviar a filtrados"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={summaryOpen} onOpenChange={setSummaryOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Resumen reciente</DialogTitle>
+            <DialogDescription>
+              {summarySession?.cliente_nombre || "Conversación"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-md border bg-gray-50 p-3 text-sm text-gray-700 whitespace-pre-wrap">
+            {getSummaryText(summarySession)}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSummaryOpen(false)}>
+              Cerrar
             </Button>
           </DialogFooter>
         </DialogContent>

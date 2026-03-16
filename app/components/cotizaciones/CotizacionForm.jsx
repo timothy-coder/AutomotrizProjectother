@@ -92,8 +92,12 @@ export default function CotizacionForm({
   const [newAdicionalDesc, setNewAdicionalDesc] = useState("");
   const [newAdicionalMonto, setNewAdicionalMonto] = useState("");
 
-  const [descuentoPorcentaje, setDescuentoPorcentaje] = useState(0);
-  const [descuentoMonto, setDescuentoMonto] = useState(0);
+  const [descuentoProductosPorcentaje, setDescuentoProductosPorcentaje] = useState(0);
+  const [descuentoProductosMonto, setDescuentoProductosMonto] = useState(0);
+  const [descuentoManoObraPorcentaje, setDescuentoManoObraPorcentaje] = useState(0);
+  const [descuentoManoObraMonto, setDescuentoManoObraMonto] = useState(0);
+  const [descuentoAdicionalesPorcentaje, setDescuentoAdicionalesPorcentaje] = useState(0);
+  const [descuentoAdicionalesMonto, setDescuentoAdicionalesMonto] = useState(0);
 
   const [monedas, setMonedas] = useState([]);
   const [impuestos, setImpuestos] = useState([]);
@@ -107,6 +111,7 @@ export default function CotizacionForm({
     const u = JSON.parse(localStorage.getItem("user") || "null");
     setUser(u);
     loadClientes();
+    loadInventoryProducts();
     loadCentros();
     loadTalleres();
     loadMostradores();
@@ -129,11 +134,6 @@ export default function CotizacionForm({
     }
   }
 
-
-  useEffect(() => {
-    loadLocationProducts();
-    if (!editId) setSelectedProducts([]);
-  }, [centroId, tallerId, mostradorId, ubicacionTipo]);
 
   async function loadCentros() {
     try {
@@ -193,20 +193,18 @@ export default function CotizacionForm({
     } catch {}
   }
 
-  async function loadLocationProducts() {
-    if (!centroId) {
-      setLocationProducts([]);
-      return;
-    }
-
-    const params = new URLSearchParams({ centro_id: centroId });
-    if (ubicacionTipo === "taller" && tallerId) params.set("taller_id", tallerId);
-    if (ubicacionTipo === "mostrador" && mostradorId) params.set("mostrador_id", mostradorId);
-
+  async function loadInventoryProducts() {
     setLoadingLocationProducts(true);
     try {
-      const r = await fetch(`/api/stock_parcial/por-ubicacion?${params}`);
-      if (r.ok) setLocationProducts(await r.json());
+      const r = await fetch("/api/productos", { cache: "no-store" });
+      if (!r.ok) return;
+      const all = await r.json();
+      setLocationProducts(
+        (Array.isArray(all) ? all : []).map((p) => ({
+          ...p,
+          stock_ubicacion: Number(p.stock_disponible ?? p.stock_total ?? 0),
+        }))
+      );
     } catch {} finally {
       setLoadingLocationProducts(false);
     }
@@ -250,8 +248,9 @@ export default function CotizacionForm({
       setTarifaId(d.tarifa_id ? String(d.tarifa_id) : "");
       setTarifaHora(Number(d.tarifa_hora || 0));
       setHorasTrabajo(Number(d.horas_trabajo || 0));
-      setDescuentoPorcentaje(Number(d.descuento_porcentaje || 0));
-      setDescuentoMonto(Number(d.descuento_monto || 0));
+      // Compatibilidad: si viene descuento global histórico, lo dejamos en productos.
+      setDescuentoProductosPorcentaje(Number(d.descuento_porcentaje || 0));
+      setDescuentoProductosMonto(Number(d.descuento_monto || 0));
 
       if (d.moneda_id) setMonedaId(String(d.moneda_id));
       if (d.impuesto_id) setImpuestoId(String(d.impuesto_id));
@@ -264,11 +263,6 @@ export default function CotizacionForm({
           descripcion: p.producto_nombre,
           cantidad: Number(p.cantidad || 1),
           precio_unitario: Number(p.precio_unitario || 0),
-          descuento_tipo: p.descuento_tipo === "monto" ? "monto" : "porcentaje",
-          descuento_valor:
-            p.descuento_tipo === "monto"
-              ? Number(p.descuento_valor || 0)
-              : Number(p.descuento_porcentaje || 0),
           stock_ubicacion: Number(p.stock_ubicacion || 0),
         }))
       );
@@ -277,8 +271,6 @@ export default function CotizacionForm({
         (d.extras || []).map((e) => ({
           descripcion: e.descripcion,
           monto: Number(e.monto || 0),
-          descuento_tipo: e.descuento_tipo === "monto" ? "monto" : "porcentaje",
-          descuento_valor: Number(e.descuento_valor || 0),
         }))
       );
     } catch {
@@ -347,8 +339,6 @@ export default function CotizacionForm({
         descripcion: p.descripcion,
         cantidad: 1,
         precio_unitario: Number(p.precio_venta || 0),
-        descuento_tipo: "porcentaje",
-        descuento_valor: 0,
         stock_ubicacion: Number(p.stock_ubicacion || 0),
       },
     ]);
@@ -365,23 +355,9 @@ export default function CotizacionForm({
 
   function getStockError(p) {
     if (p.stock_ubicacion > 0 && Number(p.cantidad) > Number(p.stock_ubicacion)) {
-      return `Máx. disponible: ${p.stock_ubicacion}`;
+      return `Máx. inventario: ${p.stock_ubicacion}`;
     }
     return null;
-  }
-
-  function calcProductDiscount(base, p) {
-    const tipoDesc = p.descuento_tipo === "monto" ? "monto" : "porcentaje";
-    const valor = Number(p.descuento_valor || 0);
-    if (tipoDesc === "monto") return Math.max(0, Math.min(base, valor));
-    const pct = Math.max(0, Math.min(100, valor));
-    return base * pct / 100;
-  }
-
-  function getProductDiscountPercentage(p) {
-    const base = Number(p.cantidad || 0) * Number(p.precio_unitario || 0);
-    if (base <= 0) return 0;
-    return (calcProductDiscount(base, p) / base) * 100;
   }
 
   function handleTarifaChange(val) {
@@ -398,8 +374,6 @@ export default function CotizacionForm({
       {
         descripcion: newAdicionalDesc.trim(),
         monto: Number(newAdicionalMonto || 0),
-        descuento_tipo: "porcentaje",
-        descuento_valor: 0,
       },
     ]);
     setNewAdicionalDesc("");
@@ -410,32 +384,31 @@ export default function CotizacionForm({
     setAdicionales((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  function updateAdicional(idx, patch) {
-    setAdicionales((prev) => prev.map((a, i) => (i === idx ? { ...a, ...patch } : a)));
-  }
-
-  function calcAdicionalDiscount(base, a) {
-    const tipoDesc = a.descuento_tipo === "monto" ? "monto" : "porcentaje";
-    const valor = Number(a.descuento_valor || 0);
-    if (tipoDesc === "monto") return Math.max(0, Math.min(base, valor));
-    const pct = Math.max(0, Math.min(100, valor));
-    return base * pct / 100;
-  }
-
   const subtotalProductos = useMemo(() => {
     return selectedProducts.reduce((sum, p) => {
-      const base = Number(p.cantidad || 0) * Number(p.precio_unitario || 0);
-      return sum + Math.max(0, base - calcProductDiscount(base, p));
+      return sum + Number(p.cantidad || 0) * Number(p.precio_unitario || 0);
     }, 0);
   }, [selectedProducts]);
 
   const subtotalManoObra = Number(horasTrabajo || 0) * Number(tarifaHora || 0);
-  const subtotalAdicionales = adicionales.reduce((s, e) => {
-    const base = Number(e.monto || 0);
-    return s + Math.max(0, base - calcAdicionalDiscount(base, e));
-  }, 0);
+  const subtotalAdicionales = adicionales.reduce((s, e) => s + Number(e.monto || 0), 0);
   const bruto = subtotalProductos + subtotalManoObra + subtotalAdicionales;
-  const totalDescuento = bruto * (Number(descuentoPorcentaje || 0) / 100) + Number(descuentoMonto || 0);
+  const descuentoProductos = Math.min(
+    subtotalProductos,
+    subtotalProductos * (Number(descuentoProductosPorcentaje || 0) / 100) + Number(descuentoProductosMonto || 0)
+  );
+  const descuentoManoObra = Math.min(
+    subtotalManoObra,
+    subtotalManoObra * (Number(descuentoManoObraPorcentaje || 0) / 100) + Number(descuentoManoObraMonto || 0)
+  );
+  const descuentoAdicionales = Math.min(
+    subtotalAdicionales,
+    subtotalAdicionales * (Number(descuentoAdicionalesPorcentaje || 0) / 100) + Number(descuentoAdicionalesMonto || 0)
+  );
+  const totalDescuento = descuentoProductos + descuentoManoObra + descuentoAdicionales;
+  const netoProductos = Math.max(0, subtotalProductos - descuentoProductos);
+  const netoManoObra = Math.max(0, subtotalManoObra - descuentoManoObra);
+  const netoAdicionales = Math.max(0, subtotalAdicionales - descuentoAdicionales);
   const netoSinIgv = Math.max(0, bruto - totalDescuento);
   const montoIgv = incluirIgv ? netoSinIgv * (igvPorcentaje / 100) : 0;
   const montoTotal = netoSinIgv + montoIgv;
@@ -465,36 +438,30 @@ export default function CotizacionForm({
         horas_trabajo: Number(horasTrabajo || 0),
         tarifa_id: tarifaId ? Number(tarifaId) : null,
         tarifa_hora: Number(tarifaHora || 0),
-        descuento_porcentaje: Number(descuentoPorcentaje || 0),
-        descuento_monto: Number(descuentoMonto || 0),
+        // Persistimos como descuento global para compatibilidad con el esquema actual.
+        descuento_porcentaje: 0,
+        descuento_monto: Number(totalDescuento || 0),
+        descuento_productos_porcentaje: Number(descuentoProductosPorcentaje || 0),
+        descuento_productos_monto: Number(descuentoProductosMonto || 0),
+        descuento_mano_obra_porcentaje: Number(descuentoManoObraPorcentaje || 0),
+        descuento_mano_obra_monto: Number(descuentoManoObraMonto || 0),
+        descuento_adicionales_porcentaje: Number(descuentoAdicionalesPorcentaje || 0),
+        descuento_adicionales_monto: Number(descuentoAdicionalesMonto || 0),
         moneda_id: monedaId ? Number(monedaId) : null,
         impuesto_id: impuestoId ? Number(impuestoId) : null,
         incluir_igv: incluirIgv ? 1 : 0,
         impuesto_porcentaje: Number(igvPorcentaje || 0),
         productos: selectedProducts.map((p) => {
           const base = Number(p.cantidad || 0) * Number(p.precio_unitario || 0);
-          const descPct = getProductDiscountPercentage(p);
           return {
             producto_id: p.producto_id,
             cantidad: Number(p.cantidad || 0),
             precio_unitario: Number(p.precio_unitario || 0),
             subtotal: base,
-            descuento_porcentaje: descPct,
-            descuento_tipo: p.descuento_tipo === "monto" ? "monto" : "porcentaje",
-            descuento_valor: Number(p.descuento_valor || 0),
+            descuento_porcentaje: 0,
           };
         }),
-        extras: adicionales.map((e) => {
-          const base = Number(e.monto || 0);
-          const descuento = calcAdicionalDiscount(base, e);
-          return {
-            descripcion: e.descripcion,
-            monto: base,
-            descuento_tipo: e.descuento_tipo === "monto" ? "monto" : "porcentaje",
-            descuento_valor: Number(e.descuento_valor || 0),
-            monto_neto: Math.max(0, base - descuento),
-          };
-        }),
+        extras: adicionales,
       };
 
       const url = editId ? `/api/cotizaciones/${editId}` : "/api/cotizaciones";
@@ -733,19 +700,11 @@ export default function CotizacionForm({
                 </div>
 
                 {loadingLocationProducts && (
-                  <p className="text-sm text-muted-foreground py-2">Cargando productos de la ubicación...</p>
+                  <p className="text-sm text-muted-foreground py-2">Cargando inventario...</p>
                 )}
 
-                {!loadingLocationProducts && !centroId && (
-                  <p className="text-sm text-muted-foreground py-2">Seleccione un centro y ubicación para ver los productos disponibles.</p>
-                )}
-
-                {!loadingLocationProducts && centroId && !(tallerId || mostradorId) && (
-                  <p className="text-sm text-muted-foreground py-2">Seleccione un taller o mostrador para ver los productos disponibles.</p>
-                )}
-
-                {!loadingLocationProducts && (tallerId || mostradorId) && filteredProducts.length === 0 && (
-                  <p className="text-sm text-muted-foreground py-2">No hay productos con stock disponible en esta ubicación.</p>
+                {!loadingLocationProducts && filteredProducts.length === 0 && (
+                  <p className="text-sm text-muted-foreground py-2">No hay productos registrados en inventario.</p>
                 )}
 
                 {filteredProducts.length > 0 && (
@@ -761,7 +720,7 @@ export default function CotizacionForm({
                           <span>{p.descripcion}</span>
                         </div>
                         <div className="flex items-center gap-3">
-                          <Badge variant="secondary" className="text-xs">Stock: {p.stock_ubicacion}</Badge>
+                          <Badge variant="secondary" className="text-xs">Stock: {p.stock_ubicacion ?? 0}</Badge>
                           <span className="text-muted-foreground">{fmt(p.precio_venta)}</span>
                         </div>
                       </button>
@@ -779,7 +738,6 @@ export default function CotizacionForm({
                           <TableHead className="w-20 text-center">Stock</TableHead>
                           <TableHead className="w-20 text-center">Cant.</TableHead>
                           <TableHead className="w-28 text-right">P. Unit.</TableHead>
-                          <TableHead className="w-48">Descuento</TableHead>
                           <TableHead className="w-32 text-right">Subtotal</TableHead>
                           <TableHead className="w-10"></TableHead>
                         </TableRow>
@@ -787,8 +745,6 @@ export default function CotizacionForm({
                       <TableBody>
                         {selectedProducts.map((p, idx) => {
                           const base = Number(p.cantidad || 0) * Number(p.precio_unitario || 0);
-                          const desc = calcProductDiscount(base, p);
-                          const subtotalProd = Math.max(0, base - desc);
                           return (
                             <TableRow key={`${p.producto_id}-${idx}`}>
                               <TableCell className="font-mono text-sm">{p.numero_parte}</TableCell>
@@ -812,39 +768,7 @@ export default function CotizacionForm({
                                 </div>
                               </TableCell>
                               <TableCell className="text-right text-sm">{fmt(p.precio_unitario)}</TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <div className="flex items-center gap-2 px-2 py-1 border rounded-md">
-                                    <span className={`text-xs ${p.descuento_tipo === "porcentaje" ? "font-semibold" : "text-muted-foreground"}`}>%</span>
-                                    <Switch
-                                      checked={p.descuento_tipo === "monto"}
-                                      onCheckedChange={(checked) =>
-                                        updateProduct(idx, {
-                                          descuento_tipo: checked ? "monto" : "porcentaje",
-                                          descuento_valor: 0,
-                                        })
-                                      }
-                                    />
-                                    <span className={`text-xs ${p.descuento_tipo === "monto" ? "font-semibold" : "text-muted-foreground"}`}>
-                                      {selectedMoneda?.simbolo || "S/"}
-                                    </span>
-                                  </div>
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    max={p.descuento_tipo === "porcentaje" ? 100 : undefined}
-                                    value={p.descuento_valor ?? ""}
-                                    onChange={(e) => {
-                                      const raw = Number(e.target.value) || 0;
-                                      const next = p.descuento_tipo === "porcentaje" ? Math.min(100, Math.max(0, raw)) : Math.max(0, raw);
-                                      updateProduct(idx, { descuento_valor: next });
-                                    }}
-                                    className="w-24 h-8"
-                                    placeholder="0"
-                                  />
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-right font-medium">{fmt(subtotalProd)}</TableCell>
+                              <TableCell className="text-right font-medium">{fmt(base)}</TableCell>
                               <TableCell>
                                 <button
                                   onClick={() => removeProduct(idx)}
@@ -935,64 +859,25 @@ export default function CotizacionForm({
                         <TableHeader>
                           <TableRow>
                             <TableHead>Descripción</TableHead>
-                            <TableHead className="w-52">Descuento</TableHead>
                             <TableHead className="text-right w-32">Precio</TableHead>
-                            <TableHead className="text-right w-32">Subtotal</TableHead>
                             <TableHead className="w-10"></TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {adicionales.map((e, idx) => {
-                            const base = Number(e.monto || 0);
-                            const desc = calcAdicionalDiscount(base, e);
-                            const neto = Math.max(0, base - desc);
-                            return (
-                              <TableRow key={`${e.descripcion}-${idx}`}>
-                                <TableCell>{e.descripcion}</TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    <div className="flex items-center gap-2 px-2 py-1 border rounded-md">
-                                      <span className={`text-xs ${e.descuento_tipo === "porcentaje" ? "font-semibold" : "text-muted-foreground"}`}>%</span>
-                                      <Switch
-                                        checked={e.descuento_tipo === "monto"}
-                                        onCheckedChange={(checked) =>
-                                          updateAdicional(idx, {
-                                            descuento_tipo: checked ? "monto" : "porcentaje",
-                                            descuento_valor: 0,
-                                          })
-                                        }
-                                      />
-                                      <span className={`text-xs ${e.descuento_tipo === "monto" ? "font-semibold" : "text-muted-foreground"}`}>
-                                        {selectedMoneda?.simbolo || "S/"}
-                                      </span>
-                                    </div>
-                                    <Input
-                                      type="number"
-                                      min={0}
-                                      max={e.descuento_tipo === "porcentaje" ? 100 : undefined}
-                                      value={e.descuento_valor ?? ""}
-                                      onChange={(ev) => {
-                                        const raw = Number(ev.target.value) || 0;
-                                        const next = e.descuento_tipo === "porcentaje" ? Math.min(100, Math.max(0, raw)) : Math.max(0, raw);
-                                        updateAdicional(idx, { descuento_valor: next });
-                                      }}
-                                      className="w-24 h-8"
-                                    />
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-right">{fmt(base)}</TableCell>
-                                <TableCell className="text-right font-medium">{fmt(neto)}</TableCell>
-                                <TableCell>
-                                  <button
-                                    onClick={() => removeAdicional(idx)}
-                                    className="text-red-500 hover:text-red-700"
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </button>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
+                          {adicionales.map((e, idx) => (
+                            <TableRow key={`${e.descripcion}-${idx}`}>
+                              <TableCell>{e.descripcion}</TableCell>
+                              <TableCell className="text-right">{fmt(Number(e.monto || 0))}</TableCell>
+                              <TableCell>
+                                <button
+                                  onClick={() => removeAdicional(idx)}
+                                  className="text-red-500 hover:text-red-700"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
                         </TableBody>
                       </Table>
                     </div>
@@ -1074,53 +959,125 @@ export default function CotizacionForm({
 
               <div className="space-y-3 border rounded-md p-3 bg-white">
                 <div className="flex items-center gap-2 text-sm font-medium">
-                  <BadgePercent className="w-4 h-4" /> Descuento global
+                  <BadgePercent className="w-4 h-4" /> Descuentos por bloque
                 </div>
-                <div className="space-y-2">
-                  <Label>Porcentaje (%)</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={descuentoPorcentaje || ""}
-                    onChange={(e) =>
-                      setDescuentoPorcentaje(Math.min(100, Math.max(0, Number(e.target.value) || 0)))
-                    }
-                  />
+
+                <div className="border rounded-md p-2 space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">Productos</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">%</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={descuentoProductosPorcentaje || ""}
+                        onChange={(e) =>
+                          setDescuentoProductosPorcentaje(Math.min(100, Math.max(0, Number(e.target.value) || 0)))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Monto</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={descuentoProductosMonto || ""}
+                        onChange={(e) => setDescuentoProductosMonto(Math.max(0, Number(e.target.value) || 0))}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Monto fijo</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={descuentoMonto || ""}
-                    onChange={(e) => setDescuentoMonto(Math.max(0, Number(e.target.value) || 0))}
-                  />
+
+                <div className="border rounded-md p-2 space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">{manoObraLabel}</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">%</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={descuentoManoObraPorcentaje || ""}
+                        onChange={(e) =>
+                          setDescuentoManoObraPorcentaje(Math.min(100, Math.max(0, Number(e.target.value) || 0)))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Monto</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={descuentoManoObraMonto || ""}
+                        onChange={(e) => setDescuentoManoObraMonto(Math.max(0, Number(e.target.value) || 0))}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border rounded-md p-2 space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">Adicionales</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">%</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={descuentoAdicionalesPorcentaje || ""}
+                        onChange={(e) =>
+                          setDescuentoAdicionalesPorcentaje(Math.min(100, Math.max(0, Number(e.target.value) || 0)))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Monto</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={descuentoAdicionalesMonto || ""}
+                        onChange={(e) => setDescuentoAdicionalesMonto(Math.max(0, Number(e.target.value) || 0))}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <div className="space-y-2 border rounded-md p-3 bg-white text-sm">
                 <div className="flex justify-between">
                   <span>Subtotal productos</span>
-                  <span>{fmt(subtotalProductos)}</span>
+                  <span>{fmt(netoProductos)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Subtotal {manoObraLabel.toLowerCase()}</span>
-                  <span>{fmt(subtotalManoObra)}</span>
+                  <span>{fmt(netoManoObra)}</span>
                 </div>
 
-                {adicionales.map((a, idx) => (
-                  <div key={`${a.descripcion}-${idx}`} className="flex justify-between text-muted-foreground">
-                    <span>Adicional: {a.descripcion}</span>
-                    <span>{fmt(Math.max(0, Number(a.monto || 0) - calcAdicionalDiscount(Number(a.monto || 0), a)))}</span>
-                  </div>
-                ))}
+                <div className="flex justify-between">
+                  <span>Subtotal adicionales</span>
+                  <span>{fmt(netoAdicionales)}</span>
+                </div>
 
                 {totalDescuento > 0 && (
-                  <div className="flex justify-between text-red-600">
-                    <span>Descuento</span>
+                  <>
+                    <div className="flex justify-between text-xs text-red-500">
+                      <span>Desc. productos</span>
+                      <span>-{fmt(descuentoProductos)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-red-500">
+                      <span>Desc. {manoObraLabel.toLowerCase()}</span>
+                      <span>-{fmt(descuentoManoObra)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-red-500">
+                      <span>Desc. adicionales</span>
+                      <span>-{fmt(descuentoAdicionales)}</span>
+                    </div>
+                  <div className="flex justify-between text-red-600 font-medium">
+                    <span>Descuento total aplicado</span>
                     <span>-{fmt(totalDescuento)}</span>
                   </div>
+                  </>
                 )}
 
                 {incluirIgv && (

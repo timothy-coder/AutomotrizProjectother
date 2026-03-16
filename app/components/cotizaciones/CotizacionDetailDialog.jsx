@@ -52,6 +52,37 @@ function calcExtraNeto(extra) {
   return Math.max(0, base - descuento);
 }
 
+function calcDescuentoDesglose(data) {
+  const subtotalProductos = Number(data?.subtotal_productos || 0);
+  const subtotalManoObra = Number(data?.subtotal_mano_obra || 0);
+  const subtotalAdicionales = Number(data?.subtotal_extras || 0);
+  const bruto = subtotalProductos + subtotalManoObra + subtotalAdicionales;
+  const pct = Number(data?.descuento_porcentaje || 0) / 100;
+  const montoFijo = Math.max(0, Number(data?.descuento_monto || 0));
+  const montoFijoAplicado = Math.min(montoFijo, bruto);
+  const factorFijo = bruto > 0 ? montoFijoAplicado / bruto : 0;
+  const tasaTotal = pct + factorFijo;
+
+  const descuentoProductos = subtotalProductos * tasaTotal;
+  const descuentoManoObra = subtotalManoObra * tasaTotal;
+  const descuentoAdicionales = subtotalAdicionales * tasaTotal;
+
+  const netoProductos = Math.max(0, subtotalProductos - descuentoProductos);
+  const netoManoObra = Math.max(0, subtotalManoObra - descuentoManoObra);
+  const netoAdicionales = Math.max(0, subtotalAdicionales - descuentoAdicionales);
+
+  return {
+    descuentoProductos,
+    descuentoManoObra,
+    descuentoAdicionales,
+    totalDescuento: descuentoProductos + descuentoManoObra + descuentoAdicionales,
+    netoProductos,
+    netoManoObra,
+    netoAdicionales,
+    netoSinIgv: netoProductos + netoManoObra + netoAdicionales,
+  };
+}
+
 export default function CotizacionDetailDialog({
   open,
   onOpenChange,
@@ -108,6 +139,7 @@ export default function CotizacionDetailDialog({
 
   const label = data?.tipo === "pyp" ? "Paños" : "Mano de obra";
   const currencyCode = data?.moneda_codigo || "PEN";
+  const desglose = calcDescuentoDesglose(data);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -279,32 +311,34 @@ export default function CotizacionDetailDialog({
             <div className="bg-muted/50 rounded-lg p-4 space-y-2">
               <div className="flex justify-between text-sm">
                 <span>Subtotal productos:</span>
-                <span>{formatCurrency(data.subtotal_productos, currencyCode)}</span>
+                <span>{formatCurrency(desglose.netoProductos, currencyCode)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span>Subtotal {label.toLowerCase()}:</span>
-                <span>{formatCurrency(data.subtotal_mano_obra, currencyCode)}</span>
+                <span>{formatCurrency(desglose.netoManoObra, currencyCode)}</span>
               </div>
-              {(data.extras || []).map((e) => (
-                <div className="flex justify-between text-sm" key={`extra-${e.id}`}>
-                  <span>Adicional: {e.descripcion}</span>
-                  <span>{formatCurrency(calcExtraNeto(e), currencyCode)}</span>
-                </div>
-              ))}
+              <div className="flex justify-between text-sm">
+                <span>Subtotal adicionales:</span>
+                <span>{formatCurrency(desglose.netoAdicionales, currencyCode)}</span>
+              </div>
               {(Number(data.descuento_porcentaje || 0) > 0 || Number(data.descuento_monto || 0) > 0) && (
                 <>
                   <hr />
+                  <div className="flex justify-between text-xs text-red-500">
+                    <span>Desc. productos</span>
+                    <span>-{formatCurrency(desglose.descuentoProductos, currencyCode)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-red-500">
+                    <span>Desc. {label.toLowerCase()}</span>
+                    <span>-{formatCurrency(desglose.descuentoManoObra, currencyCode)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-red-500">
+                    <span>Desc. adicionales</span>
+                    <span>-{formatCurrency(desglose.descuentoAdicionales, currencyCode)}</span>
+                  </div>
                   <div className="flex justify-between text-sm text-red-600">
-                    <span>
-                      Descuento
-                      {Number(data.descuento_porcentaje || 0) > 0 && ` (${data.descuento_porcentaje}%)`}
-                      {Number(data.descuento_monto || 0) > 0 && ` + ${formatCurrency(data.descuento_monto, currencyCode)}`}
-                    </span>
-                    <span>-{formatCurrency(
-                      (Number(data.subtotal_productos) + Number(data.subtotal_mano_obra) + Number(data.subtotal_extras))
-                        * Number(data.descuento_porcentaje || 0) / 100
-                        + Number(data.descuento_monto || 0)
-                    , currencyCode)}</span>
+                    <span>Descuento total aplicado</span>
+                    <span>-{formatCurrency(desglose.totalDescuento, currencyCode)}</span>
                   </div>
                 </>
               )}
@@ -312,11 +346,7 @@ export default function CotizacionDetailDialog({
                 <div className="flex justify-between text-sm">
                   <span>IGV ({Number(data.impuesto_porcentaje || data.impuesto_porcentaje_config || 0)}%)</span>
                   <span>{formatCurrency(
-                    Math.max(0,
-                      Number(data.subtotal_productos) + Number(data.subtotal_mano_obra) + Number(data.subtotal_extras)
-                      - (Number(data.subtotal_productos) + Number(data.subtotal_mano_obra) + Number(data.subtotal_extras)) * Number(data.descuento_porcentaje || 0) / 100
-                      - Number(data.descuento_monto || 0)
-                    ) * Number(data.impuesto_porcentaje || data.impuesto_porcentaje_config || 0) / 100,
+                    desglose.netoSinIgv * Number(data.impuesto_porcentaje || data.impuesto_porcentaje_config || 0) / 100,
                     currencyCode
                   )}</span>
                 </div>
