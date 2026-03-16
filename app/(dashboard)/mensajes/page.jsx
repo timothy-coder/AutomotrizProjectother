@@ -181,6 +181,67 @@ export default function ConversationsPage() {
     return String(session?.ultimomensaje || "Sin resumen disponible.");
   }
 
+  const filteredSessions = useMemo(() => {
+    return sessions.filter((s) => {
+      const term = search.trim().toLowerCase();
+      const bySearch = !term
+        || String(s?.cliente_nombre || "").toLowerCase().includes(term)
+        || String(s?.celular || "").toLowerCase().includes(term)
+        || String(s?.ultimomensaje || "").toLowerCase().includes(term);
+
+      const sourceChannel = String(s?.source_channel || "").toLowerCase();
+      const byChannel = channelFilter === "all" || sourceChannel === channelFilter;
+
+      const messageStatus = String(s?.message_status || "").toLowerCase();
+      const unreadCount = Number(s?.unread_count || 0);
+      const byStatus = statusFilter === "all"
+        || messageStatus === statusFilter
+        || (statusFilter === "unread" && unreadCount > 0);
+
+      const assignedAgentId = Number(s?.assigned_agent_id || 0);
+      const currentUserId = Number(user?.id || 0);
+      const byOwner = ownerFilter === "all"
+        || (ownerFilter === "mine" && currentUserId > 0 && assignedAgentId === currentUserId)
+        || (ownerFilter === "unassigned" && !assignedAgentId);
+
+      const assignmentStatus = String(s?.assignment_status || "unassigned").toLowerCase();
+      const byAssignment = assignmentFilter === "all"
+        || (assignmentFilter === "active" && (assignmentStatus === "open" || assignmentStatus === "pending"))
+        || assignmentStatus === assignmentFilter;
+
+      const priorityLevel = String(s?.priority_level || "normal").toLowerCase();
+      const byPriority = priorityFilter === "all"
+        || (priorityFilter === "overdue" && Number(s?.is_overdue || 0) === 1)
+        || priorityLevel === priorityFilter;
+
+      return bySearch && byChannel && byStatus && byOwner && byAssignment && byPriority;
+    });
+  }, [sessions, search, channelFilter, statusFilter, ownerFilter, assignmentFilter, priorityFilter, user]);
+
+  const scopedSessions = useMemo(() => {
+    if (!selectedSession?.session_id) return filteredSessions;
+
+    const scoped = filteredSessions.filter(
+      (s) => Number(s?.session_id) === Number(selectedSession.session_id)
+    );
+
+    if (scoped.length > 0) return scoped;
+    return [selectedSession];
+  }, [filteredSessions, selectedSession]);
+
+  useEffect(() => {
+    const filteredIdSet = new Set(filteredSessions.map((s) => Number(s.session_id)));
+    setSelectedSessionIds((prev) => prev.filter((id) => filteredIdSet.has(Number(id))));
+  }, [filteredSessions]);
+
+  const selectedSessions = useMemo(() => {
+    const selectedIdSet = new Set(selectedSessionIds.map((id) => Number(id)));
+    return filteredSessions.filter((s) => selectedIdSet.has(Number(s.session_id)));
+  }, [filteredSessions, selectedSessionIds]);
+
+  const allFilteredSelected =
+    filteredSessions.length > 0 && selectedSessions.length === filteredSessions.length;
+
   const metricsCards = useMemo(() => {
     const total = scopedSessions.length;
     const active = scopedSessions.filter((s) => {
@@ -279,67 +340,6 @@ export default function ConversationsPage() {
       },
     ];
   }, [metrics, scopedSessions, user]);
-
-  const filteredSessions = useMemo(() => {
-    return sessions.filter((s) => {
-      const term = search.trim().toLowerCase();
-      const bySearch = !term
-        || String(s?.cliente_nombre || "").toLowerCase().includes(term)
-        || String(s?.celular || "").toLowerCase().includes(term)
-        || String(s?.ultimomensaje || "").toLowerCase().includes(term);
-
-      const sourceChannel = String(s?.source_channel || "").toLowerCase();
-      const byChannel = channelFilter === "all" || sourceChannel === channelFilter;
-
-      const messageStatus = String(s?.message_status || "").toLowerCase();
-      const unreadCount = Number(s?.unread_count || 0);
-      const byStatus = statusFilter === "all"
-        || messageStatus === statusFilter
-        || (statusFilter === "unread" && unreadCount > 0);
-
-      const assignedAgentId = Number(s?.assigned_agent_id || 0);
-      const currentUserId = Number(user?.id || 0);
-      const byOwner = ownerFilter === "all"
-        || (ownerFilter === "mine" && currentUserId > 0 && assignedAgentId === currentUserId)
-        || (ownerFilter === "unassigned" && !assignedAgentId);
-
-      const assignmentStatus = String(s?.assignment_status || "unassigned").toLowerCase();
-      const byAssignment = assignmentFilter === "all"
-        || (assignmentFilter === "active" && (assignmentStatus === "open" || assignmentStatus === "pending"))
-        || assignmentStatus === assignmentFilter;
-
-      const priorityLevel = String(s?.priority_level || "normal").toLowerCase();
-      const byPriority = priorityFilter === "all"
-        || (priorityFilter === "overdue" && Number(s?.is_overdue || 0) === 1)
-        || priorityLevel === priorityFilter;
-
-      return bySearch && byChannel && byStatus && byOwner && byAssignment && byPriority;
-    });
-  }, [sessions, search, channelFilter, statusFilter, ownerFilter, assignmentFilter, priorityFilter, user]);
-
-  const scopedSessions = useMemo(() => {
-    if (!selectedSession?.session_id) return filteredSessions;
-
-    const scoped = filteredSessions.filter(
-      (s) => Number(s?.session_id) === Number(selectedSession.session_id)
-    );
-
-    if (scoped.length > 0) return scoped;
-    return [selectedSession];
-  }, [filteredSessions, selectedSession]);
-
-  useEffect(() => {
-    const filteredIdSet = new Set(filteredSessions.map((s) => Number(s.session_id)));
-    setSelectedSessionIds((prev) => prev.filter((id) => filteredIdSet.has(Number(id))));
-  }, [filteredSessions]);
-
-  const selectedSessions = useMemo(() => {
-    const selectedIdSet = new Set(selectedSessionIds.map((id) => Number(id)));
-    return filteredSessions.filter((s) => selectedIdSet.has(Number(s.session_id)));
-  }, [filteredSessions, selectedSessionIds]);
-
-  const allFilteredSelected =
-    filteredSessions.length > 0 && selectedSessions.length === filteredSessions.length;
 
   function toggleSessionSelection(sessionId) {
     const normalized = Number(sessionId);
