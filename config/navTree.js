@@ -1,6 +1,6 @@
 import {
   Users, Milestone, ListChecks, UserRound, Blinds, Boxes, Settings,
-  CalendarCheck, ClipboardList, Receipt, SquareDashedMousePointer, FileText, Home, CarFront, Columns2, Columns3, Coins, Calendar, MessageCircle
+  CalendarCheck, ClipboardList, Receipt, SquareDashedMousePointer, FileText, Home, CarFront, Columns2, Columns3, Coins, Calendar, MessageCircle, ShoppingCart, BookOpen, SlidersHorizontal
 } from "lucide-react";
 export const HOME_ITEM = { to: "/home", label: "Home", icon: Home, perm: ["home", "view"] };
 export const NAV_TREE = [
@@ -51,6 +51,15 @@ export const NAV_TREE = [
     items: [
       { to: "/mensajes", label: "Mensajes", icon: MessageCircle, perm: ["mensajes", "view"] },
       { to: "/enviosmasivos", label: "Envíos masivos", icon: MessageCircle, perm: ["mensajes", "view"] },
+    ],
+  },
+  {
+    key: "ventas-ia",
+    label: "Ventas IA",
+    items: [
+      { to: "/ventas/leads", label: "Leads / Cotizaciones", icon: ShoppingCart, perm: ["mensajes", "view"] },
+      { to: "/ventas/catalogo", label: "Catálogo", icon: BookOpen, perm: ["mensajes", "view"] },
+      { to: "/ventas/configuracion", label: "Configuración del agente", icon: SlidersHorizontal, perm: ["mensajes", "view"] },
     ],
   },
   {

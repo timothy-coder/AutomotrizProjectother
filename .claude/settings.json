@@ -42,7 +42,14 @@
       "Bash(curl -s -w \"\\\\nHTTP %{http_code}\" -X POST \"http://161.35.57.52/api/conversations/outbox/process\" -H \"Content-Type: application/json\" -H \"x-conversations-outbox-secret: ZWt-J4S4BId2Hu0hr2pjZtK0ssL_hVkePlBHjIaV5fi0Gr9gVSYQWjgZ7O8JczRC\" -d '{\"\"limit\"\": 50}')",
       "Bash(N8N_KEY=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjYjE5NzUxMi1kZWQ1LTQ5YTAtYTA3Mi0yMDY4ZjI2NjVmODgiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiODE4ODJkZTUtYTBiNC00ZmE1LTgyMzQtZDNhNmI0Nzc2YTIwIiwiaWF0IjoxNzczNTE1NTY0LCJleHAiOjE3ODEyNDA0MDB9._lNjIWiGlxVcnBp5TGFQ8hdTGOtjYEc27nTfZztv9vI\" curl -s -X POST \"https://n8n.app20.tech/api/v1/workflows/ZJnVlTKjzCMGh6c1/activate\" -H \"X-N8N-API-KEY: $N8N_KEY\")",
       "Bash(N8N_KEY=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjYjE5NzUxMi1kZWQ1LTQ5YTAtYTA3Mi0yMDY4ZjI2NjVmODgiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiODE4ODJkZTUtYTBiNC00ZmE1LTgyMzQtZDNhNmI0Nzc2YTIwIiwiaWF0IjoxNzczNTE1NTY0LCJleHAiOjE3ODEyNDA0MDB9._lNjIWiGlxVcnBp5TGFQ8hdTGOtjYEc27nTfZztv9vI\" curl -s -X POST \"https://n8n.app20.tech/api/v1/workflows/ZJnVlTKjzCMGh6c1/deactivate\" -H \"X-N8N-API-KEY: $N8N_KEY\")",
-      "Bash(node -e \"let r='''''''';process.stdin.on\\(''''data'''',d=>r+=d\\);process.stdin.on\\(''''end'''',\\(\\)=>{const d=JSON.parse\\(r\\);console.log\\(''''active:'''', d.active\\)}\\)\")"
+      "Bash(node -e \"let r='''''''';process.stdin.on\\(''''data'''',d=>r+=d\\);process.stdin.on\\(''''end'''',\\(\\)=>{const d=JSON.parse\\(r\\);console.log\\(''''active:'''', d.active\\)}\\)\")",
+      "Bash(find /d/Proyectos/ultimo/AutomotrizProjectother -type d -name workflows -o -type d -name n8n -o -type d -name workflows-*)",
+      "Bash(grep -r \"n8n\\\\|N8N\" /d/Proyectos/ultimo/AutomotrizProjectother --include=*.js --include=*.env*)",
+      "Bash(ls -la /d/Proyectos/ultimo/AutomotrizProjectother/app/\\\\\\(dashboard\\\\\\)/)",
+      "Bash(ls -la /d/Proyectos/ultimo/AutomotrizProjectother/app/\\\\\\(dashboard\\\\\\)/mensajes/)",
+      "Bash(ls -la /d/Proyectos/ultimo/AutomotrizProjectother/app/\\\\\\(dashboard\\\\\\)/enviosmasivos/)",
+      "Bash(curl -s -X POST \"https://n8n.app20.tech/api/v1/workflows/zY7IprRjgHhBDaKe/activate\" -H \"X-N8N-API-KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjYjE5NzUxMi1kZWQ1LTQ5YTAtYTA3Mi0yMDY4ZjI2NjVmODgiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiODE4ODJkZTUtYTBiNC00ZmE1LTgyMzQtZDNhNmI0Nzc2YTIwIiwiaWF0IjoxNzczNTE1NTY0LCJleHAiOjE3ODEyNDA0MDB9._lNjIWiGlxVcnBp5TGFQ8hdTGOtjYEc27nTfZztv9vI\")",
+      "Bash(npm run:*)"
     ]
   }
 }

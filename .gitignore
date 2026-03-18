@@ -48,3 +48,4 @@ bd.sql
 # n8n workflows (Claude Code)
 .mcp.json
 /claude_code/
+.claude
