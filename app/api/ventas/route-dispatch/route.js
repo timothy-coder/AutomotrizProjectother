@@ -21,6 +21,13 @@ export async function POST(req) {
   }
 
   const body = await req.json();
+  const channel = body?.channel || "whatsapp";
+
+  // Ventas IA solo aplica para WhatsApp — Instagram y Facebook siempre van al flujo normal
+  if (channel !== "whatsapp") {
+    return NextResponse.json({ route: "default", reason: "channel_not_whatsapp" });
+  }
+
   const rawPhone = body?.phone || "";
   const phone = rawPhone.replace(/\D/g, "").trim();
 
