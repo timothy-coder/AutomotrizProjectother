@@ -42,6 +42,7 @@ export const NAV_TREE = [
     key: "inventario",
     label: "Inventario",
     items: [{ to: "/inventario", label: "Inventario", icon: Boxes, perm: ["inventario", "view"] },],
+    items: [{ to: "/carros", label: "Inventario de Carros", icon: Boxes, perm: ["inventariocarros", "view"] },],
   },
   {
     key: "cotizacion",

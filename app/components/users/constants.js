@@ -9,7 +9,7 @@ export const ACTIONS = [
 
 export const SECTIONS = [
   { key: "home", label: "Home", actions: ["view"] },
-  
+
   { key: "usuarios", label: "Usuarios", actions: ["view", "create", "edit", "delete"] },
   { key: "etapas", label: "Etapas", actions: ["view", "create", "edit", "delete"] },
   { key: "tiposactividades", label: "Actividades", actions: ["view", "create", "edit", "delete"] },
@@ -20,24 +20,23 @@ export const SECTIONS = [
   { key: "combomantenimiento", label: "Combo Mantenimiento", actions: ["view", "create", "edit", "delete"] },
   { key: "precios", label: "Precios", actions: ["view", "create", "edit", "delete"] },
   { key: "configuracion", label: "Configuración", actions: ["view", "create", "edit", "delete"] },
-
-  
+  { key: "inventariocarros", label: "Inventario carros", actions: ["view", "create", "edit", "delete"] },
   { key: "citas", label: "Citas", actions: ["view", "create", "edit", "viewall"] },
   { key: "recepcion", label: "Recepcion", actions: ["view", "create", "edit", "delete"] },
-{ key: "leadspv", label: "Leads PV", actions: ["view", "create", "edit","asignar","asignar"] },
-  { key: "oportunidadespv", label: "Oportunidades PV", actions: ["view", "create", "edit","asignar"] },
+  { key: "leadspv", label: "Leads PV", actions: ["view", "create", "edit", "asignar", "asignar"] },
+  { key: "oportunidadespv", label: "Oportunidades PV", actions: ["view", "create", "edit", "asignar"] },
   { key: "agenda", label: "Agenda", actions: ["view", "create", "edit", "viewall"] },
   { key: "picaje", label: "Picaje", actions: ["view", "create", "edit", "delete"] },
- 
+
   { key: "mensajes", label: "Mensajes", actions: ["view", "create", "edit", "delete"] },
-  
+
   { key: "reportes", label: "Reportes", actions: ["view", "create", "edit", "delete"] },
   { key: "ordenes", label: "Órdenes", actions: ["view", "create", "edit", "delete"] },
   { key: "cotizacion", label: "Cotización", actions: ["view", "create", "edit", "delete"] },
   { key: "prospeccion", label: "Configuracion de Prospecciones", actions: ["view", "create", "edit", "delete"] },
   { key: "configagenda", label: "Configuración de Agenda", actions: ["view", "create", "edit", "delete"] },
-  { key: "leads", label: "Leads", actions: ["view", "create", "edit","asignar","asignar"] },
-  { key: "oportunidades", label: "Oportunidades", actions: ["view", "create", "edit","asignar"] },
+  { key: "leads", label: "Leads", actions: ["view", "create", "edit", "asignar", "asignar"] },
+  { key: "oportunidades", label: "Oportunidades", actions: ["view", "create", "edit", "asignar"] },
   { key: "configpicaje", label: "Configuración de Picaje", actions: ["view", "create", "edit", "delete"] },
   { key: "configinventario", label: "Configuración de Inventario", actions: ["view", "create", "edit", "delete"] },
   { key: "configcotizacion", label: "Configuración de Cotización", actions: ["view", "create", "edit", "delete"] }

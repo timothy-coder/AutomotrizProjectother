@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useRequirePerm } from "@/hooks/useRequirePerm";
 
 import TipoInventarioTab from "@/app/components/tipoInventario/TipoInventarioTab";
+import VersionesTab from "@/app/components/tipoInventario/VersionesTab";
 
 export default function ConfiguracionInventarioPage() {
 
@@ -20,7 +21,7 @@ export default function ConfiguracionInventarioPage() {
         <TabsList className="grid grid-cols-2 md:grid-cols-9 w-full">
 
           <TabsTrigger value="tipoinventario">Tipo de Inventario</TabsTrigger>
-          
+          <TabsTrigger value="versiones">Versiones</TabsTrigger>
 
         </TabsList>
 
@@ -28,6 +29,13 @@ export default function ConfiguracionInventarioPage() {
           <Card>
             <CardContent className="pt-6">
               <TipoInventarioTab />
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="versiones">
+          <Card>
+            <CardContent className="pt-6">
+              <VersionesTab />
             </CardContent>
           </Card>
         </TabsContent>
