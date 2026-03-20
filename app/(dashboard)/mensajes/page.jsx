@@ -14,8 +14,25 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import ConversationWorkspace from "@/app/components/conversations/ConversationWorkspace";
 import { useAuth } from "@/context/AuthContext";
+
+const METRIC_TOOLTIPS = {
+  total: "Total de conversaciones visibles según los filtros activos.",
+  active: "Conversaciones abiertas o pendientes. Haz clic para filtrar.",
+  unassigned: "Conversaciones sin asesor asignado. Haz clic para filtrar.",
+  overdue: "Conversaciones cuyo SLA venció. Haz clic para filtrar.",
+  unread: "Total de mensajes entrantes no leídos. Haz clic para filtrar.",
+  mine: "Mis conversaciones activas (asignadas a mí). Haz clic para filtrar.",
+  ftr: "Tiempo promedio en espera de las conversaciones de esta vista.",
+  wait: "Tiempo máximo de espera de las conversaciones de esta vista.",
+};
 
 export default function ConversationsPage() {
   const router = useRouter();
@@ -50,6 +67,8 @@ export default function ConversationsPage() {
   const [pageError, setPageError] = useState("");
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [summarySession, setSummarySession] = useState(null);
+  const [summaryText, setSummaryText] = useState("");
+  const [summaryLoading, setSummaryLoading] = useState(false);
   const [focusComposerSignal, setFocusComposerSignal] = useState(0);
 
   async function load() {
@@ -132,10 +151,10 @@ export default function ConversationsPage() {
   }
 
   function severityClass(level) {
-    if (level === "high") return "border-red-200 bg-red-50";
-    if (level === "medium") return "border-amber-200 bg-amber-50";
-    if (level === "low") return "border-emerald-200 bg-emerald-50";
-    return "border bg-white";
+    if (level === "high") return "border-red-200 bg-red-50 text-red-900";
+    if (level === "medium") return "border-amber-200 bg-amber-50 text-amber-900";
+    if (level === "low") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+    return "border bg-white text-gray-700";
   }
 
   function formatDurationCompact(seconds) {
@@ -160,25 +179,62 @@ export default function ConversationsPage() {
     return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
   }
 
-  function getSummaryText(session) {
-    if (!session) return "Sin resumen disponible.";
+  async function openSummaryDialog(session) {
+    setSummarySession(session);
+    setSummaryText("");
+    setSummaryOpen(true);
+    setSummaryLoading(true);
 
-    if (session?.resumen) return String(session.resumen);
+    try {
+      // Intentar obtener conversation_summary real desde el timeline
+      const res = await fetch(
+        `/api/conversations/timeline?session_id=${session.session_id}`,
+        { cache: "no-store" }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          // El campo resumen viene unificado desde conversation_sessions
+          const resumenReal = data[data.length - 1]?.resumen;
+          if (resumenReal && String(resumenReal).trim()) {
+            setSummaryText(String(resumenReal).trim());
+            setSummaryLoading(false);
+            return;
+          }
+        }
+      }
+    } catch {
+      // fallback a continuación
+    }
 
+    // Fallback: intentar extraer del context_json
     const rawContext = String(session?.ultimo_contexto || "").trim();
     if (rawContext) {
       try {
         const parsed = JSON.parse(rawContext);
-        if (typeof parsed === "string") return parsed;
-        if (parsed?.resumen) return String(parsed.resumen);
-        if (parsed?.summary) return String(parsed.summary);
-        if (parsed?.context_summary) return String(parsed.context_summary);
+        if (typeof parsed === "string" && parsed.trim()) {
+          setSummaryText(parsed.trim());
+          setSummaryLoading(false);
+          return;
+        }
+        const candidate =
+          parsed?.resumen || parsed?.summary || parsed?.context_summary;
+        if (candidate && String(candidate).trim()) {
+          setSummaryText(String(candidate).trim());
+          setSummaryLoading(false);
+          return;
+        }
       } catch {
-        return rawContext;
+        if (rawContext.length > 0) {
+          setSummaryText(rawContext);
+          setSummaryLoading(false);
+          return;
+        }
       }
     }
 
-    return String(session?.ultimomensaje || "Sin resumen disponible.");
+    setSummaryText("Sin resumen disponible para esta conversación.");
+    setSummaryLoading(false);
   }
 
   const filteredSessions = useMemo(() => {
@@ -260,9 +316,58 @@ export default function ConversationsPage() {
       return currentUserId > 0 && assignedId === currentUserId && (status === "open" || status === "pending");
     }).length;
 
-    const maxWaitMinutes = metrics.max_wait_seconds == null
+    // ── Espera máxima calculada desde scopedSessions ──────────
+    // Tiempo desde el último mensaje entrante para conversaciones con mensajes sin leer
+    const nowMs = Date.now();
+    let maxWaitSeconds = null;
+
+    scopedSessions.forEach((s) => {
+      const hasUnread = Number(s?.unread_count || 0) > 0;
+      const isOpen = ["open", "pending", "unassigned"].includes(
+        String(s?.assignment_status || "unassigned").toLowerCase()
+      );
+      if (hasUnread || isOpen) {
+        const lastAt = s?.last_message_at
+          ? new Date(s.last_message_at).getTime()
+          : s?.updated_at
+            ? new Date(s.updated_at).getTime()
+            : 0;
+        if (lastAt > 0) {
+          const waitSec = (nowMs - lastAt) / 1000;
+          if (maxWaitSeconds === null || waitSec > maxWaitSeconds) {
+            maxWaitSeconds = waitSec;
+          }
+        }
+      }
+    });
+
+    // Si no hay sesiones activas en el scope, usar valor del API global
+    const effectiveMaxWait = scopedSessions.length > 0
+      ? maxWaitSeconds
+      : metrics.max_wait_seconds;
+
+    const maxWaitMinutes = effectiveMaxWait == null
       ? null
-      : Math.round(Number(metrics.max_wait_seconds) / 60);
+      : Math.round(effectiveMaxWait / 60);
+
+    // ── 1ra respuesta promedio calculada desde scopedSessions ──
+    // Aproximacion: promedio de (updated_at - created_at) para sesiones con asesor asignado
+    // Cuando hay solo 1 sesión (conversación abierta), muestra su tiempo de espera actual
+    let avgFtrSeconds = null;
+    const sessionsWithAssignment = scopedSessions.filter(
+      (s) => Number(s?.assigned_agent_id || 0) > 0
+    );
+    if (sessionsWithAssignment.length > 0) {
+      const totalWait = sessionsWithAssignment.reduce((acc, s) => {
+        const updatedAt = s?.updated_at ? new Date(s.updated_at).getTime() : 0;
+        const lastAt = s?.last_message_at ? new Date(s.last_message_at).getTime() : updatedAt;
+        return acc + Math.max(0, (nowMs - lastAt) / 1000);
+      }, 0);
+      avgFtrSeconds = Math.round(totalWait / sessionsWithAssignment.length);
+    } else if (scopedSessions.length === 0) {
+      // Caer al valor global del API si no hay sesiones en el scope
+      avgFtrSeconds = metrics.avg_first_response_seconds;
+    }
 
     return [
       {
@@ -317,19 +422,19 @@ export default function ConversationsPage() {
       {
         key: "ftr",
         title: "1ra resp. prom.",
-        value: formatDurationCompact(metrics.avg_first_response_seconds),
-        tone: metrics.avg_first_response_seconds == null
+        value: formatDurationCompact(avgFtrSeconds),
+        tone: avgFtrSeconds == null
           ? "neutral"
-          : Number(metrics.avg_first_response_seconds) > 900
+          : avgFtrSeconds > 900
             ? "high"
-            : Number(metrics.avg_first_response_seconds) > 300
+            : avgFtrSeconds > 300
               ? "medium"
               : "low",
       },
       {
         key: "wait",
         title: "Espera máxima",
-        value: formatDurationCompact(metrics.max_wait_seconds),
+        value: formatDurationCompact(effectiveMaxWait),
         tone: maxWaitMinutes == null
           ? "neutral"
           : maxWaitMinutes > 60
@@ -410,323 +515,393 @@ export default function ConversationsPage() {
     }
   }
 
+  // Detectar si hay filtros activos (para mostrar etiqueta en indicadores)
+  const hasActiveFilters = channelFilter !== "all" || statusFilter !== "all"
+    || ownerFilter !== "all" || assignmentFilter !== "all" || priorityFilter !== "all"
+    || search.trim() !== "";
+
   return (
-    <div className="h-full min-h-0 flex flex-col gap-2 overflow-y-auto pr-1">
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-2 items-start">
-        {pageError && (
-          <div className="xl:col-span-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            {pageError}
-          </div>
-        )}
+    <TooltipProvider>
+      <div className="h-full min-h-0 flex flex-col gap-2 overflow-y-auto pr-1">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-2 items-start">
+          {pageError && (
+            <div className="xl:col-span-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              {pageError}
+            </div>
+          )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por cliente, celular o mensaje"
-            className="sm:col-span-3 h-9"
-          />
+          {/* Filtros */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por cliente, celular o mensaje"
+              className="sm:col-span-3 h-9"
+            />
 
-          <select
-            className="h-8 rounded-md border bg-transparent px-2 text-xs"
-            value={channelFilter}
-            onChange={(e) => setChannelFilter(e.target.value)}
-          >
-            <option value="all">Todos los canales</option>
-            <option value="whatsapp">WhatsApp</option>
-            <option value="instagram">Instagram</option>
-            <option value="messenger">Messenger</option>
-            <option value="n8n">n8n</option>
-          </select>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <select
+                  className="h-8 rounded-md border bg-transparent px-2 text-xs"
+                  value={channelFilter}
+                  onChange={(e) => setChannelFilter(e.target.value)}
+                >
+                  <option value="all">Todos los canales</option>
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="instagram">Instagram</option>
+                  <option value="messenger">Messenger</option>
+                  <option value="n8n">n8n</option>
+                </select>
+              </TooltipTrigger>
+              <TooltipContent>Filtrar por canal de origen del mensaje</TooltipContent>
+            </Tooltip>
 
-          <select
-            className="h-8 rounded-md border bg-transparent px-2 text-xs"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="all">Todos los estados</option>
-            <option value="received">Recibido</option>
-            <option value="queued">En cola</option>
-            <option value="sent">Enviado</option>
-            <option value="delivered">Entregado</option>
-            <option value="read">Leido</option>
-            <option value="failed">Fallido</option>
-            <option value="unread">No leidos</option>
-          </select>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <select
+                  className="h-8 rounded-md border bg-transparent px-2 text-xs"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  <option value="all">Todos los estados</option>
+                  <option value="received">Recibido</option>
+                  <option value="queued">En cola</option>
+                  <option value="sent">Enviado</option>
+                  <option value="delivered">Entregado</option>
+                  <option value="read">Leido</option>
+                  <option value="failed">Fallido</option>
+                  <option value="unread">No leidos</option>
+                </select>
+              </TooltipTrigger>
+              <TooltipContent>Filtrar por estado del último mensaje</TooltipContent>
+            </Tooltip>
 
-          <select
-            className="h-8 rounded-md border bg-transparent px-2 text-xs"
-            value={ownerFilter}
-            onChange={(e) => setOwnerFilter(e.target.value)}
-          >
-            <option value="all">Todas</option>
-            <option value="mine">Mis conversaciones</option>
-            <option value="unassigned">Sin asignar</option>
-          </select>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <select
+                  className="h-8 rounded-md border bg-transparent px-2 text-xs"
+                  value={ownerFilter}
+                  onChange={(e) => setOwnerFilter(e.target.value)}
+                >
+                  <option value="all">Todas</option>
+                  <option value="mine">Mis conversaciones</option>
+                  <option value="unassigned">Sin asignar</option>
+                </select>
+              </TooltipTrigger>
+              <TooltipContent>Filtrar por propietario de la conversación</TooltipContent>
+            </Tooltip>
 
-          <select
-            className="h-8 rounded-md border bg-transparent px-2 text-xs"
-            value={assignmentFilter}
-            onChange={(e) => setAssignmentFilter(e.target.value)}
-          >
-            <option value="all">Todos los flujos</option>
-            <option value="active">Abiertas/Pendientes</option>
-            <option value="open">Abiertas</option>
-            <option value="pending">Pendientes</option>
-            <option value="closed">Cerradas</option>
-            <option value="unassigned">Sin asignar</option>
-          </select>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <select
+                  className="h-8 rounded-md border bg-transparent px-2 text-xs"
+                  value={assignmentFilter}
+                  onChange={(e) => setAssignmentFilter(e.target.value)}
+                >
+                  <option value="all">Todos los flujos</option>
+                  <option value="active">Abiertas/Pendientes</option>
+                  <option value="open">Abiertas</option>
+                  <option value="pending">Pendientes</option>
+                  <option value="closed">Cerradas</option>
+                  <option value="unassigned">Sin asignar</option>
+                </select>
+              </TooltipTrigger>
+              <TooltipContent>Filtrar por estado de asignación del agente</TooltipContent>
+            </Tooltip>
 
-          <select
-            className="h-8 rounded-md border bg-transparent px-2 text-xs"
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value)}
-          >
-            <option value="all">Todas las prioridades</option>
-            <option value="urgent">Urgente</option>
-            <option value="high">Alta</option>
-            <option value="normal">Normal</option>
-            <option value="low">Baja</option>
-            <option value="overdue">Vencidas SLA</option>
-          </select>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <select
+                  className="h-8 rounded-md border bg-transparent px-2 text-xs"
+                  value={priorityFilter}
+                  onChange={(e) => setPriorityFilter(e.target.value)}
+                >
+                  <option value="all">Todas las prioridades</option>
+                  <option value="urgent">Urgente</option>
+                  <option value="high">Alta</option>
+                  <option value="normal">Normal</option>
+                  <option value="low">Baja</option>
+                  <option value="overdue">Vencidas SLA</option>
+                </select>
+              </TooltipTrigger>
+              <TooltipContent>Filtrar por nivel de prioridad o SLA vencido</TooltipContent>
+            </Tooltip>
 
-          <div className="flex items-center justify-between sm:col-span-3 text-xs text-gray-500 px-1 gap-1.5">
-            <span>
-              {filteredSessions.length} conversaciones · {selectedSessions.length} seleccionadas
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 px-2 text-xs"
-              onClick={toggleSelectAllFiltered}
-              disabled={filteredSessions.length === 0}
-            >
-              {allFilteredSelected ? "Limpiar selección" : "Seleccionar filtrados"}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 px-2 text-xs"
-              onClick={() => {
-                setBulkError("");
-                setBulkSummary(null);
-                setBulkTargetMode(selectedSessions.length > 0 ? "selected" : "filtered");
-                setBulkOpen(true);
-              }}
-            >
-              Envío masivo básico
-            </Button>
-          </div>
-        </div>
-
-        <div className="border rounded-lg p-1.5 bg-white">
-          <p className="text-[10px] text-gray-500 px-1 mb-1">Indicadores</p>
-          <div className="grid grid-cols-2 gap-1">
-            {metricsCards.map((card) => (
-              <button
-                key={card.key}
-                type="button"
-                onClick={() => card.clickable && applyMetricFilter(card.key)}
-                className={`rounded-md px-1.5 py-1 text-left transition ${severityClass(card.tone)} ${card.clickable ? "hover:shadow-sm cursor-pointer" : "cursor-default"}`}
+            <div className="flex items-center justify-between sm:col-span-3 text-xs text-gray-500 px-1 gap-1.5">
+              <span>
+                {filteredSessions.length} conversaciones · {selectedSessions.length} seleccionadas
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-2 text-xs"
+                onClick={toggleSelectAllFiltered}
+                disabled={filteredSessions.length === 0}
               >
-                <p className="text-[9px] text-gray-600 leading-tight truncate">{card.title}</p>
-                <p className="text-[13px] font-semibold leading-tight">{card.value}</p>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-[330px_minmax(0,1fr)] gap-2 flex-1 min-h-0">
-        <div className={`${selectedSession ? "hidden lg:flex" : "flex"} border rounded-xl overflow-hidden bg-white shadow min-h-0 h-full flex-col`}>
-          <div className="overflow-y-auto flex-1 min-h-0">
-            {filteredSessions.map((s) => (
-              <div
-                key={s.session_id}
-                onClick={() => openTimeline(s)}
-                onDoubleClick={() => {
-                  openTimeline(s);
-                  setFocusComposerSignal((prev) => prev + 1);
+                {allFilteredSelected ? "Limpiar selección" : "Seleccionar filtrados"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-2 text-xs"
+                onClick={() => {
+                  setBulkError("");
+                  setBulkSummary(null);
+                  setBulkTargetMode(selectedSessions.length > 0 ? "selected" : "filtered");
+                  setBulkOpen(true);
                 }}
-                className={`flex items-center justify-between p-4 border-b hover:bg-gray-50 cursor-pointer ${selectedSession?.session_id === s.session_id ? "bg-gray-50" : ""}`}
               >
-                <div>
-                  <div className="mb-1">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4"
-                      checked={selectedSessionIds.includes(Number(s.session_id))}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={() => toggleSessionSelection(s.session_id)}
-                      aria-label={`Seleccionar conversacion ${s.session_id}`}
-                    />
-                  </div>
-
-                  <div className="font-semibold">
-                    {s.cliente_nombre || "Cliente"}
-                  </div>
-
-                  <div className="text-sm text-gray-500 truncate max-w-55">
-                    {s.ultimomensaje || "Sin mensajes"}
-                  </div>
-
-                  <div className="text-xs text-gray-400">
-                    {s.celular || s.phone}
-                    {s.source_channel ? ` · ${s.source_channel}` : ""}
-                    {s.message_status ? ` · ${s.message_status}` : ""}
-                  </div>
-
-                  <div className="text-xs mt-1 text-gray-500">
-                    {s.assigned_agent_name
-                      ? `Asignado a: ${s.assigned_agent_name}`
-                      : "Sin asignar"}
-                    {s.assignment_status ? ` · ${s.assignment_status}` : ""}
-                  </div>
-
-                  <div className="text-xs mt-1 text-gray-500">
-                    Prioridad: {s.priority_level || "normal"}
-                    {s.sla_due_at ? ` · SLA: ${new Date(s.sla_due_at).toLocaleString()}` : ""}
-                    {Number(s?.is_overdue || 0) === 1 ? " · Vencida" : ""}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {Number(s?.is_overdue || 0) === 1 && (
-                    <span className="h-6 px-2 rounded-full bg-amber-600 text-white text-xs inline-flex items-center justify-center">
-                      SLA
-                    </span>
-                  )}
-
-                  {Number(s?.unread_count || 0) > 0 && (
-                    <span className="min-w-6 h-6 px-2 rounded-full bg-red-600 text-white text-xs inline-flex items-center justify-center">
-                      {s.unread_count}
-                    </span>
-                  )}
-
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSummarySession(s);
-                      setSummaryOpen(true);
-                    }}
-                  >
-                    <Eye className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-
-            {filteredSessions.length === 0 && (
-              <div className="p-6 text-sm text-gray-500 text-center">
-                No hay conversaciones que coincidan con los filtros.
-              </div>
-            )}
+                Envío masivo básico
+              </Button>
             </div>
           </div>
 
-        <div className={`${selectedSession ? "block" : "hidden lg:block"} min-h-0 h-full`}>
-          <ConversationWorkspace
-            session={selectedSession}
-            onConversationUpdated={load}
-            onBack={() => setSelectedSession(null)}
-            focusComposerSignal={focusComposerSignal}
-          />
+          {/* Indicadores / Métricas */}
+          <div className="border rounded-lg p-1.5 bg-white">
+            <div className="flex items-center justify-between px-1 mb-1">
+              <p className="text-[10px] text-gray-500">Indicadores</p>
+              {hasActiveFilters && (
+                <span className="text-[9px] bg-blue-100 text-blue-700 rounded-full px-1.5 py-0.5 font-medium">
+                  Filtrado activo
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-1">
+              {metricsCards.map((card) => (
+                <Tooltip key={card.key}>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => card.clickable && applyMetricFilter(card.key)}
+                      className={`rounded-md px-1.5 py-1 text-left transition border ${severityClass(card.tone)} ${card.clickable ? "hover:shadow-sm cursor-pointer hover:opacity-90" : "cursor-default"}`}
+                    >
+                      <p className="text-[9px] opacity-70 leading-tight truncate">{card.title}</p>
+                      <p className="text-[13px] font-semibold leading-tight">{card.value}</p>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[200px] text-center">
+                    {METRIC_TOOLTIPS[card.key] || card.title}
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
 
-      <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Envío masivo básico</DialogTitle>
-            <DialogDescription>
-              Envia el mismo mensaje a las conversaciones filtradas actualmente.
-            </DialogDescription>
-          </DialogHeader>
+        {/* Layout conversaciones */}
+        <div className="grid grid-cols-1 lg:grid-cols-[330px_minmax(0,1fr)] gap-2 flex-1 min-h-0">
+          <div className={`${selectedSession ? "hidden lg:flex" : "flex"} border rounded-xl overflow-hidden bg-white shadow min-h-0 h-full flex-col`}>
+            <div className="overflow-y-auto flex-1 min-h-0">
+              {filteredSessions.map((s) => (
+                <div
+                  key={s.session_id}
+                  onClick={() => openTimeline(s)}
+                  onDoubleClick={() => {
+                    openTimeline(s);
+                    setFocusComposerSignal((prev) => prev + 1);
+                  }}
+                  className={`flex items-center justify-between p-4 border-b hover:bg-gray-50 cursor-pointer ${selectedSession?.session_id === s.session_id ? "bg-gray-50" : ""}`}
+                >
+                  <div>
+                    <div className="mb-1">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        checked={selectedSessionIds.includes(Number(s.session_id))}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => toggleSessionSelection(s.session_id)}
+                        aria-label={`Seleccionar conversacion ${s.session_id}`}
+                      />
+                    </div>
 
-          <div className="space-y-3">
-            <p className="text-xs text-gray-500">
-              Filtrados: {filteredSessions.length} · Seleccionados: {selectedSessions.length}
-            </p>
+                    <div className="font-semibold">
+                      {s.cliente_nombre || "Cliente"}
+                    </div>
 
-            <select
-              className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-              value={bulkTargetMode}
-              onChange={(e) => setBulkTargetMode(e.target.value)}
-              disabled={bulkSending}
-            >
-              <option value="filtered">Enviar a filtrados</option>
-              <option value="selected">Enviar solo a seleccionados</option>
-            </select>
+                    <div className="text-sm text-gray-500 truncate max-w-55">
+                      {s.ultimomensaje || "Sin mensajes"}
+                    </div>
 
-            <select
-              className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-              value={bulkChannel}
-              onChange={(e) => setBulkChannel(e.target.value)}
-              disabled={bulkSending}
-            >
-              <option value="whatsapp">WhatsApp</option>
-              <option value="instagram">Instagram</option>
-              <option value="facebook">Facebook</option>
-            </select>
+                    <div className="text-xs text-gray-400">
+                      {s.celular || s.phone}
+                      {s.source_channel ? ` · ${s.source_channel}` : ""}
+                      {s.message_status ? ` · ${s.message_status}` : ""}
+                    </div>
 
-            <Textarea
-              value={bulkText}
-              onChange={(e) => setBulkText(e.target.value)}
-              placeholder="Escribe el mensaje promocional a enviar..."
-              className="min-h-28"
-              disabled={bulkSending}
-            />
+                    <div className="text-xs mt-1 text-gray-500">
+                      {s.assigned_agent_name
+                        ? `Asignado a: ${s.assigned_agent_name}`
+                        : "Sin asignar"}
+                      {s.assignment_status ? ` · ${s.assignment_status}` : ""}
+                    </div>
 
-            {bulkError && <p className="text-sm text-red-600">{bulkError}</p>}
+                    <div className="text-xs mt-1 text-gray-500">
+                      Prioridad: {s.priority_level || "normal"}
+                      {s.sla_due_at ? ` · SLA: ${new Date(s.sla_due_at).toLocaleString()}` : ""}
+                      {Number(s?.is_overdue || 0) === 1 ? " · Vencida" : ""}
+                    </div>
+                  </div>
 
-            {bulkSummary && (
-              <div className="text-xs rounded-md border bg-gray-50 p-2 text-gray-700">
-                Total: {bulkSummary.total || 0} · Enviados: {bulkSummary.sent || 0} · En cola: {bulkSummary.queued || 0} · Fallidos: {bulkSummary.failed || 0} · Omitidos: {bulkSummary.skipped || 0}
+                  <div className="flex items-center gap-2">
+                    {Number(s?.is_overdue || 0) === 1 && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="h-6 px-2 rounded-full bg-amber-600 text-white text-xs inline-flex items-center justify-center">
+                            SLA
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>SLA vencido — requiere atención urgente</TooltipContent>
+                      </Tooltip>
+                    )}
+
+                    {Number(s?.unread_count || 0) > 0 && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="min-w-6 h-6 px-2 rounded-full bg-red-600 text-white text-xs inline-flex items-center justify-center">
+                            {s.unread_count}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>{s.unread_count} mensaje{s.unread_count !== 1 ? "s" : ""} sin leer</TooltipContent>
+                      </Tooltip>
+                    )}
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openSummaryDialog(s);
+                          }}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Ver resumen de la conversación</TooltipContent>
+                    </Tooltip>
+                  </div>
+                </div>
+              ))}
+
+              {filteredSessions.length === 0 && (
+                <div className="p-6 text-sm text-gray-500 text-center">
+                  No hay conversaciones que coincidan con los filtros.
+                </div>
+              )}
               </div>
-            )}
+            </div>
+
+          <div className={`${selectedSession ? "block" : "hidden lg:block"} min-h-0 h-full`}>
+            <ConversationWorkspace
+              session={selectedSession}
+              onConversationUpdated={load}
+              onBack={() => setSelectedSession(null)}
+              focusComposerSignal={focusComposerSignal}
+            />
           </div>
+        </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setBulkOpen(false)} disabled={bulkSending}>
-              Cerrar
-            </Button>
-            <Button
-              onClick={sendBulkMessage}
-              disabled={
-                bulkSending
-                || !bulkText.trim()
-                || (bulkTargetMode === "selected" && selectedSessions.length === 0)
-                || (bulkTargetMode === "filtered" && filteredSessions.length === 0)
-              }
-            >
-              {bulkSending ? "Enviando..." : "Enviar a filtrados"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {/* Dialog: Envío masivo */}
+        <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
+          <DialogContent className="sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle>Envío masivo básico</DialogTitle>
+              <DialogDescription>
+                Envia el mismo mensaje a las conversaciones filtradas actualmente.
+              </DialogDescription>
+            </DialogHeader>
 
-      <Dialog open={summaryOpen} onOpenChange={setSummaryOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Resumen reciente</DialogTitle>
-            <DialogDescription>
-              {summarySession?.cliente_nombre || "Conversación"}
-            </DialogDescription>
-          </DialogHeader>
+            <div className="space-y-3">
+              <p className="text-xs text-gray-500">
+                Filtrados: {filteredSessions.length} · Seleccionados: {selectedSessions.length}
+              </p>
 
-          <div className="rounded-md border bg-gray-50 p-3 text-sm text-gray-700 whitespace-pre-wrap">
-            {getSummaryText(summarySession)}
-          </div>
+              <select
+                className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+                value={bulkTargetMode}
+                onChange={(e) => setBulkTargetMode(e.target.value)}
+                disabled={bulkSending}
+              >
+                <option value="filtered">Enviar a filtrados</option>
+                <option value="selected">Enviar solo a seleccionados</option>
+              </select>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSummaryOpen(false)}>
-              Cerrar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+              <select
+                className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+                value={bulkChannel}
+                onChange={(e) => setBulkChannel(e.target.value)}
+                disabled={bulkSending}
+              >
+                <option value="whatsapp">WhatsApp</option>
+                <option value="instagram">Instagram</option>
+                <option value="facebook">Facebook</option>
+              </select>
+
+              <Textarea
+                value={bulkText}
+                onChange={(e) => setBulkText(e.target.value)}
+                placeholder="Escribe el mensaje promocional a enviar..."
+                className="min-h-28"
+                disabled={bulkSending}
+              />
+
+              {bulkError && <p className="text-sm text-red-600">{bulkError}</p>}
+
+              {bulkSummary && (
+                <div className="text-xs rounded-md border bg-gray-50 p-2 text-gray-700">
+                  Total: {bulkSummary.total || 0} · Enviados: {bulkSummary.sent || 0} · En cola: {bulkSummary.queued || 0} · Fallidos: {bulkSummary.failed || 0} · Omitidos: {bulkSummary.skipped || 0}
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setBulkOpen(false)} disabled={bulkSending}>
+                Cerrar
+              </Button>
+              <Button
+                onClick={sendBulkMessage}
+                disabled={
+                  bulkSending
+                  || !bulkText.trim()
+                  || (bulkTargetMode === "selected" && selectedSessions.length === 0)
+                  || (bulkTargetMode === "filtered" && filteredSessions.length === 0)
+                }
+              >
+                {bulkSending ? "Enviando..." : "Enviar a filtrados"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog: Resumen de conversación */}
+        <Dialog open={summaryOpen} onOpenChange={setSummaryOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Resumen de conversación</DialogTitle>
+              <DialogDescription>
+                {summarySession?.cliente_nombre || "Conversación"}
+                {summarySession?.celular ? ` · ${summarySession.celular}` : ""}
+                {summarySession?.source_channel ? ` · ${summarySession.source_channel}` : ""}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="rounded-md border bg-gray-50 p-3 text-sm text-gray-700 whitespace-pre-wrap min-h-[80px] flex items-center justify-center">
+              {summaryLoading ? (
+                <span className="text-gray-400 italic text-xs">Cargando resumen...</span>
+              ) : (
+                <span className="w-full">{summaryText}</span>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSummaryOpen(false)}>
+                Cerrar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </TooltipProvider>
   );
 }

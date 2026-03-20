@@ -197,12 +197,72 @@ export async function POST(req) {
     ]
   );
 
+  // ── Crear registro LD- en oportunidades automáticamente ──────────────────
+  let oportunidadId = null;
+  if (clienteId && modelo_id) {
+    try {
+      // Obtener o crear el origen "WhatsApp Bot"
+      await db.query(
+        `INSERT IGNORE INTO origenes_citas (name, is_active) VALUES ('WhatsApp Bot', 1)`
+      );
+      const [[origenBot]] = await db.query(
+        `SELECT id FROM origenes_citas WHERE name = 'WhatsApp Bot' LIMIT 1`
+      );
+
+      // Obtener marca del modelo
+      const [[modeloRow]] = await db.query(
+        `SELECT marca_id FROM modelos WHERE id = ? LIMIT 1`,
+        [Number(modelo_id)]
+      );
+
+      if (origenBot && modeloRow) {
+        // Generar siguiente número LD-
+        const [[maxRow]] = await db.query(
+          `SELECT COALESCE(MAX(CAST(SUBSTRING(oportunidad_id, 4) AS UNSIGNED)), 0) AS max_num
+           FROM oportunidades
+           WHERE oportunidad_padre_id IS NULL AND oportunidad_id REGEXP '^LD-[0-9]+$'`
+        );
+        const nextNum = Number(maxRow?.max_num || 0) + 1;
+        const oportunidadCodigo = `LD-${nextNum}`;
+
+        const detalleCrm = [
+          modelo_nombre ? `Modelo: ${modelo_nombre}` : null,
+          version_nombre ? `Versión: ${version_nombre}` : null,
+          forma_pago ? `Pago: ${forma_pago}` : null,
+          notas_agente ? `Notas: ${notas_agente}` : null,
+        ]
+          .filter(Boolean)
+          .join(" | ") || "Lead capturado por agente WhatsApp";
+
+        await db.query(
+          `INSERT INTO oportunidades
+             (oportunidad_id, cliente_id, marca_id, modelo_id,
+              origen_id, etapasconversion_id, detalle, created_by,
+              created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, 1, ?, NULL, NOW(), NOW())`,
+          [
+            oportunidadCodigo,
+            clienteId,
+            modeloRow.marca_id,
+            Number(modelo_id),
+            origenBot.id,
+            detalleCrm,
+          ]
+        );
+        oportunidadId = oportunidadCodigo;
+      }
+    } catch (e) {
+      console.error("[ventas/leads] Error creando oportunidad CRM:", e.message);
+    }
+  }
+
   return NextResponse.json(
     {
       id: result.insertId,
       lead_uuid: leadUuid,
       cliente_id: clienteId,
       cliente_nuevo: !clienteExistente && clienteId !== null,
+      oportunidad_crm: oportunidadId,
       message: "Lead guardado",
     },
     { status: 201 }
