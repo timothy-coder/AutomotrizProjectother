@@ -26,7 +26,7 @@ export const NAV_TREE = [
     key: "pventa",
     label: "Inventario Venta",
     items: [
-      { to: "/carros", label: "Inventario de Carros", icon: Boxes, perm: ["inventariocarros", "view"] },
+      { to: "/carros", label: "Precios de Carros", icon: Boxes, perm: ["inventariocarros", "view"] },
     ],
   },
   {
