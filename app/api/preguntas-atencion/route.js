@@ -31,11 +31,26 @@ export async function GET(req) {
 
     const [rows] = await db.query(query, params);
 
-    // Parsear JSON de opciones
-    const preguntasFormateadas = rows.map((row) => ({
-      ...row,
-      opciones: row.opciones ? JSON.parse(row.opciones) : null,
-    }));
+    // Parsear JSON de opciones de forma segura para evitar romper todo el listado.
+    const preguntasFormateadas = rows.map((row) => {
+      let opcionesParseadas = null;
+
+      if (row.opciones) {
+        try {
+          const trimmed = String(row.opciones).trim();
+          if (trimmed && trimmed !== "null") {
+            opcionesParseadas = JSON.parse(trimmed);
+          }
+        } catch {
+          opcionesParseadas = null;
+        }
+      }
+
+      return {
+        ...row,
+        opciones: opcionesParseadas,
+      };
+    });
 
     return NextResponse.json(preguntasFormateadas);
   } catch (e) {
@@ -46,8 +61,14 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
-    const { pregunta, tipo_respuesta, opciones, es_obligatoria, orden, es_activa } =
-      await req.json();
+    const {
+      pregunta,
+      tipo_respuesta,
+      opciones,
+      es_obligatoria,
+      orden,
+      es_activa,
+    } = await req.json();
 
     if (!pregunta || !tipo_respuesta) {
       return NextResponse.json(
@@ -56,10 +77,27 @@ export async function POST(req) {
       );
     }
 
-    const opcionesJSON =
-      tipo_respuesta === "opcion_multiple" && opciones
-        ? JSON.stringify(opciones)
-        : null;
+    let opcionesJSON = null;
+    if (tipo_respuesta === "opcion_multiple" && opciones !== undefined && opciones !== null) {
+      try {
+        if (Array.isArray(opciones)) {
+          opcionesJSON = JSON.stringify(opciones);
+        } else if (typeof opciones === "string") {
+          const parsed = JSON.parse(opciones);
+          opcionesJSON = JSON.stringify(parsed);
+        } else {
+          return NextResponse.json(
+            { message: "Las opciones deben ser un arreglo o un JSON válido" },
+            { status: 400 }
+          );
+        }
+      } catch {
+        return NextResponse.json(
+          { message: "Las opciones deben ser un JSON válido" },
+          { status: 400 }
+        );
+      }
+    }
 
     const [result] = await db.query(
       `INSERT INTO preguntas_atencion 

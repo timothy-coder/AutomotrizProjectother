@@ -20,7 +20,7 @@ export async function GET(req) {
         m.name as marca,
         mo.name as modelo,
         o.oportunidad_id as numero_oportunidad,
-        u.nombre as created_by_name
+        COALESCE(u.fullname, u.nombre, u.name) as created_by_name
       FROM cotizacionesagenda ca
       INNER JOIN marcas m ON m.id = ca.marca_id
       INNER JOIN modelos mo ON mo.id = ca.modelo_id
@@ -71,6 +71,7 @@ export async function POST(req) {
       marca_id,
       modelo_id,
       version_id,
+      anio,
       sku,
       color_externo,
       color_interno,
@@ -101,13 +102,14 @@ export async function POST(req) {
     // Insertar cotización de agenda
     const [result] = await db.query(
       `INSERT INTO cotizacionesagenda 
-       (oportunidad_id, marca_id, modelo_id, version_id, sku, color_externo, color_interno, estado, created_by)
-       VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (oportunidad_id, marca_id, modelo_id, version_id, anio, sku, color_externo, color_interno, estado, created_by)
+       VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         oportunidad_id,
         marca_id,
         modelo_id,
         version_id || null,
+        anio || null,
         sku || null,
         color_externo || null,
         color_interno || null,

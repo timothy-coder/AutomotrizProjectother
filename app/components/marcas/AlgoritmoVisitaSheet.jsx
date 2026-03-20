@@ -10,7 +10,13 @@ import {
   SheetDescription,
   SheetFooter,
 } from "@/components/ui/sheet";
-import { Pencil, Trash2, Plus } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Pencil, Trash2, Plus, RefreshCw, Wrench, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import AlgoritmoVisitaDialog from "./AlgoritmoVisitaDialog";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
@@ -158,116 +164,255 @@ export default function AlgoritmoVisitaSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-xl">
-        <SheetHeader>
-          <SheetTitle>Configuracion de tiempo de mantenimiento</SheetTitle>
-          <SheetDescription>
-            Gestionar tus tiempos de mantenimiento
-          </SheetDescription>
-        </SheetHeader>
+    <TooltipProvider>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col px-3">
 
-        <div className="mt-5 space-y-4">
-          <div className="flex items-center justify-between gap-2">
-            <Button variant="outline" onClick={loadData} disabled={loading}>
-              Recargar
-            </Button>
-
-            {canCreate && (
-              <Button onClick={onNewRecord} disabled={loading}>
-                <Plus size={16} /> Nuevo registro
-              </Button>
-            )}
-          </div>
-
-          <div className="border rounded-md overflow-hidden">
-            <div className="max-h-[65vh] overflow-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted sticky top-0">
-                  <tr>
-                    <th className="p-3 text-left">Modelo</th>
-                    <th className="p-3 text-left">Marca</th>
-                    <th className="p-3 text-left">Kilometraje</th>
-                    <th className="p-3 text-left">Meses</th>
-                    <th className="p-3 text-right">Acciones</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {recordsSorted.map((record) => (
-                    <tr key={record.id} className="border-t">
-                      <td className="p-3">{record.modelo_name}</td>
-                      <td className="p-3">{record.marca_name}</td>
-                      <td className="p-3">{record.kilometraje}</td>
-                      <td className="p-3">{record.meses}</td>
-
-                      <td className="p-3 text-right space-x-2">
-                        {canEdit && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => onEditRecord(record)}
-                            disabled={loading}
-                            title="Editar"
-                          >
-                            <Pencil size={16} />
-                          </Button>
-                        )}
-
-                        {canDelete && (
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => askDeleteRecord(record)}
-                            disabled={loading}
-                            title="Eliminar"
-                          >
-                            <Trash2 size={16} />
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-
-                  {!loading && recordsSorted.length === 0 && (
-                    <tr>
-                      <td
-                        className="p-4 text-sm text-muted-foreground"
-                        colSpan={5}
-                      >
-                        No hay registros aún.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+          {/* Header */}
+          <SheetHeader className="border-b pb-4">
+            <div className="flex items-center gap-2">
+              <Wrench size={24} className="text-blue-600" />
+              <div>
+                <SheetTitle className="text-xl">Tiempo de Mantenimiento</SheetTitle>
+                <SheetDescription>
+                  Configura los intervalos de mantenimiento por modelo
+                </SheetDescription>
+              </div>
             </div>
+          </SheetHeader>
+
+          {/* Content */}
+          <div className="flex-1 mt-6 space-y-4 overflow-y-auto">
+
+            {/* Toolbar */}
+            <div className="flex items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    onClick={loadData} 
+                    disabled={loading}
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+                    Recargar
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Actualizar lista de registros</TooltipContent>
+              </Tooltip>
+
+              {canCreate && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      onClick={onNewRecord} 
+                      disabled={loading}
+                      className="bg-green-600 hover:bg-green-700 text-white gap-2 ml-auto"
+                      size="sm"
+                    >
+                      <Plus size={16} />
+                      Nuevo registro
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Crear nuevo registro de mantenimiento</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+
+            {/* Tabla */}
+            <div className="border rounded-lg overflow-hidden bg-white">
+              <div className="max-h-[50vh] overflow-y-auto">
+                <table className="w-full text-sm">
+
+                  {/* Header */}
+                  <thead className="bg-slate-50 border-b sticky top-0">
+                    <tr>
+                      <th className="p-3 text-left font-semibold text-slate-700">
+                        <div className="flex items-center gap-1">
+                          <span>Modelo</span>
+                        </div>
+                      </th>
+                      <th className="p-3 text-left font-semibold text-slate-700">Marca</th>
+                      <th className="p-3 text-left font-semibold text-slate-700">
+                        <div className="flex items-center gap-1">
+                          <span>Km</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Calendar size={12} className="text-gray-400 cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              Cada cuántos km hacer mantenimiento
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </th>
+                      <th className="p-3 text-left font-semibold text-slate-700">
+                        <div className="flex items-center gap-1">
+                          <span>Meses</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Calendar size={12} className="text-gray-400 cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              Cada cuántos meses hacer mantenimiento
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </th>
+                      <th className="p-3 text-right font-semibold text-slate-700">Acciones</th>
+                    </tr>
+                  </thead>
+
+                  {/* Body */}
+                  <tbody>
+                    {loading ? (
+                      <tr>
+                        <td colSpan={5} className="p-8 text-center">
+                          <div className="flex flex-col items-center gap-2">
+                            <RefreshCw size={20} className="text-gray-400 animate-spin" />
+                            <span className="text-sm text-gray-500">Cargando registros...</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : recordsSorted.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="p-8 text-center">
+                          <div className="flex flex-col items-center gap-2">
+                            <Wrench size={24} className="text-gray-300" />
+                            <span className="text-sm text-gray-500">
+                              No hay registros de mantenimiento
+                            </span>
+                            <p className="text-xs text-gray-400 mt-1">
+                              Crea uno nuevo para comenzar
+                            </p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      recordsSorted.map((record, index) => (
+                        <tr 
+                          key={record.id}
+                          className={`border-b hover:bg-slate-50 transition-colors ${
+                            index % 2 === 0 ? "bg-white" : "bg-slate-50/30"
+                          }`}
+                        >
+                          <td className="p-3">
+                            <span className="font-medium text-slate-900">
+                              {record.modelo_name}
+                            </span>
+                          </td>
+                          <td className="p-3 text-gray-700">
+                            {record.marca_name}
+                          </td>
+                          <td className="p-3">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-100 text-blue-700 text-xs font-semibold">
+                              <Wrench size={12} />
+                              {record.kilometraje} km
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-purple-100 text-purple-700 text-xs font-semibold">
+                              <Calendar size={12} />
+                              {record.meses} m
+                            </span>
+                          </td>
+
+                          <td className="p-3 text-right">
+                            <div className="flex gap-1 justify-end">
+                              {canEdit && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="hover:bg-amber-100 hover:text-amber-700"
+                                      onClick={() => onEditRecord(record)}
+                                      disabled={loading}
+                                    >
+                                      <Pencil size={16} />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">Editar registro</TooltipContent>
+                                </Tooltip>
+                              )}
+
+                              {canDelete && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="hover:bg-red-100 hover:text-red-700"
+                                      onClick={() => askDeleteRecord(record)}
+                                      disabled={loading}
+                                    >
+                                      <Trash2 size={16} />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">Eliminar registro</TooltipContent>
+                                </Tooltip>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Footer con información */}
+            {recordsSorted.length > 0 && (
+              <div className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-lg text-sm border border-slate-200">
+                <span className="text-gray-600">
+                  Total: <span className="font-semibold text-slate-700">{recordsSorted.length}</span> registro(s)
+                </span>
+                <span className="text-xs text-gray-500">
+                  Modelos configurados
+                </span>
+              </div>
+            )}
+
           </div>
-        </div>
 
-        <SheetFooter className="mt-6">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cerrar
-          </Button>
-        </SheetFooter>
+          {/* Footer */}
+          <SheetFooter className="border-t pt-4 mt-6">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  onClick={() => onOpenChange(false)}
+                  className="w-full"
+                >
+                  Cerrar
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Cerrar panel de configuración</TooltipContent>
+            </Tooltip>
+          </SheetFooter>
 
-        <AlgoritmoVisitaDialog
-          open={formDialogOpen}
-          onOpenChange={setFormDialogOpen}
-          mode={formMode}
-          record={selectedRecord}
-          marcas={marcas}
-          onSave={saveRecord}
-        />
+          {/* Dialogs */}
+          <AlgoritmoVisitaDialog
+            open={formDialogOpen}
+            onOpenChange={setFormDialogOpen}
+            mode={formMode}
+            record={selectedRecord}
+            marcas={marcas}
+            onSave={saveRecord}
+          />
 
-        <ConfirmDeleteDialog
-          open={deleteDialogOpen}
-          onOpenChange={setDeleteDialogOpen}
-          title="Eliminar registro"
-          description={`¿Seguro que deseas eliminar este registro de modelo ID "${recordToDelete?.modelo_id}"?`}
-          onConfirm={confirmDelete}
-        />
-      </SheetContent>
-    </Sheet>
+          <ConfirmDeleteDialog
+            open={deleteDialogOpen}
+            onOpenChange={setDeleteDialogOpen}
+            title="Eliminar registro de mantenimiento"
+            description={`¿Seguro que deseas eliminar este registro de mantenimiento para el modelo "${recordToDelete?.modelo_name}" (${recordToDelete?.marca_name})?`}
+            onConfirm={confirmDelete}
+          />
+
+        </SheetContent>
+      </Sheet>
+    </TooltipProvider>
   );
 }

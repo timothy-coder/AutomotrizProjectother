@@ -243,9 +243,9 @@ export default function OportunidadDetailPage() {
       const body = editingVehiculo
         ? vehiculoFormData
         : {
-            ...vehiculoFormData,
-            client_id: oportunidad.cliente_id,
-          };
+          ...vehiculoFormData,
+          client_id: oportunidad.cliente_id,
+        };
 
       const response = await fetch(url, {
         method,
@@ -258,7 +258,7 @@ export default function OportunidadDetailPage() {
           editingVehiculo ? "Vehículo actualizado" : "Vehículo añadido"
         );
         setDialogVehiculoOpen(false);
-        
+
         // Recargar vehículos
         const resVeh = await fetch(
           `/api/client-interest-vehicles?client_id=${oportunidad.cliente_id}`,
@@ -291,7 +291,7 @@ export default function OportunidadDetailPage() {
       if (response.ok) {
         toast.success("Vehículo eliminado");
         setDeleteVehiculoDialog(false);
-        
+
         // Recargar vehículos
         const resVeh = await fetch(
           `/api/client-interest-vehicles?client_id=${oportunidad.cliente_id}`,
@@ -448,11 +448,10 @@ export default function OportunidadDetailPage() {
             <div key={etapa.id} className="flex items-center gap-2 flex-shrink-0">
               <button
                 onClick={() => setEtapaActual(etapa.id)}
-                className={`px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap transition-all ${
-                  etapaActual === etapa.id
+                className={`px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap transition-all ${etapaActual === etapa.id
                     ? "bg-blue-600 text-white"
                     : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
+                  }`}
               >
                 {etapa.label}
               </button>
@@ -504,7 +503,44 @@ export default function OportunidadDetailPage() {
                 </div>
               </div>
             </div>
-
+            {/* Información Adicional */}
+            <div className="bg-white rounded-lg border p-6">
+              <h2 className="text-lg font-semibold mb-4">Información Adicional</h2>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-600">Correo Electrónico</p>
+                  <p className="font-medium">{oportunidad.email || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Teléfono</p>
+                  <p className="font-medium">{oportunidad.telefono || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Celular</p>
+                  <p className="font-medium">{oportunidad.celular || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">DNI</p>
+                  <p className="font-medium">{oportunidad.documento || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Fecha de Creación</p>
+                  <p className="font-medium">
+                    {oportunidad.created_at
+                      ? new Date(oportunidad.created_at).toLocaleDateString("es-ES")
+                      : "-"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Última Actualización</p>
+                  <p className="font-medium">
+                    {oportunidad.updated_at
+                      ? new Date(oportunidad.updated_at).toLocaleDateString("es-ES")
+                      : "-"}
+                  </p>
+                </div>
+              </div>
+            </div>
             {/* Vehículos de Interés */}
             <div className="bg-white rounded-lg border p-6">
               <div className="flex justify-between items-center mb-4">
@@ -605,44 +641,7 @@ export default function OportunidadDetailPage() {
               </div>
             </div>
 
-            {/* Información Adicional */}
-            <div className="bg-white rounded-lg border p-6">
-              <h2 className="text-lg font-semibold mb-4">Información Adicional</h2>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-600">Correo Electrónico</p>
-                  <p className="font-medium">{oportunidad.email || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Teléfono</p>
-                  <p className="font-medium">{oportunidad.telefono || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Celular</p>
-                  <p className="font-medium">{oportunidad.celular || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">DNI</p>
-                  <p className="font-medium">{oportunidad.documento || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Fecha de Creación</p>
-                  <p className="font-medium">
-                    {oportunidad.created_at
-                      ? new Date(oportunidad.created_at).toLocaleDateString("es-ES")
-                      : "-"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Última Actualización</p>
-                  <p className="font-medium">
-                    {oportunidad.updated_at
-                      ? new Date(oportunidad.updated_at).toLocaleDateString("es-ES")
-                      : "-"}
-                  </p>
-                </div>
-              </div>
-            </div>
+
           </div>
 
           {/* Right: Panel de Acciones */}
@@ -913,13 +912,13 @@ export default function OportunidadDetailPage() {
         </DialogContent>
       </Dialog>
       <div className="bg-white rounded-lg border p-6">
-  <CotizacionAgendaSection 
-    oportunidadId={oportunidadId}
-    clienteId={oportunidad.cliente_id}
-    oportunidadData={oportunidad}
-  />
-</div>
+        <CotizacionAgendaSection
+          oportunidadId={oportunidadId}
+          clienteId={oportunidad.cliente_id}
+          oportunidadData={oportunidad}
+        />
+      </div>
     </div>
-    
+
   );
 }

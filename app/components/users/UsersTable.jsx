@@ -11,6 +11,12 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 import {
   Eye,
@@ -60,11 +66,18 @@ export default function UsersTable({
         const user = row.original;
 
         return (
-          <Switch
-            checked={!!user.is_active}
-            onCheckedChange={() => onToggleActive(user)}
-            className={"bg-black text-white"}
-          />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Switch
+                checked={!!user.is_active}
+                onCheckedChange={() => onToggleActive(user)}
+                className={"bg-black text-white"}
+              />
+            </TooltipTrigger>
+            <TooltipContent>
+              {user.is_active ? "Desactivar usuario" : "Activar usuario"}
+            </TooltipContent>
+          </Tooltip>
         );
       },
     },
@@ -80,35 +93,50 @@ export default function UsersTable({
           <div className="flex gap-2">
 
             {/* VER */}
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => onView(user)}
-            >
-              <Eye size={18} />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => onView(user)}
+                >
+                  <Eye size={18} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Ver usuario</TooltipContent>
+            </Tooltip>
 
             {/* EDITAR */}
             {canEdit && (
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => onEdit(user)}
-              >
-                <Pencil size={18} />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => onEdit(user)}
+                  >
+                    <Pencil size={18} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Editar usuario</TooltipContent>
+              </Tooltip>
             )}
 
             {/* DELETE */}
             {canDelete && (
-              <Button
-                size="icon"
-                variant="destructive"
-                className="text-white"
-                onClick={() => onDelete(user)}
-              >
-                <Trash2 size={18} />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="destructive"
+                    className="text-white"
+                    onClick={() => onDelete(user)}
+                  >
+                    <Trash2 size={18} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Eliminar usuario</TooltipContent>
+              </Tooltip>
             )}
 
           </div>
@@ -136,102 +164,118 @@ export default function UsersTable({
   // UI
   // -----------------------------
   return (
-    <div className="rounded-xl border overflow-hidden">
+    <TooltipProvider>
+      <div className="rounded-xl border overflow-hidden">
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
 
-          {/* HEADER */}
-          <thead className="bg-muted/50">
-            {table.getHeaderGroups().map(headerGroup => (
-              <tr key={headerGroup.id}>
-                {headerGroup.headers.map(header => (
-                  <th
-                    key={header.id}
-                    className="text-left p-3 font-medium"
-                  >
-                    {flexRender(
-                      header.column.columnDef.header,
-                      header.getContext()
-                    )}
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
+            {/* HEADER */}
+            <thead className="bg-muted/50">
+              {table.getHeaderGroups().map(headerGroup => (
+                <tr key={headerGroup.id}>
+                  {headerGroup.headers.map(header => (
+                    <th
+                      key={header.id}
+                      className="text-left p-3 font-medium"
+                    >
+                      {flexRender(
+                        header.column.columnDef.header,
+                        header.getContext()
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              ))}
+            </thead>
 
-          {/* BODY */}
-          <tbody>
+            {/* BODY */}
+            <tbody>
 
-            {loading && (
-              <tr>
-                <td colSpan={4} className="p-6 text-center">
-                  Cargando usuarios...
-                </td>
-              </tr>
-            )}
-
-            {!loading && table.getRowModel().rows.length === 0 && (
-              <tr>
-                <td colSpan={4} className="p-6 text-center">
-                  No hay usuarios
-                </td>
-              </tr>
-            )}
-
-            {!loading && table.getRowModel().rows.map(row => (
-              <tr key={row.id} className="border-t">
-
-                {row.getVisibleCells().map(cell => (
-                  <td key={cell.id} className="p-3">
-
-                    {flexRender(
-                      cell.column.columnDef.cell,
-                      cell.getContext()
-                    )}
-
+              {loading && (
+                <tr>
+                  <td colSpan={4} className="p-6 text-center">
+                    Cargando usuarios...
                   </td>
-                ))}
+                </tr>
+              )}
 
-              </tr>
-            ))}
+              {!loading && table.getRowModel().rows.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="p-6 text-center">
+                    No hay usuarios
+                  </td>
+                </tr>
+              )}
 
-          </tbody>
+              {!loading && table.getRowModel().rows.map(row => (
+                <tr key={row.id} className="border-t">
 
-        </table>
-      </div>
+                  {row.getVisibleCells().map(cell => (
+                    <td key={cell.id} className="p-3">
 
-      {/* PAGINACIÓN */}
-      <div className="flex items-center justify-between p-3 border-t">
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
 
-        <span className="text-sm text-muted-foreground">
-          Página {pagination.pageIndex + 1} de {table.getPageCount()}
-        </span>
+                    </td>
+                  ))}
 
-        <div className="flex gap-2">
+                </tr>
+              ))}
 
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!table.getCanPreviousPage()}
-            onClick={() => table.previousPage()}
-          >
-            Anterior
-          </Button>
+            </tbody>
 
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!table.getCanNextPage()}
-            onClick={() => table.nextPage()}
-          >
-            Siguiente
-          </Button>
+          </table>
+        </div>
+
+        {/* PAGINACIÓN */}
+        <div className="flex items-center justify-between p-3 border-t">
+
+          <span className="text-sm text-muted-foreground">
+            Página {pagination.pageIndex + 1} de {table.getPageCount()}
+          </span>
+
+          <div className="flex gap-2">
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!table.getCanPreviousPage()}
+                  onClick={() => table.previousPage()}
+                >
+                  Anterior
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {table.getCanPreviousPage() ? "Ir a página anterior" : "Ya estás en la primera página"}
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!table.getCanNextPage()}
+                  onClick={() => table.nextPage()}
+                >
+                  Siguiente
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {table.getCanNextPage() ? "Ir a siguiente página" : "Ya estás en la última página"}
+              </TooltipContent>
+            </Tooltip>
+
+          </div>
 
         </div>
 
       </div>
-
-    </div>
+    </TooltipProvider>
   );
 }

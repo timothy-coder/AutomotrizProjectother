@@ -8,7 +8,7 @@ import { db } from "@/lib/db";
 
 export async function GET(req, { params }) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     const [rows] = await db.query(
       `SELECT 
@@ -17,7 +17,7 @@ export async function GET(req, { params }) {
         mo.name as modelo,
         o.oportunidad_id as numero_oportunidad,
         o.cliente_name,
-        u.nombre as created_by_name
+        COALESCE(u.fullname, u.nombre, u.name) as created_by_name
       FROM cotizacionesagenda ca
       INNER JOIN marcas m ON m.id = ca.marca_id
       INNER JOIN modelos mo ON mo.id = ca.modelo_id
@@ -46,7 +46,7 @@ export async function GET(req, { params }) {
 
 export async function PUT(req, { params }) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await req.json();
     const {
       sku,
@@ -56,6 +56,7 @@ export async function PUT(req, { params }) {
       marca_id,
       modelo_id,
       version_id,
+      anio,
     } = body;
 
     // Verificar que existe
@@ -75,7 +76,7 @@ export async function PUT(req, { params }) {
     const [result] = await db.query(
       `UPDATE cotizacionesagenda 
        SET sku = ?, color_externo = ?, color_interno = ?, estado = ?, 
-           marca_id = ?, modelo_id = ?, version_id = ?, updated_at = NOW()
+           marca_id = ?, modelo_id = ?, version_id = ?, anio = ?, updated_at = NOW()
        WHERE id = ?`,
       [
         sku || null,
@@ -85,6 +86,7 @@ export async function PUT(req, { params }) {
         marca_id,
         modelo_id,
         version_id || null,
+        anio || null,
         id,
       ]
     );
@@ -108,7 +110,7 @@ export async function PUT(req, { params }) {
 
 export async function DELETE(req, { params }) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     // Verificar que existe
     const [existing] = await db.query(

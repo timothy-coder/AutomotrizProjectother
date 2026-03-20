@@ -19,7 +19,7 @@ export async function GET(req) {
         pa.tipo_respuesta,
         pa.opciones,
         pa.es_obligatoria,
-        u.name as creado_por_nombre,
+        COALESCE(u.fullname, u.nombre, u.name) as creado_por_nombre,
         o.oportunidad_id,
         c.nombre as cliente_nombre,
         m.name as marca,
@@ -49,11 +49,22 @@ export async function GET(req) {
 
     const [rows] = await db.query(query, params);
 
-    // Parsear JSON de opciones
-    const respuestasFormateadas = rows.map((row) => ({
-      ...row,
-      opciones: row.opciones ? JSON.parse(row.opciones) : null,
-    }));
+    // Parseo seguro para que un JSON inválido no rompa el endpoint.
+    const respuestasFormateadas = rows.map((row) => {
+      let opcionesParseadas = null;
+      if (row.opciones) {
+        try {
+          opcionesParseadas = JSON.parse(row.opciones);
+        } catch {
+          opcionesParseadas = null;
+        }
+      }
+
+      return {
+        ...row,
+        opciones: opcionesParseadas,
+      };
+    });
 
     return NextResponse.json(respuestasFormateadas);
   } catch (e) {

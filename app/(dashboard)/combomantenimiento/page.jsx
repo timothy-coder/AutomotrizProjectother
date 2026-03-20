@@ -2,10 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, Check, Wrench, AlertCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 import {
   Dialog,
@@ -15,10 +21,8 @@ import {
   DialogFooter
 } from "@/components/ui/dialog";
 
-import { Input } from "@/components/ui/input"; // Aquí importamos Textarea
-
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
 import {
   Select,
   SelectTrigger,
@@ -51,17 +55,13 @@ function idsToCommaText(ids) {
   return (ids || []).join(",");
 }
 
-/** ✅ MultiSelect buscable tipo shadcn Command
- *  - abre solo al click
- *  - muestra tags con X
- *  - guarda ids (number[])
- */
+/** ✅ MultiSelect buscable tipo shadcn Command */
 function MultiMantenimientoSelector({
   allItems = [],
   selectedIds = [],
   onChange,
   disabled,
-  excludeId, // opcional: evitar seleccionar el mismo mantenimiento
+  excludeId,
 }) {
   const [open, setOpen] = useState(false);
 
@@ -85,31 +85,32 @@ function MultiMantenimientoSelector({
 
   return (
     <div className="space-y-2">
-      {/* “Input” clickable con tags dentro */}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
             type="button"
             disabled={disabled}
-            className={`w-full text-left border rounded-md px-2 py-2 min-h-[44px] flex flex-wrap gap-2 items-center ${
-              disabled ? "opacity-50 cursor-not-allowed" : "cursor-text"
+            className={`w-full text-left border rounded-lg px-3 py-2 min-h-[44px] flex flex-wrap gap-2 items-center transition-colors ${
+              disabled 
+                ? "opacity-50 cursor-not-allowed bg-gray-50" 
+                : "cursor-text hover:border-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             }`}
           >
             {selected.length === 0 ? (
               <span className="text-sm text-muted-foreground">
-                Click para buscar y seleccionar mantenimientos...
+                Click para buscar y seleccionar...
               </span>
             ) : (
               selected.map((it) => (
                 <span
                   key={it.id}
-                  className="flex items-center gap-1 bg-primary text-primary-foreground rounded-md px-2 py-1 text-xs"
+                  className="flex items-center gap-1 bg-blue-600 text-white rounded-md px-2 py-1 text-xs font-medium"
                 >
                   {it.name}
                   <span
                     role="button"
                     tabIndex={0}
-                    className="ml-1 text-sm leading-none"
+                    className="ml-1 text-sm leading-none hover:opacity-80 cursor-pointer"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -145,10 +146,10 @@ function MultiMantenimientoSelector({
                       key={m.id}
                       value={`${m.name ?? ""} ${m.id}`}
                       onSelect={() => toggle(m.id)}
-                      className="flex items-center justify-between"
+                      className="flex items-center justify-between cursor-pointer"
                     >
                       <span className="text-sm">{m.name}</span>
-                      {isSelected ? <Check className="h-4 w-4" /> : null}
+                      {isSelected ? <Check className="h-4 w-4 text-blue-600" /> : null}
                     </CommandItem>
                   );
                 })}
@@ -158,9 +159,8 @@ function MultiMantenimientoSelector({
         </PopoverContent>
       </Popover>
 
-      {/* texto “real” que se guardará */}
-      <div className="text-xs text-muted-foreground">
-        Se guarda como: <span className="font-mono">{idsToCommaText(selectedIds)}</span>
+      <div className="text-xs text-gray-600 bg-slate-50 p-2 rounded">
+        <span className="font-medium">IDs seleccionados:</span> <span className="font-mono">{idsToCommaText(selectedIds) || "—"}</span>
       </div>
     </div>
   );
@@ -172,31 +172,24 @@ export default function ComboMantenimientoPage() {
   const [sub, setSub] = useState([]);
   const [expanded, setExpanded] = useState({});
 
-  // dialog principal (mantenimiento / sub)
   const [dialog, setDialog] = useState({
     open: false,
-    mode: "create-mant", // create-mant | edit-mant | create-sub | edit-sub
+    mode: "create-mant",
     item: null
   });
 
   const [form, setForm] = useState({
-    // comunes
     name: "",
     description: "",
     is_active: true,
-
-    // sub
     type_id: "",
-
-    // ✅ resumen (solo mantenimiento)
     resumen: false,
-    mantenimiento_ids: [] // number[]
+    mantenimiento_ids: []
   });
 
-  // delete
   const [deleteDialog, setDeleteDialog] = useState({
     open: false,
-    type: null, // mant | sub
+    type: null,
     item: null
   });
 
@@ -284,10 +277,8 @@ export default function ComboMantenimientoPage() {
     }
 
     try {
-      // ✅ mantenimiento_id SOLO si resumen está activo
       const mantenimiento_id = form.resumen ? idsToCommaText(form.mantenimiento_ids) : null;
 
-      // ----- MANTENIMIENTO -----
       if (dialog.mode === "create-mant") {
         const res = await fetch("/api/mantenimiento", {
           method: "POST",
@@ -320,7 +311,6 @@ export default function ComboMantenimientoPage() {
         toast.success("Mantenimiento actualizado");
       }
 
-      // ----- SUBMANTENIMIENTO -----
       if (dialog.mode === "create-sub") {
         if (!form.type_id) {
           toast.warning("Seleccione mantenimiento padre");
@@ -397,7 +387,7 @@ export default function ComboMantenimientoPage() {
     }
   }
 
-  // ================= TOGGLE ACTIVO (SOLO MANTENIMIENTO) =================
+  // ================= TOGGLE ACTIVO =================
   async function toggleMantActive(m, value) {
     try {
       const res = await fetch(`/api/mantenimiento/${m.id}`, {
@@ -420,227 +410,429 @@ export default function ComboMantenimientoPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* HEADER */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-xl font-semibold">Mantenimiento</h1>
+    <TooltipProvider>
+      <div className="space-y-6">
+        
+        {/* HEADER */}
+        <div className="flex justify-between items-center px-1">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+              <Wrench size={28} className="text-blue-600" />
+              Mantenimientos
+            </h1>
+            <p className="text-sm text-gray-600 mt-1">Gestiona mantenimientos y submantenimientos</p>
+          </div>
 
-        <Button onClick={openNewMant}>
-          <Plus size={16} /> Nuevo mantenimiento
-        </Button>
-      </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                onClick={openNewMant}
+                className="bg-green-600 hover:bg-green-700 text-white gap-2"
+              >
+                <Plus size={16} />
+                Nuevo mantenimiento
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Crear nuevo mantenimiento</TooltipContent>
+          </Tooltip>
+        </div>
 
-      {/* LISTA */}
-      <div className="border rounded-md overflow-hidden">
-        {grouped.map((m) => (
-          <div key={m.id} className="border-b">
-            <div className="flex justify-between p-3 bg-muted">
-              <div className="flex items-center gap-2 cursor-pointer" onClick={() => toggleExpand(m.id)}>
-                {expanded[m.id] ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-                <span className="font-medium">{m.name}</span>
-                <span className="text-xs text-muted-foreground">({m.items.length})</span>
-
-                {m.mantenimiento_id && String(m.mantenimiento_id).trim() !== "" && (
-                  <span className="ml-2 text-[11px] px-2 py-0.5 rounded bg-primary text-primary-foreground">
-                    Con mantenimiento base
-                  </span>
-                )}
-              </div>
-
-              <div className="flex gap-2 items-center">
-                {/* ✅ switch SOLO para mantenimiento */}
-                <Switch checked={Number(m.is_active) === 1} onCheckedChange={(v) => toggleMantActive(m, v)} />
-
-                <Button size="sm" variant="ghost" onClick={() => openEditMant(m)}>
-                  <Pencil size={16} />
-                </Button>
-
-                <Button size="sm" variant="destructive" onClick={() => askDeleteMant(m)}>
-                  <Trash2 size={16} />
-                </Button>
-
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    openNewSub(m.id);
-                    setExpanded((p) => ({ ...p, [m.id]: true }));
-                  }}
+        {/* LISTA */}
+        <div className="border rounded-lg overflow-hidden bg-white">
+          {grouped.map((m, idx) => (
+            <div key={m.id} className={idx !== grouped.length - 1 ? "border-b" : ""}>
+              
+              {/* MANTENIMIENTO */}
+              <div className={`flex justify-between items-center p-4 hover:bg-slate-50 transition-colors ${
+                Number(m.is_active) === 0 ? "opacity-60" : ""
+              }`}>
+                
+                <div 
+                  className="flex items-center gap-3 flex-1 cursor-pointer"
+                  onClick={() => toggleExpand(m.id)}
                 >
-                  <Plus size={14} /> Sub mantenimiento
-                </Button>
-              </div>
-            </div>
+                  {expanded[m.id] ? 
+                    <ChevronDown size={20} className="text-blue-600" /> : 
+                    <ChevronRight size={20} className="text-gray-400" />
+                  }
+                  
+                  <div className="flex-1">
+                    <p className="font-semibold text-slate-900">{m.name}</p>
+                    <p className="text-xs text-gray-600">{m.items.length} submantenimiento(s)</p>
+                  </div>
 
-            {/* SUB LIST */}
-            {expanded[m.id] && (
-              <div className="p-3 space-y-2">
-                {m.items.map((item) => (
-                  <div key={item.id} className="flex justify-between border rounded-md px-3 py-2">
-                    <div className="flex gap-3 items-center">{item.name}</div>
+                  {m.mantenimiento_id && String(m.mantenimiento_id).trim() !== "" && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="text-[11px] px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-semibold cursor-help">
+                          Con base
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        Mantenimiento base: {m.mantenimiento_id}
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
 
-                    <div className="flex gap-2 items-center">
-                      {/* ✅ sin switch para submantenimiento */}
-                      <Button size="sm" variant="ghost" onClick={() => openEditSub(item)}>
+                <div className="flex gap-2 items-center ml-4">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 rounded-lg">
+                        <Switch 
+                          checked={Number(m.is_active) === 1} 
+                          onCheckedChange={(v) => toggleMantActive(m, v)}
+                          className="data-[state=checked]:bg-green-600"
+                        />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      {Number(m.is_active) === 1 ? "Desactivar" : "Activar"}
+                    </TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        size="sm" 
+                        variant="ghost"
+                        className="hover:bg-amber-100 hover:text-amber-700"
+                        onClick={() => openEditMant(m)}
+                      >
                         <Pencil size={16} />
                       </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Editar mantenimiento</TooltipContent>
+                  </Tooltip>
 
-                      <Button size="sm" variant="destructive" onClick={() => askDeleteSub(item)}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        size="sm" 
+                        variant="ghost"
+                        className="hover:bg-red-100 hover:text-red-700"
+                        onClick={() => askDeleteMant(m)}
+                      >
                         <Trash2 size={16} />
                       </Button>
-                    </div>
-                  </div>
-                ))}
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Eliminar mantenimiento</TooltipContent>
+                  </Tooltip>
 
-                {m.items.length === 0 && (
-                  <p className="text-sm text-muted-foreground">Sin submantenimientos</p>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* FORM DIALOG */}
-      <Dialog open={dialog.open} onOpenChange={(v) => setDialog((p) => ({ ...p, open: v }))}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {dialog.mode === "create-mant"
-                ? "Nuevo mantenimiento"
-                : dialog.mode === "edit-mant"
-                ? "Editar mantenimiento"
-                : dialog.mode === "create-sub"
-                ? "Nuevo submantenimiento"
-                : "Editar submantenimiento"}
-            </DialogTitle>
-          </DialogHeader>
-
-          {/* ✅ Enter = Guardar */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              save();
-            }}
-          >
-            <div className="space-y-4">
-              <div>
-                <Label>Nombre</Label>
-                <Input
-                  value={form.name}
-                  onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700 text-white gap-1"
+                        onClick={() => {
+                          openNewSub(m.id);
+                          setExpanded((p) => ({ ...p, [m.id]: true }));
+                        }}
+                      >
+                        <Plus size={14} />
+                        <span className="hidden sm:inline">Sub</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Agregar submantenimiento</TooltipContent>
+                  </Tooltip>
+                </div>
               </div>
 
-              {(dialog.mode === "create-sub" || dialog.mode === "edit-sub") && (
-                <div>
-                  <Label>Mantenimiento padre</Label>
-                  <Select
-                    value={String(form.type_id || "")}
-                    onValueChange={(v) => setForm((p) => ({ ...p, type_id: v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {mantenimientos.map((m) => (
-                        <SelectItem key={m.id} value={String(m.id)}>
-                          {m.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              {/* SUBMANTENIMIENTOS */}
+              {expanded[m.id] && (
+                <div className="bg-slate-50 border-t p-4 space-y-2">
+                  {m.items.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-8">
+                      Sin submantenimientos - Crea uno nuevo
+                    </p>
+                  ) : (
+                    m.items.map((item) => (
+                      <div 
+                        key={item.id} 
+                        className="flex justify-between items-center border rounded-lg px-3 py-3 bg-white hover:bg-slate-50 transition-colors"
+                      >
+                        <div className="flex-1 pl-8">
+                          <p className="font-medium text-slate-900">{item.name}</p>
+                          {item.description && (
+                            <p className="text-xs text-gray-600">{item.description}</p>
+                          )}
+                        </div>
+
+                        <div className="flex gap-1">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                size="sm" 
+                                variant="ghost"
+                                className="hover:bg-amber-100 hover:text-amber-700"
+                                onClick={() => openEditSub(item)}
+                              >
+                                <Pencil size={16} />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Editar submantenimiento</TooltipContent>
+                          </Tooltip>
+
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                size="sm" 
+                                variant="ghost"
+                                className="hover:bg-red-100 hover:text-red-700"
+                                onClick={() => askDeleteSub(item)}
+                              >
+                                <Trash2 size={16} />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Eliminar submantenimiento</TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               )}
+            </div>
+          ))}
 
-              <div>
-                <Label>Descripción</Label>
-                <Textarea
-                className="overflow-y-auto"
-                  value={form.description}
-                  onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-                />
+          {grouped.length === 0 && (
+            <div className="text-center py-12">
+              <Wrench size={40} className="mx-auto text-gray-300 mb-2" />
+              <p className="text-gray-500">No hay mantenimientos</p>
+            </div>
+          )}
+        </div>
+
+        {/* FORM DIALOG */}
+        <Dialog open={dialog.open} onOpenChange={(v) => setDialog((p) => ({ ...p, open: v }))}>
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader className="border-b pb-4">
+              <div className="flex items-center gap-2">
+                <Wrench size={24} className="text-blue-600" />
+                <DialogTitle className="text-xl">
+                  {dialog.mode === "create-mant"
+                    ? "Nuevo mantenimiento"
+                    : dialog.mode === "edit-mant"
+                    ? "Editar mantenimiento"
+                    : dialog.mode === "create-sub"
+                    ? "Nuevo submantenimiento"
+                    : "Editar submantenimiento"}
+                </DialogTitle>
               </div>
+            </DialogHeader>
 
-              <div className="flex gap-2 items-center">
-                <Switch
-                  checked={form.is_active}
-                  onCheckedChange={(v) => setForm((p) => ({ ...p, is_active: v }))}
-                />
-                <Label>Activo</Label>
-              </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                save();
+              }}
+            >
+              <div className="space-y-5 py-4">
+                
+                {/* Sección 1: Información */}
+                <div className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                  <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">1</span>
+                    Información
+                  </h3>
 
-              {/* ✅ SOLO MANTENIMIENTO: switch resumen */}
-              {(dialog.mode === "create-mant" || dialog.mode === "edit-mant") && (
-                <>
-                  <div className="flex gap-2 items-center">
-                    <Switch
-                      checked={form.resumen}
-                      onCheckedChange={(v) =>
-                        setForm((p) => ({
-                          ...p,
-                          resumen: v,
-                          mantenimiento_ids: v ? p.mantenimiento_ids : []
-                        }))
-                      }
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1">
+                      Nombre
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      value={form.name}
+                      onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                      placeholder="Ej: Cambio de aceite"
+                      className="h-9"
                     />
-                    <Label>Mantenimiento base</Label>
                   </div>
 
-                  {/* ✅ MULTI SELECT SOLO cuando resumen=true */}
-                  {form.resumen && (
-                    <div>
-                      <Label>Mantenimientos que suma</Label>
-                      <MultiMantenimientoSelector
-                        allItems={mantenimientos}
-                        selectedIds={form.mantenimiento_ids}
-                        excludeId={dialog.item?.id} // opcional: evita seleccionarse a sí mismo
-                        onChange={(ids) => setForm((p) => ({ ...p, mantenimiento_ids: ids }))}
-                      />
+                  <div className="space-y-2">
+                    <Label>Descripción</Label>
+                    <Textarea
+                      value={form.description}
+                      onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+                      placeholder="Descripción detallada..."
+                      className="min-h-24 resize-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Sección 2: Padre (solo para sub) */}
+                {(dialog.mode === "create-sub" || dialog.mode === "edit-sub") && (
+                  <div className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-purple-600 text-white text-xs flex items-center justify-center font-bold">2</span>
+                      Relación
+                    </h3>
+
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-1">
+                        Mantenimiento padre
+                        <span className="text-red-500">*</span>
+                      </Label>
+                      <Select
+                        value={String(form.type_id || "")}
+                        onValueChange={(v) => setForm((p) => ({ ...p, type_id: v }))}
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Seleccione mantenimiento" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {mantenimientos.map((m) => (
+                            <SelectItem key={m.id} value={String(m.id)}>
+                              {m.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
+                  </div>
+                )}
+
+                {/* Sección 3: Opciones */}
+                <div className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                  <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-green-600 text-white text-xs flex items-center justify-center font-bold">3</span>
+                    Opciones
+                  </h3>
+
+                  <div className="flex items-center gap-3 p-3 bg-white rounded-lg border">
+                    <Switch
+                      checked={form.is_active}
+                      onCheckedChange={(v) => setForm((p) => ({ ...p, is_active: v }))}
+                      className="data-[state=checked]:bg-green-600"
+                    />
+                    <div>
+                      <p className="font-medium text-sm">Activo</p>
+                      <p className="text-xs text-gray-600">{form.is_active ? "Visible en el sistema" : "Oculto"}</p>
+                    </div>
+                  </div>
+
+                  {/* Mantenimiento base (solo crear/editar mantenimiento) */}
+                  {(dialog.mode === "create-mant" || dialog.mode === "edit-mant") && (
+                    <>
+                      <div className="flex items-center gap-3 p-3 bg-white rounded-lg border">
+                        <Switch
+                          checked={form.resumen}
+                          onCheckedChange={(v) =>
+                            setForm((p) => ({
+                              ...p,
+                              resumen: v,
+                              mantenimiento_ids: v ? p.mantenimiento_ids : []
+                            }))
+                          }
+                          className="data-[state=checked]:bg-blue-600"
+                        />
+                        <div>
+                          <p className="font-medium text-sm flex items-center gap-1">
+                            Mantenimiento base
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <AlertCircle size={14} className="text-gray-400 cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top">
+                                Este mantenimiento es la suma de otros
+                              </TooltipContent>
+                            </Tooltip>
+                          </p>
+                          <p className="text-xs text-gray-600">
+                            {form.resumen ? "Activo" : "Inactivo"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {form.resumen && (
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-1">
+                            Mantenimientos que suma
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <AlertCircle size={14} className="text-gray-400 cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top">
+                                Selecciona los mantenimientos que forman parte de este
+                              </TooltipContent>
+                            </Tooltip>
+                          </Label>
+                          <MultiMantenimientoSelector
+                            allItems={mantenimientos}
+                            selectedIds={form.mantenimiento_ids}
+                            excludeId={dialog.item?.id}
+                            onChange={(ids) => setForm((p) => ({ ...p, mantenimiento_ids: ids }))}
+                          />
+                        </div>
+                      )}
+                    </>
                   )}
-                </>
+                </div>
+
+              </div>
+
+              <DialogFooter className="border-t pt-4 flex gap-2 justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDialog({ open: false, mode: "create-mant", item: null })}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit"
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Guardar cambios
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* DELETE DIALOG */}
+        <Dialog open={deleteDialog.open} onOpenChange={(v) => !v && setDeleteDialog({ open: false, type: null, item: null })}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Confirmar eliminación</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <p className="text-sm text-gray-700">
+                {deleteDialog.type === "mant"
+                  ? `¿Eliminar el mantenimiento "${deleteDialog.item?.name}"?`
+                  : `¿Eliminar el submantenimiento "${deleteDialog.item?.name}"?`}
+              </p>
+              
+              {deleteDialog.type === "mant" && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex gap-2">
+                  <AlertCircle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-800">
+                    Todos los submantenimientos asociados también serán eliminados
+                  </p>
+                </div>
               )}
             </div>
 
-            <DialogFooter className="mt-6">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setDialog({ open: false, mode: "create-mant", item: null })}
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setDeleteDialog({ open: false, type: null, item: null })}
               >
                 Cancelar
               </Button>
-              <Button type="submit">Guardar</Button>
+              <Button 
+                variant="destructive"
+                onClick={confirmDelete}
+              >
+                Eliminar
+              </Button>
             </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
 
-      {/* DELETE DIALOG */}
-      <Dialog open={deleteDialog.open} onOpenChange={(v) => !v && setDeleteDialog({ open: false, type: null, item: null })}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmar eliminación</DialogTitle>
-          </DialogHeader>
-
-          <p className="text-sm text-muted-foreground">
-            {deleteDialog.type === "mant"
-              ? `¿Eliminar el mantenimiento "${deleteDialog.item?.name}"?`
-              : `¿Eliminar el submantenimiento "${deleteDialog.item?.name}"?`}
-          </p>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialog({ open: false, type: null, item: null })}>
-              Cancelar
-            </Button>
-            <Button variant="destructive" onClick={confirmDelete}>
-              Eliminar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }

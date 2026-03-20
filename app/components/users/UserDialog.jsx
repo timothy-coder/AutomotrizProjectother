@@ -17,6 +17,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { AlertCircle, User, Clock, Lock, MapPin, Palette } from "lucide-react";
 import { SECTIONS, ACTIONS } from "./constants";
 
 const DAYS = [
@@ -88,7 +95,7 @@ function getOptionLabel(item) {
 export default function UserDialog({
   open,
   onOpenChange,
-  mode, // view | create | edit
+  mode,
   user,
   onSave,
 }) {
@@ -330,366 +337,516 @@ export default function UserDialog({
   }, [form.centros, centrosOptions]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} className="bg-white">
-      <DialogContent className="max-w-4xl">
-        <DialogHeader className="bg-white px-6 py-5 rounded-t-2xl border-b border-gray-200">
-          <DialogTitle className="text-xl font-bold text-[#1e293b]">
-            {isView ? "Ver usuario" : isEdit ? "Editar usuario" : "Nuevo usuario"}
-          </DialogTitle>
-
-          <DialogDescription>
-            {isView ? "Solo lectura" : "Complete los datos"}
-          </DialogDescription>
-        </DialogHeader>
-
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="grid grid-cols-4 w-full">
-            <TabsTrigger
-              value="general"
-              className="flex-1 rounded-lg border-b-2 border-transparent text-gray-600 font-medium data-[state=active]:border-[#13223F] data-[state=active]:text-[#13223F]"
-            >
-              General
-            </TabsTrigger>
-            <TabsTrigger
-              value="horario"
-              className="flex-1 rounded-lg border-b-2 border-transparent text-gray-600 font-medium data-[state=active]:border-[#13223F] data-[state=active]:text-[#13223F]"
-            >
-              Horario
-            </TabsTrigger>
-            <TabsTrigger
-              value="permisos"
-              className="flex-1 rounded-lg border-b-2 border-transparent text-gray-600 font-medium data-[state=active]:border-[#13223F] data-[state=active]:text-[#13223F]"
-            >
-              Permisos
-            </TabsTrigger>
-            <TabsTrigger
-              value="sitios"
-              className="flex-1 rounded-lg border-b-2 border-transparent text-gray-600 font-medium data-[state=active]:border-[#13223F] data-[state=active]:text-[#13223F]"
-            >
-              Sitios
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent
-            value="general"
-            className="mt-4 space-y-4 max-h-[50vh] overflow-y-auto"
-          >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <TooltipProvider>
+      <Dialog open={open} onOpenChange={onOpenChange} className="bg-white">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="sticky top-0 bg-white border-b pb-4 z-10">
+            <div className="flex items-center gap-2">
+              <User size={24} className="text-blue-600" />
               <div>
-                <Label>Nombre completo</Label>
-                <Input
-                  disabled={isView}
-                  value={form.fullname || ""}
-                  onChange={(e) => updateField("fullname", e.target.value)}
-                />
-              </div>
-
-              <div>
-                <Label>Usuario</Label>
-                <Input
-                  disabled={isView}
-                  value={form.username || ""}
-                  onChange={(e) => updateField("username", e.target.value)}
-                />
-              </div>
-
-              <div>
-                <Label>Email</Label>
-                <Input
-                  disabled={isView}
-                  value={form.email || ""}
-                  onChange={(e) => updateField("email", e.target.value)}
-                />
-              </div>
-
-              <div>
-                <Label>Teléfono</Label>
-                <Input
-                  disabled={isView}
-                  value={form.phone || ""}
-                  onChange={(e) => updateField("phone", e.target.value)}
-                />
-              </div>
-
-              <div>
-                <Label>Rol</Label>
-                <Input
-                  disabled={isView}
-                  value={form.role || ""}
-                  onChange={(e) => updateField("role", e.target.value)}
-                />
-              </div>
-
-              <div>
-                <Label>Color</Label>
-
-                <div className="flex items-center gap-3">
-                  <Input
-                    disabled={isView}
-                    value={form.color || "#5e17eb"}
-                    onChange={(e) => updateField("color", e.target.value)}
-                  />
-
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <button
-                        type="button"
-                        disabled={isView}
-                        className="h-9 w-9 rounded-md border border-border"
-                        style={{ background: form.color || "#5e17eb" }}
-                        aria-label="Elegir color"
-                        title="Elegir color"
-                      />
-                    </PopoverTrigger>
-
-                    <PopoverContent className="w-40">
-                      <input
-                        type="color"
-                        value={form.color || "#5e17eb"}
-                        onChange={(e) => updateField("color", e.target.value)}
-                        className="w-full h-10"
-                        disabled={isView}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-
-              {!isView && (
-                <>
-                  <div>
-                    <Label>Contraseña</Label>
-                    <Input
-                      type="password"
-                      value={form.password || ""}
-                      onChange={(e) => updateField("password", e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Confirmar contraseña</Label>
-                    <Input
-                      type="password"
-                      value={form.password2 || ""}
-                      onChange={(e) => updateField("password2", e.target.value)}
-                    />
-
-                    {passMismatch && (
-                      <p className="text-xs text-destructive">
-                        Contraseñas no coinciden
-                      </p>
-                    )}
-                  </div>
-                </>
-              )}
-
-              <div className="flex gap-2 md:col-span-2">
-                <Checkbox
-                  checked={!!form.is_active}
-                  disabled={isView}
-                  onCheckedChange={(v) => updateField("is_active", !!v)}
-                />
-                Usuario activo
+                <DialogTitle className="text-xl">
+                  {isView ? "Ver usuario" : isEdit ? "Editar usuario" : "Nuevo usuario"}
+                </DialogTitle>
+                <DialogDescription>
+                  {isView ? "Solo lectura" : "Complete los datos del usuario"}
+                </DialogDescription>
               </div>
             </div>
-          </TabsContent>
+          </DialogHeader>
 
-          <TabsContent value="horario" className="max-h-[50vh] overflow-y-auto">
-            {DAYS.map((d) => {
-              const enabled = !!form.work_schedule?.[d.key];
+          <Tabs value={tab} onValueChange={setTab} className="w-full">
+            <TabsList className="grid grid-cols-4 w-full mb-6">
+              <TabsTrigger
+                value="general"
+                className="flex items-center gap-1"
+              >
+                <User size={16} />
+                <span className="hidden sm:inline">General</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="horario"
+                className="flex items-center gap-1"
+              >
+                <Clock size={16} />
+                <span className="hidden sm:inline">Horario</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="permisos"
+                className="flex items-center gap-1"
+              >
+                <Lock size={16} />
+                <span className="hidden sm:inline">Permisos</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="sitios"
+                className="flex items-center gap-1"
+              >
+                <MapPin size={16} />
+                <span className="hidden sm:inline">Sitios</span>
+              </TabsTrigger>
+            </TabsList>
 
-              return (
-                <div key={d.key} className="border rounded-md p-3 mb-2">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Checkbox
-                      checked={enabled}
+            {/* TAB: GENERAL */}
+            <TabsContent
+              value="general"
+              className="space-y-4 max-h-[50vh] overflow-y-auto pr-4"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                
+                {/* Nombre completo */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1">
+                    Nombre completo
+                    <span className="text-red-500">*</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertCircle size={14} className="text-gray-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        Nombre y apellido del usuario
+                      </TooltipContent>
+                    </Tooltip>
+                  </Label>
+                  <Input
+                    disabled={isView}
+                    value={form.fullname || ""}
+                    onChange={(e) => updateField("fullname", e.target.value)}
+                    placeholder="Ej: Juan Pérez"
+                    className="h-9"
+                  />
+                </div>
+
+                {/* Usuario */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1">
+                    Usuario
+                    <span className="text-red-500">*</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertCircle size={14} className="text-gray-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        Nombre único para login
+                      </TooltipContent>
+                    </Tooltip>
+                  </Label>
+                  <Input
+                    disabled={isView}
+                    value={form.username || ""}
+                    onChange={(e) => updateField("username", e.target.value)}
+                    placeholder="Ej: jperez"
+                    className="h-9"
+                  />
+                </div>
+
+                {/* Email */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1">
+                    Email
+                    <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    disabled={isView}
+                    type="email"
+                    value={form.email || ""}
+                    onChange={(e) => updateField("email", e.target.value)}
+                    placeholder="correo@ejemplo.com"
+                    className="h-9"
+                  />
+                </div>
+
+                {/* Teléfono */}
+                <div className="space-y-2">
+                  <Label>Teléfono</Label>
+                  <Input
+                    disabled={isView}
+                    value={form.phone || ""}
+                    onChange={(e) => updateField("phone", e.target.value)}
+                    placeholder="Ej: 987654321"
+                    className="h-9"
+                  />
+                </div>
+
+                {/* Rol */}
+                <div className="space-y-2">
+                  <Label>Rol</Label>
+                  <Input
+                    disabled={isView}
+                    value={form.role || ""}
+                    onChange={(e) => updateField("role", e.target.value)}
+                    placeholder="Ej: Gerente"
+                    className="h-9"
+                  />
+                </div>
+
+                {/* Color */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1">
+                    Color
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertCircle size={14} className="text-gray-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        Color de identificación del usuario
+                      </TooltipContent>
+                    </Tooltip>
+                  </Label>
+
+                  <div className="flex items-center gap-2">
+                    <Input
                       disabled={isView}
-                      onCheckedChange={(v) => setDayEnabled(d.key, !!v)}
+                      value={form.color || "#5e17eb"}
+                      onChange={(e) => updateField("color", e.target.value)}
+                      className="flex-1 h-9"
                     />
-                    {d.label}
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              disabled={isView}
+                              className="h-9 w-12 rounded-md border-2 border-slate-300 hover:border-slate-400 transition-colors"
+                              style={{ background: form.color || "#5e17eb" }}
+                              aria-label="Elegir color"
+                            />
+                          </PopoverTrigger>
+
+                          <PopoverContent className="w-40">
+                            <input
+                              type="color"
+                              value={form.color || "#5e17eb"}
+                              onChange={(e) => updateField("color", e.target.value)}
+                              className="w-full h-10 cursor-pointer"
+                              disabled={isView}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">Selector de color</TooltipContent>
+                    </Tooltip>
+                  </div>
+                </div>
+
+                {/* Contraseña */}
+                {!isView && (
+                  <>
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-1">
+                        Contraseña
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <AlertCircle size={14} className="text-gray-400 cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            Mínimo 8 caracteres
+                          </TooltipContent>
+                        </Tooltip>
+                      </Label>
+                      <Input
+                        type="password"
+                        value={form.password || ""}
+                        onChange={(e) => updateField("password", e.target.value)}
+                        placeholder="••••••••"
+                        className="h-9"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Confirmar contraseña</Label>
+                      <Input
+                        type="password"
+                        value={form.password2 || ""}
+                        onChange={(e) => updateField("password2", e.target.value)}
+                        placeholder="••••••••"
+                        className={`h-9 ${passMismatch ? "border-red-500" : ""}`}
+                      />
+
+                      {passMismatch && (
+                        <p className="text-xs text-red-500 flex items-center gap-1">
+                          <AlertCircle size={12} /> Las contraseñas no coinciden
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* Usuario activo */}
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border col-span-1 md:col-span-2">
+                  <Checkbox
+                    checked={!!form.is_active}
+                    disabled={isView}
+                    onCheckedChange={(v) => updateField("is_active", !!v)}
+                    className="w-5 h-5"
+                  />
+                  <div>
+                    <p className="font-medium text-sm">Usuario activo</p>
+                    <p className="text-xs text-gray-600">
+                      {form.is_active ? "Puede acceder al sistema" : "Acceso bloqueado"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* TAB: HORARIO */}
+            <TabsContent value="horario" className="space-y-3 max-h-[50vh] overflow-y-auto pr-4">
+              {DAYS.map((d) => {
+                const enabled = !!form.work_schedule?.[d.key];
+
+                return (
+                  <div key={d.key} className="border rounded-lg p-4 hover:border-slate-300 transition-colors">
+                    <div className="flex items-center gap-3 mb-3">
+                      <Checkbox
+                        checked={enabled}
+                        disabled={isView}
+                        onCheckedChange={(v) => setDayEnabled(d.key, !!v)}
+                      />
+                      <Label className="font-semibold text-slate-900 cursor-pointer flex-1 mb-0">
+                        {d.label}
+                      </Label>
+                      {enabled && (
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                          Activo
+                        </span>
+                      )}
+                    </div>
+
+                    {enabled && (
+                      <div className="grid grid-cols-2 gap-3 pl-6">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-gray-600">Entrada</Label>
+                          <Input
+                            type="time"
+                            disabled={isView}
+                            value={form.work_schedule[d.key].start}
+                            onChange={(e) => setDayTime(d.key, "start", e.target.value)}
+                            className="h-8"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-xs text-gray-600">Salida</Label>
+                          <Input
+                            type="time"
+                            disabled={isView}
+                            value={form.work_schedule[d.key].end}
+                            onChange={(e) => setDayTime(d.key, "end", e.target.value)}
+                            className="h-8"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </TabsContent>
+
+            {/* TAB: PERMISOS */}
+            <TabsContent
+              value="permisos"
+              className="space-y-3 max-h-[55vh] overflow-y-auto pr-4"
+            >
+              {SECTIONS.map((s) => (
+                <div
+                  key={s.key}
+                  className="border rounded-lg p-4 hover:border-slate-300 transition-colors"
+                >
+                  <div className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                    <Lock size={16} className="text-blue-600" />
+                    {s.label}
                   </div>
 
-                  {enabled && (
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        type="time"
-                        disabled={isView}
-                        value={form.work_schedule[d.key].start}
-                        onChange={(e) => setDayTime(d.key, "start", e.target.value)}
-                      />
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                    {ACTIONS.filter((a) => s.actions.includes(a.key)).map((a) => (
+                      <Tooltip key={a.key}>
+                        <TooltipTrigger asChild>
+                          <label className="flex items-center gap-2 text-sm cursor-pointer p-2 rounded hover:bg-slate-50 transition-colors">
+                            <Checkbox
+                              checked={!!form.permissions?.[s.key]?.[a.key]}
+                              disabled={isView}
+                              onCheckedChange={(v) => setPerm(s.key, a.key, !!v)}
+                            />
+                            {a.label}
+                          </label>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">{a.label}</TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </TabsContent>
 
-                      <Input
-                        type="time"
-                        disabled={isView}
-                        value={form.work_schedule[d.key].end}
-                        onChange={(e) => setDayTime(d.key, "end", e.target.value)}
-                      />
+            {/* TAB: SITIOS */}
+            <TabsContent
+              value="sitios"
+              className="space-y-4 max-h-[55vh] overflow-y-auto pr-4"
+            >
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-slate-900">
+                  <span className="font-semibold">Centros seleccionados:</span>
+                  <br />
+                  <span className="text-slate-700">{centrosSeleccionadosTexto}</span>
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                
+                {/* Centros */}
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                    <MapPin size={16} className="text-blue-600" />
+                    Centros
+                  </h3>
+
+                  {loadingCentros ? (
+                    <p className="text-sm text-muted-foreground">Cargando centros...</p>
+                  ) : centrosOptions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No hay centros disponibles</p>
+                  ) : (
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {centrosOptions.map((item) => {
+                        const checked = normalizeIds(form.centros).includes(Number(item.id));
+
+                        return (
+                          <label
+                            key={item.id}
+                            className="flex items-center gap-2 text-sm p-2 rounded hover:bg-slate-50 transition-colors cursor-pointer"
+                          >
+                            <Checkbox
+                              checked={checked}
+                              disabled={isView}
+                              onCheckedChange={(v) =>
+                                toggleArrayField("centros", item.id, !!v)
+                              }
+                            />
+                            <span className="text-slate-700">{getOptionLabel(item)}</span>
+                          </label>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
-              );
-            })}
-          </TabsContent>
 
-          <TabsContent
-            value="permisos"
-            className="mt-4 max-h-[55vh] overflow-y-auto pr-2"
-          >
-            {SECTIONS.map((s) => (
-              <div
-                key={s.key}
-                className="border border-border rounded-md p-3 mb-3"
-              >
-                <div className="font-medium mb-2">{s.label}</div>
+                {/* Talleres */}
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                    <Palette size={16} className="text-purple-600" />
+                    Talleres
+                  </h3>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                  {ACTIONS.filter((a) => s.actions.includes(a.key)).map((a) => (
-                    <label key={a.key} className="flex items-center gap-2 text-sm">
-                      <Checkbox
-                        checked={!!form.permissions?.[s.key]?.[a.key]}
-                        disabled={isView}
-                        onCheckedChange={(v) => setPerm(s.key, a.key, !!v)}
-                      />
-                      {a.label}
-                    </label>
-                  ))}
+                  {!form.centros?.length ? (
+                    <p className="text-sm text-muted-foreground">
+                      Selecciona uno o más centros
+                    </p>
+                  ) : loadingDependientes ? (
+                    <p className="text-sm text-muted-foreground">Cargando talleres...</p>
+                  ) : talleresOptions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No hay talleres para los centros elegidos
+                    </p>
+                  ) : (
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {talleresOptions.map((item) => {
+                        const checked = normalizeIds(form.talleres).includes(Number(item.id));
+
+                        return (
+                          <label
+                            key={item.id}
+                            className="flex items-center gap-2 text-sm p-2 rounded hover:bg-slate-50 transition-colors cursor-pointer"
+                          >
+                            <Checkbox
+                              checked={checked}
+                              disabled={isView}
+                              onCheckedChange={(v) =>
+                                toggleArrayField("talleres", item.id, !!v)
+                              }
+                            />
+                            <span className="text-slate-700">{getOptionLabel(item)}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Mostradores */}
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                    <Palette size={16} className="text-green-600" />
+                    Mostradores
+                  </h3>
+
+                  {!form.centros?.length ? (
+                    <p className="text-sm text-muted-foreground">
+                      Selecciona uno o más centros
+                    </p>
+                  ) : loadingDependientes ? (
+                    <p className="text-sm text-muted-foreground">Cargando mostradores...</p>
+                  ) : mostradoresOptions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No hay mostradores para los centros elegidos
+                    </p>
+                  ) : (
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {mostradoresOptions.map((item) => {
+                        const checked = normalizeIds(form.mostradores).includes(Number(item.id));
+
+                        return (
+                          <label
+                            key={item.id}
+                            className="flex items-center gap-2 text-sm p-2 rounded hover:bg-slate-50 transition-colors cursor-pointer"
+                          >
+                            <Checkbox
+                              checked={checked}
+                              disabled={isView}
+                              onCheckedChange={(v) =>
+                                toggleArrayField("mostradores", item.id, !!v)
+                              }
+                            />
+                            <span className="text-slate-700">{getOptionLabel(item)}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
-            ))}
-          </TabsContent>
+            </TabsContent>
+          </Tabs>
 
-          <TabsContent
-            value="sitios"
-            className="mt-4 space-y-4 max-h-[55vh] overflow-y-auto pr-2"
-          >
-            <div className="text-sm text-muted-foreground">
-              Centros seleccionados: {centrosSeleccionadosTexto}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="border rounded-md p-3">
-                <div className="font-medium mb-3">Centros</div>
-
-                {loadingCentros ? (
-                  <p className="text-sm text-muted-foreground">Cargando centros...</p>
-                ) : centrosOptions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No hay centros disponibles</p>
-                ) : (
-                  <div className="space-y-2">
-                    {centrosOptions.map((item) => {
-                      const checked = normalizeIds(form.centros).includes(Number(item.id));
-
-                      return (
-                        <label
-                          key={item.id}
-                          className="flex items-center gap-2 text-sm"
-                        >
-                          <Checkbox
-                            checked={checked}
-                            disabled={isView}
-                            onCheckedChange={(v) =>
-                              toggleArrayField("centros", item.id, !!v)
-                            }
-                          />
-                          {getOptionLabel(item)}
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              <div className="border rounded-md p-3">
-                <div className="font-medium mb-3">Talleres</div>
-
-                {!form.centros?.length ? (
-                  <p className="text-sm text-muted-foreground">
-                    Selecciona uno o más centros
-                  </p>
-                ) : loadingDependientes ? (
-                  <p className="text-sm text-muted-foreground">Cargando talleres...</p>
-                ) : talleresOptions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No hay talleres para los centros elegidos
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {talleresOptions.map((item) => {
-                      const checked = normalizeIds(form.talleres).includes(Number(item.id));
-
-                      return (
-                        <label
-                          key={item.id}
-                          className="flex items-center gap-2 text-sm"
-                        >
-                          <Checkbox
-                            checked={checked}
-                            disabled={isView}
-                            onCheckedChange={(v) =>
-                              toggleArrayField("talleres", item.id, !!v)
-                            }
-                          />
-                          {getOptionLabel(item)}
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              <div className="border rounded-md p-3">
-                <div className="font-medium mb-3">Mostradores</div>
-
-                {!form.centros?.length ? (
-                  <p className="text-sm text-muted-foreground">
-                    Selecciona uno o más centros
-                  </p>
-                ) : loadingDependientes ? (
-                  <p className="text-sm text-muted-foreground">Cargando mostradores...</p>
-                ) : mostradoresOptions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No hay mostradores para los centros elegidos
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {mostradoresOptions.map((item) => {
-                      const checked = normalizeIds(form.mostradores).includes(Number(item.id));
-
-                      return (
-                        <label
-                          key={item.id}
-                          className="flex items-center gap-2 text-sm"
-                        >
-                          <Checkbox
-                            checked={checked}
-                            disabled={isView}
-                            onCheckedChange={(v) =>
-                              toggleArrayField("mostradores", item.id, !!v)
-                            }
-                          />
-                          {getOptionLabel(item)}
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {isView ? "Cerrar" : "Cancelar"}
-          </Button>
-
-          {!isView && (
-            <Button onClick={handleSave} disabled={passMismatch}>
-              Guardar
+          <DialogFooter className="border-t pt-4 mt-6 flex gap-2 justify-end">
+            <Button 
+              variant="outline" 
+              onClick={() => onOpenChange(false)}
+            >
+              {isView ? "Cerrar" : "Cancelar"}
             </Button>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+
+            {!isView && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    onClick={handleSave} 
+                    disabled={passMismatch}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    Guardar cambios
+                  </Button>
+                </TooltipTrigger>
+                {passMismatch && (
+                  <TooltipContent side="top">
+                    Las contraseñas no coinciden
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </TooltipProvider>
   );
 }

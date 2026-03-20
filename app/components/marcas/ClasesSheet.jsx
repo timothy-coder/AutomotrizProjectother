@@ -13,8 +13,14 @@ import {
 } from "@/components/ui/sheet";
 
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
-import { Pencil, Trash2, Plus } from "lucide-react";
+import { Pencil, Trash2, Plus, RefreshCw, Package } from "lucide-react";
 
 import ClaseDialog from "@/app/components/clases/ClaseDialog";
 import ConfirmDeleteDialog from "@/app/components/clases/ConfirmDeleteDialog";
@@ -25,14 +31,14 @@ export default function ClasesSheet({
   canEdit = true,
   canDelete = true,
   canCreate = true,
-  onChanged, // <-- opcional: para que MarcasPage haga loadAll() y actualice el Select
+  onChanged,
 }) {
   const [loading, setLoading] = useState(false);
   const [clases, setClases] = useState([]);
 
-  // dialogs clase (create/edit/view si tu ClaseDialog lo soporta)
+  // dialogs clase
   const [claseOpen, setClaseOpen] = useState(false);
-  const [claseMode, setClaseMode] = useState("create"); // create | edit | view
+  const [claseMode, setClaseMode] = useState("create");
   const [claseSelected, setClaseSelected] = useState(null);
 
   // delete confirm
@@ -99,7 +105,6 @@ export default function ClasesSheet({
         body: JSON.stringify({ name: payload.name }),
       });
 
-      // tu API puede devolver texto, así que no fuerzo json
       if (!res.ok) {
         const t = await res.text().catch(() => "");
         throw new Error(t || "Error");
@@ -109,7 +114,7 @@ export default function ClasesSheet({
       setClaseOpen(false);
 
       await loadClases();
-      onChanged?.(); // ✅ refresca también MarcasPage si lo pasas
+      onChanged?.();
     } catch {
       toast.error("No se pudo guardar la clase");
     }
@@ -130,115 +135,211 @@ export default function ClasesSheet({
       setDeleteOpen(false);
 
       await loadClases();
-      onChanged?.(); // ✅ refresca también MarcasPage si lo pasas
+      onChanged?.();
     } catch {
       toast.error("No se pudo eliminar");
     }
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-xl">
-        <SheetHeader>
-          <SheetTitle>Clases</SheetTitle>
-          <SheetDescription>
-            Crea, edita o elimina clases desde aquí.
-          </SheetDescription>
-        </SheetHeader>
+    <TooltipProvider>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col px-3">
 
-        <div className="mt-5 space-y-4">
-          <div className="flex items-center justify-between gap-2">
-            <Button variant="outline" onClick={loadClases} disabled={loading}>
-              Recargar
-            </Button>
-
-            {canCreate && (
-              <Button onClick={onNewClase} disabled={loading}>
-                <Plus size={16} /> Nueva clase
-              </Button>
-            )}
-          </div>
-
-          <div className="border rounded-md overflow-hidden">
-            <div className="max-h-[65vh] overflow-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted sticky top-0">
-                  <tr>
-                    <th className="p-3 text-left">Clase</th>
-                    <th className="p-3 text-right">Acciones</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {clasesSorted.map((c) => (
-                    <tr key={c.id} className="border-t">
-                      <td className="p-3">{c.name}</td>
-
-                      <td className="p-3 text-right space-x-2">
-                        {canEdit && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => onEditClase(c)}
-                            disabled={loading}
-                            title="Editar"
-                          >
-                            <Pencil size={16} />
-                          </Button>
-                        )}
-
-                        {canDelete && (
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => askDeleteClase(c)}
-                            disabled={loading}
-                            title="Eliminar"
-                          >
-                            <Trash2 size={16} />
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-
-                  {!loading && clasesSorted.length === 0 && (
-                    <tr>
-                      <td className="p-4 text-sm text-muted-foreground" colSpan={2}>
-                        No hay clases aún.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+          {/* Header */}
+          <SheetHeader className="border-b pb-4">
+            <div className="flex items-center gap-2">
+              <Package size={24} className="text-blue-600" />
+              <div>
+                <SheetTitle className="text-xl">Clases de Vehículos</SheetTitle>
+                <SheetDescription>
+                  Gestiona las categorías de vehículos
+                </SheetDescription>
+              </div>
             </div>
+          </SheetHeader>
+
+          {/* Content */}
+          <div className="flex-1 mt-6 space-y-4 overflow-y-auto">
+
+            {/* Toolbar */}
+            <div className="flex items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    onClick={loadClases} 
+                    disabled={loading}
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <RefreshCw size={16} />
+                    Recargar
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Actualizar lista de clases</TooltipContent>
+              </Tooltip>
+
+              {canCreate && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      onClick={onNewClase} 
+                      disabled={loading}
+                      className="bg-green-600 hover:bg-green-700 text-white gap-2 ml-auto"
+                      size="sm"
+                    >
+                      <Plus size={16} />
+                      Nueva clase
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Crear nueva clase</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+
+            {/* Tabla */}
+            <div className="border rounded-lg overflow-hidden bg-white">
+              <div className="max-h-[50vh] overflow-y-auto">
+                <table className="w-full text-sm">
+
+                  {/* Header */}
+                  <thead className="bg-slate-50 border-b sticky top-0">
+                    <tr>
+                      <th className="p-3 text-left font-semibold text-slate-700">
+                        Nombre de Clase
+                      </th>
+                      <th className="p-3 text-right font-semibold text-slate-700">
+                        Acciones
+                      </th>
+                    </tr>
+                  </thead>
+
+                  {/* Body */}
+                  <tbody>
+                    {loading ? (
+                      <tr>
+                        <td colSpan={2} className="p-8 text-center">
+                          <div className="flex flex-col items-center gap-2">
+                            <RefreshCw size={20} className="text-gray-400 animate-spin" />
+                            <span className="text-sm text-gray-500">Cargando clases...</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : clasesSorted.length === 0 ? (
+                      <tr>
+                        <td colSpan={2} className="p-8 text-center">
+                          <div className="flex flex-col items-center gap-2">
+                            <Package size={24} className="text-gray-300" />
+                            <span className="text-sm text-gray-500">No hay clases registradas</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      clasesSorted.map((c, index) => (
+                        <tr 
+                          key={c.id} 
+                          className={`border-b hover:bg-slate-50 transition-colors ${
+                            index % 2 === 0 ? "bg-white" : "bg-slate-50/30"
+                          }`}
+                        >
+                          <td className="p-3">
+                            <span className="font-medium text-slate-900">
+                              {c.name}
+                            </span>
+                          </td>
+
+                          <td className="p-3 text-right">
+                            <div className="flex gap-1 justify-end">
+                              {canEdit && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="hover:bg-amber-100 hover:text-amber-700"
+                                      onClick={() => onEditClase(c)}
+                                      disabled={loading}
+                                    >
+                                      <Pencil size={16} />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">Editar clase</TooltipContent>
+                                </Tooltip>
+                              )}
+
+                              {canDelete && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="hover:bg-red-100 hover:text-red-700"
+                                      onClick={() => askDeleteClase(c)}
+                                      disabled={loading}
+                                    >
+                                      <Trash2 size={16} />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">Eliminar clase</TooltipContent>
+                                </Tooltip>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Footer con información */}
+            {clasesSorted.length > 0 && (
+              <div className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-lg text-sm">
+                <span className="text-gray-600">
+                  Total: <span className="font-semibold text-slate-700">{clasesSorted.length}</span> clase(s)
+                </span>
+              </div>
+            )}
+
           </div>
-        </div>
 
-        <SheetFooter className="mt-6">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cerrar
-          </Button>
-        </SheetFooter>
+          {/* Footer */}
+          <SheetFooter className="border-t pt-4 mt-6">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  onClick={() => onOpenChange(false)}
+                  className="w-full"
+                >
+                  Cerrar
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Cerrar panel</TooltipContent>
+            </Tooltip>
+          </SheetFooter>
 
-        {/* Dialog crear/editar clase */}
-        <ClaseDialog
-          open={claseOpen}
-          onOpenChange={setClaseOpen}
-          mode={claseMode}
-          clase={claseSelected}
-          onSave={saveClase}
-        />
+          {/* Dialogs */}
+          <ClaseDialog
+            open={claseOpen}
+            onOpenChange={setClaseOpen}
+            mode={claseMode}
+            clase={claseSelected}
+            onSave={saveClase}
+          />
 
-        {/* Confirm delete */}
-        <ConfirmDeleteDialog
-          open={deleteOpen}
-          onOpenChange={setDeleteOpen}
-          title="Eliminar clase"
-          description={`¿Seguro que deseas eliminar la clase "${deleteItem?.name}"?`}
-          onConfirm={confirmDelete}
-        />
-      </SheetContent>
-    </Sheet>
+          <ConfirmDeleteDialog
+            open={deleteOpen}
+            onOpenChange={setDeleteOpen}
+            title="Eliminar clase"
+            description={`¿Seguro que deseas eliminar la clase "${deleteItem?.name}"?`}
+            onConfirm={confirmDelete}
+          />
+
+        </SheetContent>
+      </Sheet>
+    </TooltipProvider>
   );
 }

@@ -8,7 +8,7 @@ import { db } from "@/lib/db";
 
 export async function GET(req, { params }) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     const [rows] = await db.query(
       "SELECT * FROM preguntas_atencion WHERE id = ?",
@@ -22,8 +22,16 @@ export async function GET(req, { params }) {
       );
     }
 
-    const pregunta = rows[0];
-    pregunta.opciones = pregunta.opciones ? JSON.parse(pregunta.opciones) : null;
+    const pregunta = { ...rows[0] };
+    if (pregunta.opciones) {
+      try {
+        pregunta.opciones = JSON.parse(pregunta.opciones);
+      } catch {
+        pregunta.opciones = null;
+      }
+    } else {
+      pregunta.opciones = null;
+    }
 
     return NextResponse.json(pregunta);
   } catch (e) {
@@ -34,7 +42,7 @@ export async function GET(req, { params }) {
 
 export async function PUT(req, { params }) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const { pregunta, tipo_respuesta, opciones, es_obligatoria, orden, es_activa } =
       await req.json();
 
@@ -45,10 +53,22 @@ export async function PUT(req, { params }) {
       );
     }
 
-    const opcionesJSON =
-      tipo_respuesta === "opcion_multiple" && opciones
-        ? JSON.stringify(opciones)
-        : null;
+    let opcionesJSON = null;
+    if (tipo_respuesta === "opcion_multiple" && opciones !== undefined && opciones !== null) {
+      try {
+        if (Array.isArray(opciones)) {
+          opcionesJSON = JSON.stringify(opciones);
+        } else if (typeof opciones === "string") {
+          const parsed = JSON.parse(opciones);
+          opcionesJSON = JSON.stringify(parsed);
+        }
+      } catch {
+        return NextResponse.json(
+          { message: "Las opciones deben ser un JSON válido" },
+          { status: 400 }
+        );
+      }
+    }
 
     const [result] = await db.query(
       `UPDATE preguntas_atencion 
@@ -73,7 +93,7 @@ export async function PUT(req, { params }) {
 
 export async function DELETE(req, { params }) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     // Verificar si la pregunta está siendo usada
     const [respuestas] = await db.query(

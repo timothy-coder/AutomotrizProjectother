@@ -1,5 +1,5 @@
 // ============================================
-// COMPONENTE DE COTIZACIONES CON TABLA
+// COMPONENTE DE COTIZACIONES - COMPLETO
 // archivo: components/CotizacionesAgendaTab.jsx
 // ============================================
 
@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useUserScope } from "@/hooks/useUserScope";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,15 +36,21 @@ import {
   Plus,
   Loader2,
   ChevronDown,
-  ChevronUp,
   Trash2,
+  Copy,
+  FileText,
+  Send,
+  MoreVertical,
   Edit,
 } from "lucide-react";
 
 export default function CotizacionesAgendaSection({ oportunidadId, oportunidadData }) {
+  const { userId, loading: userLoading } = useUserScope();
+
   const [cotizaciones, setCotizaciones] = useState([]);
   const [marcas, setMarcas] = useState([]);
   const [modelos, setModelos] = useState([]);
+  const [versiones, setVersiones] = useState([]);
   const [modeloEspecificaciones, setModeloEspecificaciones] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -46,13 +60,13 @@ export default function CotizacionesAgendaSection({ oportunidadId, oportunidadDa
   const [editingCotizacion, setEditingCotizacion] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
-  // Selección de marca y modelo
   const [selectedMarca, setSelectedMarca] = useState("");
   const [selectedModelo, setSelectedModelo] = useState("");
   const [expandedEspecificaciones, setExpandedEspecificaciones] = useState(false);
 
   const [loadingEspecificaciones, setLoadingEspecificaciones] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   const [formData, setFormData] = useState({
     sku: "",
@@ -67,21 +81,22 @@ export default function CotizacionesAgendaSection({ oportunidadId, oportunidadDa
     direction: "asc",
   });
 
-  // Cargar datos iniciales
   async function loadData() {
     setLoading(true);
     try {
-      const [cot, m, mo] = await Promise.all([
+      const [cot, m, mo, v] = await Promise.all([
         fetch(`/api/cotizacionesagenda?oportunidad_id=${oportunidadId}`, {
           cache: "no-store",
         }).then((r) => r.json()),
         fetch("/api/marcas", { cache: "no-store" }).then((r) => r.json()),
         fetch("/api/modelos", { cache: "no-store" }).then((r) => r.json()),
+        fetch("/api/versiones", { cache: "no-store" }).then((r) => r.json()),
       ]);
 
       setCotizaciones(Array.isArray(cot) ? cot : []);
       setMarcas(Array.isArray(m) ? m : []);
       setModelos(Array.isArray(mo) ? mo : []);
+      setVersiones(Array.isArray(v) ? v : []);
     } catch (error) {
       console.error(error);
       toast.error("Error cargando datos");
@@ -90,7 +105,6 @@ export default function CotizacionesAgendaSection({ oportunidadId, oportunidadDa
     }
   }
 
-  // Cargar especificaciones del modelo y marca
   async function loadModeloEspecificaciones() {
     if (!selectedMarca || !selectedModelo) {
       setModeloEspecificaciones([]);
@@ -123,7 +137,6 @@ export default function CotizacionesAgendaSection({ oportunidadId, oportunidadDa
     loadModeloEspecificaciones();
   }, [selectedMarca, selectedModelo]);
 
-  // Abrir dialog para nueva cotización
   function openCreate() {
     setEditingCotizacion(null);
     setSelectedMarca("");
@@ -148,7 +161,7 @@ export default function CotizacionesAgendaSection({ oportunidadId, oportunidadDa
       color_externo: cotizacion.color_externo || "",
       color_interno: cotizacion.color_interno || "",
       version_id: cotizacion.version_id || "",
-      anio: "",
+      anio: cotizacion.anio || "",
     });
     setDialogOpen(true);
   }
@@ -158,11 +171,13 @@ export default function CotizacionesAgendaSection({ oportunidadId, oportunidadDa
       return toast.warning("Selecciona marca y modelo");
     }
 
+    if (!userId) {
+      return toast.error("No se pudo obtener el ID del usuario");
+    }
+
     setSaving(true);
 
     try {
-      const usuarioId = localStorage.getItem("usuario_id");
-
       const url = editingCotizacion
         ? `/api/cotizacionesagenda/${editingCotizacion.id}`
         : "/api/cotizacionesagenda";
@@ -171,18 +186,29 @@ export default function CotizacionesAgendaSection({ oportunidadId, oportunidadDa
 
       const body = editingCotizacion
         ? {
-            ...formData,
-            marca_id: parseInt(selectedMarca),
-            modelo_id: parseInt(selectedModelo),
-          }
-        : {
-            oportunidad_id: oportunidadId,
+            sku: formData.sku || null,
+            color_externo: formData.color_externo || null,
+            color_interno: formData.color_interno || null,
+            version_id: formData.version_id || null,
+            anio: formData.anio ? parseInt(formData.anio) : null,
             marca_id: parseInt(selectedMarca),
             modelo_id: parseInt(selectedModelo),
             estado: "borrador",
-            ...formData,
-            created_by: usuarioId,
+          }
+        : {
+            oportunidad_id: parseInt(oportunidadId),
+            marca_id: parseInt(selectedMarca),
+            modelo_id: parseInt(selectedModelo),
+            version_id: formData.version_id || null,
+            anio: formData.anio ? parseInt(formData.anio) : null,
+            sku: formData.sku || null,
+            color_externo: formData.color_externo || null,
+            color_interno: formData.color_interno || null,
+            estado: "borrador",
+            created_by: userId,
           };
+
+      console.log("Body a enviar:", body);
 
       const response = await fetch(url, {
         method,
@@ -190,17 +216,22 @@ export default function CotizacionesAgendaSection({ oportunidadId, oportunidadDa
         body: JSON.stringify(body),
       });
 
+      console.log("Response status:", response.status);
+
       if (response.ok) {
+        const data = await response.json();
+        console.log("Respuesta exitosa:", data);
         toast.success(editingCotizacion ? "Actualizada" : "Creada");
         setDialogOpen(false);
         loadData();
       } else {
-        const data = await response.json();
-        toast.error(data.message);
+        const errorData = await response.json();
+        console.log("Error response:", errorData);
+        toast.error(errorData.message || "Error guardando cotización");
       }
     } catch (error) {
-      console.error(error);
-      toast.error("Error guardando cotización");
+      console.error("Error:", error);
+      toast.error("Error guardando cotización: " + error.message);
     } finally {
       setSaving(false);
     }
@@ -230,15 +261,120 @@ export default function CotizacionesAgendaSection({ oportunidadId, oportunidadDa
     }
   }
 
-  // Filtrar modelos por marca seleccionada
+  async function duplicateCotizacion(cotizacion) {
+    try {
+      setSaving(true);
+      const response = await fetch("/api/cotizacionesagenda", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          oportunidad_id: cotizacion.oportunidad_id,
+          marca_id: cotizacion.marca_id,
+          modelo_id: cotizacion.modelo_id,
+          version_id: cotizacion.version_id,
+          anio: cotizacion.anio,
+          sku: cotizacion.sku,
+          color_externo: cotizacion.color_externo,
+          color_interno: cotizacion.color_interno,
+          estado: "borrador",
+          created_by: userId,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success("Cotización duplicada");
+        loadData();
+      } else {
+        toast.error("Error duplicando cotización");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Error duplicando cotización");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function changeStatus(cotizacion, nuevoEstado) {
+    try {
+      setSaving(true);
+      const response = await fetch(`/api/cotizacionesagenda/${cotizacion.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sku: cotizacion.sku,
+          color_externo: cotizacion.color_externo,
+          color_interno: cotizacion.color_interno,
+          version_id: cotizacion.version_id,
+          anio: cotizacion.anio,
+          marca_id: cotizacion.marca_id,
+          modelo_id: cotizacion.modelo_id,
+          estado: nuevoEstado,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success(`Estado cambiado a ${nuevoEstado}`);
+        loadData();
+      } else {
+        toast.error("Error cambiando estado");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Error cambiando estado");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function generatePDF(cotizacion) {
+    try {
+      setGeneratingPdf(true);
+
+      const response = await fetch(
+        `/api/cotizacionesagenda/${cotizacion.id}/pdf`
+      );
+
+      if (!response.ok) {
+        throw new Error("Error generando PDF");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Cotizacion-Q-${String(cotizacion.id).padStart(6, "0")}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+
+      toast.success("PDF generado correctamente");
+    } catch (error) {
+      console.error(error);
+      toast.error("Error generando PDF");
+    } finally {
+      setGeneratingPdf(false);
+    }
+  }
+
+  async function sendOrder(cotizacion) {
+    try {
+      setSaving(true);
+      await changeStatus(cotizacion, "enviada");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const modelosFiltrados = selectedMarca
     ? modelos.filter((m) => m.marca_id === parseInt(selectedMarca))
     : [];
 
   const marcaObj = marcas.find((m) => m.id === parseInt(selectedMarca));
   const modeloObj = modelos.find((m) => m.id === parseInt(selectedModelo));
+  const versionObj = versiones.find((v) => v.id === parseInt(formData.version_id));
 
-  // Ordenar cotizaciones
   const sortedCotizaciones = [...cotizaciones].sort((a, b) => {
     let aVal = a[sortConfig.key];
     let bVal = b[sortConfig.key];
@@ -263,7 +399,7 @@ export default function CotizacionesAgendaSection({ oportunidadId, oportunidadDa
     });
   };
 
-  if (loading) {
+  if (loading || userLoading) {
     return (
       <div className="flex justify-center items-center py-12">
         <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
@@ -336,7 +472,7 @@ export default function CotizacionesAgendaSection({ oportunidadId, oportunidadDa
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-gray-900">
-                            Q-{cot.id}
+                            Q-{String(cot.id).padStart(6, "0")}
                           </span>
                           <span className="text-sm text-gray-500">
                             {cot.marca} {cot.modelo}
@@ -350,14 +486,15 @@ export default function CotizacionesAgendaSection({ oportunidadId, oportunidadDa
                               ? "bg-green-100 text-green-700"
                               : cot.estado === "enviada"
                               ? "bg-blue-100 text-blue-700"
+                              : cot.estado === "cancelado"
+                              ? "bg-red-100 text-red-700"
                               : "bg-gray-100 text-gray-700"
                           }`}
                         >
                           {cot.estado === "borrador"
                             ? "Abierto"
-                            : cot.estado === "enviada"
-                            ? "Enviada"
-                            : "Aceptada"}
+                            : cot.estado.charAt(0).toUpperCase() +
+                              cot.estado.slice(1)}
                         </span>
                       </td>
                       <td className="py-3 px-4 text-gray-700">
@@ -368,23 +505,62 @@ export default function CotizacionesAgendaSection({ oportunidadId, oportunidadDa
                         })}
                       </td>
                       <td className="py-3 px-4">
-                        <div className="flex justify-center gap-2">
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            onClick={() => openEdit(cot)}
-                            className="h-8 w-8"
-                          >
-                            <Edit size={16} />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            onClick={() => openDelete(cot)}
-                            className="h-8 w-8"
-                          >
-                            <Trash2 size={16} />
-                          </Button>
+                        <div className="flex justify-center">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                className="h-8 w-8"
+                              >
+                                <MoreVertical size={16} />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem onClick={() => openEdit(cot)}>
+                                <Edit size={14} className="mr-2" />
+                                Modificar
+                              </DropdownMenuItem>
+
+                              <DropdownMenuSeparator />
+
+                              <DropdownMenuItem
+                                onClick={() => changeStatus(cot, "enviada")}
+                                disabled={saving}
+                              >
+                                <Send size={14} className="mr-2" />
+                                Enviar pedido
+                              </DropdownMenuItem>
+
+                              <DropdownMenuSeparator />
+
+                              <DropdownMenuItem
+                                onClick={() => duplicateCotizacion(cot)}
+                                disabled={saving}
+                              >
+                                <Copy size={14} className="mr-2" />
+                                Duplicar
+                              </DropdownMenuItem>
+
+                              <DropdownMenuItem
+                                onClick={() => generatePDF(cot)}
+                                disabled={generatingPdf}
+                              >
+                                <FileText size={14} className="mr-2" />
+                                Generar PDF
+                              </DropdownMenuItem>
+
+                              <DropdownMenuSeparator />
+
+                              <DropdownMenuItem
+                                onClick={() => openDelete(cot)}
+                                className="text-red-600"
+                              >
+                                <Trash2 size={14} className="mr-2" />
+                                Cancelar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </td>
                     </tr>
@@ -422,7 +598,7 @@ export default function CotizacionesAgendaSection({ oportunidadId, oportunidadDa
                     value={selectedMarca}
                     onValueChange={(value) => {
                       setSelectedMarca(value);
-                      setSelectedModelo(""); // Limpiar modelo al cambiar marca
+                      setSelectedModelo("");
                     }}
                     disabled={!!editingCotizacion}
                   >
@@ -455,7 +631,13 @@ export default function CotizacionesAgendaSection({ oportunidadId, oportunidadDa
                     disabled={!selectedMarca || !!editingCotizacion}
                   >
                     <SelectTrigger className="text-sm">
-                      <SelectValue placeholder={selectedMarca ? "Selecciona modelo" : "Selecciona marca primero"} />
+                      <SelectValue
+                        placeholder={
+                          selectedMarca
+                            ? "Selecciona modelo"
+                            : "Selecciona marca primero"
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       {modelosFiltrados.map((m) => (
@@ -478,7 +660,7 @@ export default function CotizacionesAgendaSection({ oportunidadId, oportunidadDa
                     Año
                   </label>
                   <Input
-                    type="text"
+                    type="number"
                     value={formData.anio}
                     onChange={(e) =>
                       setFormData((prev) => ({
@@ -487,6 +669,8 @@ export default function CotizacionesAgendaSection({ oportunidadId, oportunidadDa
                       }))
                     }
                     placeholder="2024"
+                    min={2000}
+                    max={new Date().getFullYear() + 1}
                     className="text-sm"
                   />
                 </div>
@@ -496,18 +680,31 @@ export default function CotizacionesAgendaSection({ oportunidadId, oportunidadDa
                   <label className="text-xs font-medium text-gray-600 block mb-2">
                     Versión
                   </label>
-                  <Input
-                    type="text"
+                  <Select
                     value={formData.version_id}
-                    onChange={(e) =>
+                    onValueChange={(value) =>
                       setFormData((prev) => ({
                         ...prev,
-                        version_id: e.target.value,
+                        version_id: value,
                       }))
                     }
-                    placeholder="Advance CVT AWD"
-                    className="text-sm"
-                  />
+                  >
+                    <SelectTrigger className="text-sm">
+                      <SelectValue placeholder="Selecciona versión" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {versiones.map((v) => (
+                        <SelectItem key={v.id} value={v.id.toString()}>
+                          {v.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {formData.version_id && versionObj && (
+                    <div className="mt-2 p-2 bg-blue-50 rounded text-xs text-blue-700 font-medium">
+                      ✓ {versionObj.nombre}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -596,7 +793,7 @@ export default function CotizacionesAgendaSection({ oportunidadId, oportunidadDa
                       {marcaObj?.name} {modeloObj?.name}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {formData.anio || formData.version_id || "Versión"}
+                      {versionObj?.nombre || formData.anio || "Versión"}
                     </p>
                   </div>
                 ) : (
@@ -618,7 +815,7 @@ export default function CotizacionesAgendaSection({ oportunidadId, oportunidadDa
                 className="flex items-center gap-2 font-semibold mb-4 hover:text-blue-600"
               >
                 {expandedEspecificaciones ? (
-                  <ChevronUp size={20} />
+                  <ChevronDown size={20} />
                 ) : (
                   <ChevronDown size={20} />
                 )}
@@ -663,7 +860,7 @@ export default function CotizacionesAgendaSection({ oportunidadId, oportunidadDa
             </Button>
             <Button
               onClick={saveCotizacion}
-              disabled={saving || !selectedMarca || !selectedModelo}
+              disabled={saving || !selectedMarca || !selectedModelo || !userId}
               className="bg-red-600 hover:bg-red-700"
             >
               {saving ? (
@@ -683,13 +880,14 @@ export default function CotizacionesAgendaSection({ oportunidadId, oportunidadDa
       <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Eliminar Cotización</DialogTitle>
+            <DialogTitle>Cancelar Cotización</DialogTitle>
           </DialogHeader>
 
           <p>
-            ¿Eliminar la cotización{" "}
+            ¿Cancelar la cotización{" "}
             <b>
-              Q-{deleteTarget?.id} - {deleteTarget?.marca} {deleteTarget?.modelo}
+              Q-{String(deleteTarget?.id).padStart(6, "0")} -{" "}
+              {deleteTarget?.marca} {deleteTarget?.modelo}
             </b>
             ?
           </p>
@@ -699,13 +897,16 @@ export default function CotizacionesAgendaSection({ oportunidadId, oportunidadDa
               variant="outline"
               onClick={() => setDeleteDialog(false)}
             >
-              Cancelar
+              No, mantener
             </Button>
             <Button
               variant="destructive"
-              onClick={confirmDelete}
+              onClick={() => {
+                changeStatus(deleteTarget, "cancelado");
+                setDeleteDialog(false);
+              }}
             >
-              Eliminar
+              Sí, cancelar
             </Button>
           </DialogFooter>
         </DialogContent>
