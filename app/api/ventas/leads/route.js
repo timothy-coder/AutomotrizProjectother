@@ -134,13 +134,19 @@ export async function POST(req) {
 
   // ── Buscar cliente existente por teléfono ──────────────────────────────────
   let clienteId = null;
+  let nombreFinal = nombre_cliente?.trim() || null;
+
   const [[clienteExistente]] = await db.query(
-    "SELECT id, email FROM clientes WHERE celular = ? LIMIT 1",
+    "SELECT id, nombre, apellido, email FROM clientes WHERE celular = ? LIMIT 1",
     [telefonoClean]
   );
 
   if (clienteExistente) {
     clienteId = clienteExistente.id;
+    // Usar el nombre real del sistema si el bot no lo capturó o el cliente ya está registrado
+    const nombreDb = [clienteExistente.nombre, clienteExistente.apellido]
+      .filter(Boolean).join(" ").trim();
+    if (nombreDb) nombreFinal = nombreDb;
     // Actualizar email si el cliente no lo tenía y el bot lo capturó
     if (!clienteExistente.email && email?.trim()) {
       await db.query("UPDATE clientes SET email = ? WHERE id = ?", [
@@ -148,9 +154,9 @@ export async function POST(req) {
         clienteId,
       ]);
     }
-  } else if (nombre_cliente?.trim()) {
+  } else if (nombreFinal) {
     // Crear cliente nuevo con los datos capturados por el bot
-    const partes = nombre_cliente.trim().split(" ");
+    const partes = nombreFinal.split(" ");
     const nombre = partes[0] || null;
     const apellido = partes.slice(1).join(" ") || null;
     const [ins] = await db.query(
@@ -174,7 +180,7 @@ export async function POST(req) {
       leadUuid,
       session_id ? Number(session_id) : null,
       clienteId,
-      nombre_cliente?.trim() || null,
+      nombreFinal,
       telefonoClean,
       email?.trim() || null,
       modelo_id ? Number(modelo_id) : null,
@@ -215,13 +221,16 @@ export async function POST(req) {
         `SELECT id FROM origenes_citas WHERE name = 'WhatsApp Bot' LIMIT 1`
       );
 
-      // Obtener marca del modelo
+      // Obtener marca del modelo y primera etapa de conversión
       const [[modeloRow]] = await db.query(
         `SELECT marca_id FROM modelos WHERE id = ? LIMIT 1`,
         [Number(modelo_id)]
       );
+      const [[primeraEtapa]] = await db.query(
+        `SELECT id FROM etapasconversion ORDER BY sort_order ASC, id ASC LIMIT 1`
+      );
 
-      if (origenBot && modeloRow) {
+      if (origenBot && primeraEtapa) {
         // Generar siguiente número LD-
         const [[maxRow]] = await db.query(
           `SELECT COALESCE(MAX(CAST(SUBSTRING(oportunidad_id, 4) AS UNSIGNED)), 0) AS max_num
@@ -245,18 +254,21 @@ export async function POST(req) {
              (oportunidad_id, cliente_id, marca_id, modelo_id,
               origen_id, etapasconversion_id, detalle, created_by,
               created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, 1, ?, ?, NOW(), NOW())`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
           [
             oportunidadCodigo,
             clienteId,
-            modeloRow.marca_id,
+            modeloRow?.marca_id || null,
             Number(modelo_id),
             origenBot.id,
+            primeraEtapa.id,
             detalleCrm,
             botUserId,
           ]
         );
         oportunidadId = oportunidadCodigo;
+      } else {
+        console.error("[ventas/leads] No se encontró origen o etapa:", { origenBot, primeraEtapa });
       }
     } catch (e) {
       console.error("[ventas/leads] Error creando oportunidad CRM:", e.message);
