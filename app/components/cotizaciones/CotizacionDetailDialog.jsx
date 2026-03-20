@@ -13,7 +13,8 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import { Loader2, Link as LinkIcon, Copy, ExternalLink, Eye } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const estadoColor = {
   pendiente: "bg-yellow-100 text-yellow-800 border-yellow-300",
@@ -93,10 +94,16 @@ export default function CotizacionDetailDialog({
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [publicToken, setPublicToken] = useState(null);
+  const [views, setViews] = useState([]);
+  const [loadingViews, setLoadingViews] = useState(false);
+  const [generatingLink, setGeneratingLink] = useState(false);
 
   useEffect(() => {
     if (!open || !cotizacionId) return;
     loadDetail();
+    setPublicToken(null);
+    setViews([]);
   }, [open, cotizacionId]);
 
   async function loadDetail() {
@@ -104,7 +111,10 @@ export default function CotizacionDetailDialog({
     try {
       const r = await fetch(`/api/cotizaciones/${cotizacionId}`, { cache: "no-store" });
       const d = await r.json();
-      if (r.ok) setData(d);
+      if (r.ok) {
+        setData(d);
+        if (d.public_token) setPublicToken(d.public_token);
+      }
       else toast.error("Error cargando detalle");
     } catch {
       toast.error("Error de conexión");
@@ -135,6 +145,45 @@ export default function CotizacionDetailDialog({
     }
   }
 
+  async function handleGenerateLink() {
+    setGeneratingLink(true);
+    try {
+      const r = await fetch(`/api/cotizaciones/${cotizacionId}/public-link`, {
+        method: "POST"
+      });
+      const d = await r.json();
+      if (r.ok) {
+        setPublicToken(d.token);
+        copyToClipboard(d.token);
+      } else {
+        toast.error("Error generando enlace");
+      }
+    } catch {
+      toast.error("Error de conexión");
+    } finally {
+      setGeneratingLink(false);
+    }
+  }
+
+  function copyToClipboard(token) {
+    const url = `${window.location.origin}/q/${token}`;
+    navigator.clipboard.writeText(url);
+    toast.success("Enlace público copiado al portapapeles");
+  }
+
+  async function loadViews() {
+    setLoadingViews(true);
+    try {
+      const r = await fetch(`/api/cotizaciones/${cotizacionId}/views`);
+      if (r.ok) {
+        setViews(await r.json());
+      }
+    } catch {
+    } finally {
+      setLoadingViews(false);
+    }
+  }
+
   if (!data && !loading) return null;
 
   const label = data?.tipo === "pyp" ? "Paños" : "Mano de obra";
@@ -145,7 +194,25 @@ export default function CotizacionDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Detalle de Cotización #{data?.id || ""}</DialogTitle>
+          <div className="flex items-center justify-between mt-2 mb-2 pr-6">
+            <DialogTitle>Detalle de Cotización #{data?.id || ""}</DialogTitle>
+            {data && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={publicToken ? () => copyToClipboard(publicToken) : handleGenerateLink}
+                disabled={generatingLink}
+                className="h-8 shadow-sm flex items-center gap-2"
+              >
+                {generatingLink ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <LinkIcon className="w-3.5 h-3.5" />
+                )}
+                {publicToken ? "Copiar enlace público" : "Crear enlace público"}
+              </Button>
+            )}
+          </div>
         </DialogHeader>
 
         {loading ? (
@@ -153,8 +220,15 @@ export default function CotizacionDetailDialog({
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
           </div>
         ) : data ? (
-          <div className="space-y-6">
-            {/* General info */}
+          <Tabs defaultValue="detalle" onValueChange={(v) => v === "vistas" && loadViews()}>
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="detalle">Resumen Cotización</TabsTrigger>
+              <TabsTrigger value="vistas" className="flex items-center gap-2">
+                <Eye className="w-4 h-4" /> Métricas de Vistas
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="detalle" className="space-y-6">
+              {/* General info */}
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-muted-foreground">Tipo:</span>
@@ -357,7 +431,78 @@ export default function CotizacionDetailDialog({
                 <span className="text-green-600">{formatCurrency(data.monto_total, currencyCode)}</span>
               </div>
             </div>
-          </div>
+            </TabsContent>
+            
+            <TabsContent value="vistas">
+              <div className="space-y-4 pt-2">
+                <div className="flex items-center justify-between pb-2">
+                  <h4 className="font-semibold text-lg flex items-center gap-2">
+                    Visualizaciones del Link Público
+                  </h4>
+                  <Badge variant="outline" className="text-sm px-3 py-1 bg-slate-50">
+                    Total: {views.length} vistas
+                  </Badge>
+                </div>
+
+                {!publicToken && (
+                  <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-md text-sm">
+                    Aún no se ha generado un enlace público para esta cotización. Haz clic en "Crear enlace público" arriba.
+                  </div>
+                )}
+
+                {publicToken && (
+                  <div className="flex items-center gap-2 p-3 bg-slate-50 border rounded-md text-sm text-muted-foreground break-all">
+                    <span className="font-medium text-slate-700">Enlace HTTP:</span> 
+                    <a href={`${window.location.origin}/q/${publicToken}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
+                      {window.location.origin}/q/{publicToken}
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                )}
+
+                <div className="border rounded-md mt-4 overflow-hidden">
+                  <Table>
+                    <TableHeader className="bg-slate-50">
+                      <TableRow>
+                        <TableHead className="w-[180px]">Fecha y Hora</TableHead>
+                        <TableHead className="w-[140px]">Dirección IP</TableHead>
+                        <TableHead>Dispositivo / Navegador</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {loadingViews ? (
+                        <TableRow>
+                          <TableCell colSpan={3} className="h-24 text-center">
+                            <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
+                          </TableCell>
+                        </TableRow>
+                      ) : views.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
+                            {publicToken ? "Nadie ha visto esta cotización aún." : "Genera un enlace para empezar a rastrear vistas."}
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        views.map((v, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="font-medium whitespace-nowrap text-sm">
+                              {formatDate(v.viewed_at)}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs text-slate-600">
+                              {v.ip_address || "Desconocida"}
+                            </TableCell>
+                            <TableCell className="text-xs text-slate-500 break-words max-w-[280px]">
+                              {v.user_agent || "Desconocido"}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
         ) : null}
 
         <DialogFooter>

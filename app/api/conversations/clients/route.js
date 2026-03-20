@@ -16,6 +16,7 @@ export async function GET(req) {
       const [rows] = await db.query(`
         SELECT 
           cs.id AS session_id,
+          cs.client_id,
           cs.phone,
           cs.state,
           cs.last_intent,
@@ -106,6 +107,7 @@ export async function GET(req) {
       const [legacyRows] = await db.query(`
         SELECT 
           cs.id AS session_id,
+          cs.client_id,
           cs.phone,
           cs.state,
           cs.last_intent,

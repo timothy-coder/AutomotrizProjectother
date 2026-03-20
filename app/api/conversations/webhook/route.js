@@ -997,6 +997,9 @@ export async function POST(req) {
     });
 
     const slaMinutes = getSlaMinutes();
+    // Si el mensaje viene del agente de ventas IA, marcar la sesión con source='ventas_ia'
+    // para que el routing del Bot Taller v14 pueda detectar conversaciones activas de ventas.
+    const isVentasSource = source === "ventas_ia";
     try {
       await db.query(
         `
@@ -1010,10 +1013,11 @@ export async function POST(req) {
             WHEN COALESCE(assignment_status, 'unassigned') = 'closed' THEN 'open'
             ELSE COALESCE(assignment_status, 'open')
           END,
-          sla_due_at = DATE_ADD(NOW(), INTERVAL ? MINUTE)
+          sla_due_at = DATE_ADD(NOW(), INTERVAL ? MINUTE),
+          source = CASE WHEN ? THEN 'ventas_ia' ELSE COALESCE(source, 'manual') END
         WHERE id = ?
         `,
-        [inserted.id, slaMinutes, sessionId]
+        [inserted.id, slaMinutes, isVentasSource, sessionId]
       );
     } catch (error) {
       if (!isMissingColumnError(error)) throw error;

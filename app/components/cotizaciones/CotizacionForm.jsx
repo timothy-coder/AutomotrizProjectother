@@ -99,6 +99,9 @@ export default function CotizacionForm({
   const [descuentoAdicionalesPorcentaje, setDescuentoAdicionalesPorcentaje] = useState(0);
   const [descuentoAdicionalesMonto, setDescuentoAdicionalesMonto] = useState(0);
 
+  const [descuentoGeneralPorcentaje, setDescuentoGeneralPorcentaje] = useState(0);
+  const [descuentoGeneralMonto, setDescuentoGeneralMonto] = useState(0);
+
   const [monedas, setMonedas] = useState([]);
   const [impuestos, setImpuestos] = useState([]);
   const [monedaId, setMonedaId] = useState("");
@@ -405,10 +408,21 @@ export default function CotizacionForm({
     subtotalAdicionales,
     subtotalAdicionales * (Number(descuentoAdicionalesPorcentaje || 0) / 100) + Number(descuentoAdicionalesMonto || 0)
   );
-  const totalDescuento = descuentoProductos + descuentoManoObra + descuentoAdicionales;
+  
+  const totalDescuentoBloques = descuentoProductos + descuentoManoObra + descuentoAdicionales;
+  const subtotalNetoBloques = Math.max(0, bruto - totalDescuentoBloques);
+
+  const descuentoGeneral = Math.min(
+    subtotalNetoBloques,
+    subtotalNetoBloques * (Number(descuentoGeneralPorcentaje || 0) / 100) + Number(descuentoGeneralMonto || 0)
+  );
+
+  const totalDescuento = totalDescuentoBloques + descuentoGeneral;
+  
   const netoProductos = Math.max(0, subtotalProductos - descuentoProductos);
   const netoManoObra = Math.max(0, subtotalManoObra - descuentoManoObra);
   const netoAdicionales = Math.max(0, subtotalAdicionales - descuentoAdicionales);
+  
   const netoSinIgv = Math.max(0, bruto - totalDescuento);
   const montoIgv = incluirIgv ? netoSinIgv * (igvPorcentaje / 100) : 0;
   const montoTotal = netoSinIgv + montoIgv;
@@ -1042,6 +1056,36 @@ export default function CotizacionForm({
                     </div>
                   </div>
                 </div>
+
+                <div className="border rounded-md p-2 space-y-2 bg-slate-50 border-slate-200">
+                  <p className="text-xs font-medium text-slate-700">Descuento General</p>
+                  <p className="text-[10px] text-muted-foreground leading-tight -mt-1">Aplica al subtotal de toda la cotización</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">%</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={descuentoGeneralPorcentaje || ""}
+                        onChange={(e) =>
+                          setDescuentoGeneralPorcentaje(Math.min(100, Math.max(0, Number(e.target.value) || 0)))
+                        }
+                        className="bg-white"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Monto</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={descuentoGeneralMonto || ""}
+                        onChange={(e) => setDescuentoGeneralMonto(Math.max(0, Number(e.target.value) || 0))}
+                        className="bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-2 border rounded-md p-3 bg-white text-sm">
@@ -1061,22 +1105,35 @@ export default function CotizacionForm({
 
                 {totalDescuento > 0 && (
                   <>
-                    <div className="flex justify-between text-xs text-red-500">
-                      <span>Desc. productos</span>
-                      <span>-{fmt(descuentoProductos)}</span>
+                    {descuentoProductos > 0 && (
+                      <div className="flex justify-between text-xs text-red-500">
+                        <span>Desc. productos</span>
+                        <span>-{fmt(descuentoProductos)}</span>
+                      </div>
+                    )}
+                    {descuentoManoObra > 0 && (
+                      <div className="flex justify-between text-xs text-red-500">
+                        <span>Desc. {manoObraLabel.toLowerCase()}</span>
+                        <span>-{fmt(descuentoManoObra)}</span>
+                      </div>
+                    )}
+                    {descuentoAdicionales > 0 && (
+                      <div className="flex justify-between text-xs text-red-500">
+                        <span>Desc. adicionales</span>
+                        <span>-{fmt(descuentoAdicionales)}</span>
+                      </div>
+                    )}
+                    {descuentoGeneral > 0 && (
+                      <div className="flex justify-between text-xs text-red-500">
+                        <span>Desc. general</span>
+                        <span>-{fmt(descuentoGeneral)}</span>
+                      </div>
+                    )}
+                    <hr className="my-1 border-red-100" />
+                    <div className="flex justify-between text-red-600 font-medium">
+                      <span>Descuento total aplicado</span>
+                      <span>-{fmt(totalDescuento)}</span>
                     </div>
-                    <div className="flex justify-between text-xs text-red-500">
-                      <span>Desc. {manoObraLabel.toLowerCase()}</span>
-                      <span>-{fmt(descuentoManoObra)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs text-red-500">
-                      <span>Desc. adicionales</span>
-                      <span>-{fmt(descuentoAdicionales)}</span>
-                    </div>
-                  <div className="flex justify-between text-red-600 font-medium">
-                    <span>Descuento total aplicado</span>
-                    <span>-{fmt(totalDescuento)}</span>
-                  </div>
                   </>
                 )}
 
