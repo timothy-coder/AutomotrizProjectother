@@ -10,8 +10,24 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { DayPicker } from "react-day-picker";
 import { es } from "date-fns/locale";
+import { 
+  Building2,
+  Clock,
+  User,
+  Calendar,
+  Info,
+  AlertCircle,
+  CheckCircle,
+  Loader
+} from "lucide-react";
 import "react-day-picker/dist/style.css";
 
 export default function Paso3Horario({
@@ -33,6 +49,8 @@ export default function Paso3Horario({
   const [slots, setSlots] = useState([]);
 
   const [horario, setHorario] = useState(null);
+  const [loadingHorario, setLoadingHorario] = useState(false);
+  const [loadingTalleres, setLoadingTalleres] = useState(false);
 
   const initialAppliedRef = useRef(false);
 
@@ -122,6 +140,7 @@ export default function Paso3Horario({
       return;
     }
 
+    setLoadingTalleres(true);
     setTalleres([]);
     setTallerId(null);
     setDate(null);
@@ -145,6 +164,7 @@ export default function Paso3Horario({
           filtrados.some((t) => Number(t.id) === Number(initialValue.taller_id))
         ) {
           setTallerId(Number(initialValue.taller_id));
+          setLoadingTalleres(false);
           return;
         }
 
@@ -153,11 +173,14 @@ export default function Paso3Horario({
         } else {
           setTallerId(null);
         }
+
+        setLoadingTalleres(false);
       })
       .catch((e) => {
         console.log(e);
         setTalleres([]);
         setTallerId(null);
+        setLoadingTalleres(false);
       });
   }, [centroId, allowedTalleresSet, initialValue?.taller_id]);
 
@@ -184,12 +207,19 @@ export default function Paso3Horario({
       return;
     }
 
+    setLoadingHorario(true);
+
     fetch(`/api/horacitas_centro/by-centro/${centroId}`, { cache: "no-store" })
       .then((r) => r.json())
-      .then((data) => setHorario(data))
+      .then((data) => {
+        console.log("✅ Horario cargado:", data);
+        setHorario(data);
+        setLoadingHorario(false);
+      })
       .catch((e) => {
-        console.log(e);
+        console.error("❌ Error cargando horario:", e);
         setHorario(null);
+        setLoadingHorario(false);
       });
   }, [centroId]);
 
@@ -279,7 +309,7 @@ export default function Paso3Horario({
           start = Math.max(start, aStart);
           end = Math.min(end, aEnd);
         } catch (e) {
-          console.log(e);
+          console.error("Error parseando horario asesor:", e);
           setSlots([]);
           return;
         }
@@ -306,6 +336,7 @@ export default function Paso3Horario({
       });
     }
 
+    console.log(`📅 Slots generados para ${date.toDateString()}:`, arr);
     setSlots(arr);
   }, [date, asesorId, horario, tallerId, asesores, initialValue]);
 
@@ -340,142 +371,299 @@ export default function Paso3Horario({
     });
   }, [slot, date, centroId, tallerId, asesorId, onChange]);
 
+  // Determinar estado de completitud
+  const isComplete = centroId && tallerId && date && slot;
+
   return (
-    <Card>
-      <CardHeader className="font-semibold">
-        PASO 3 — Seleccione fecha y hora
-      </CardHeader>
+    <TooltipProvider>
+      <Card className="border-slate-200 shadow-sm">
+        <CardHeader className="bg-gradient-to-r from-slate-50 to-purple-50 border-b">
+          <div className="flex items-center gap-2">
+            <Clock size={24} className="text-purple-600" />
+            <div>
+              <h2 className="font-semibold text-lg text-slate-900">Fecha y hora</h2>
+              <p className="text-xs text-gray-600 mt-1">Paso 3 - Elige cuándo deseas agendar la cita</p>
+            </div>
+          </div>
+        </CardHeader>
 
-      <CardContent className="space-y-6">
-        <div className="flex justify-between gap-3 flex-wrap">
-          {/* CENTRO */}
-          <Select
-            value={centroId ? String(centroId) : undefined}
-            onValueChange={(v) => {
-              initialAppliedRef.current = false;
-              setCentroId(Number(v));
-            }}
-            disabled={centros.length === 0}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Seleccione un centro" />
-            </SelectTrigger>
-            <SelectContent>
-              {centros.length > 0 ? (
-                centros.map((c) => (
-                  <SelectItem key={c.id} value={String(c.id)}>
-                    {c.nombre || c.name}
-                  </SelectItem>
-                ))
-              ) : (
-                <SelectItem value="__sin_centros" disabled>
-                  No tienes centros asignados
-                </SelectItem>
-              )}
-            </SelectContent>
-          </Select>
+        <CardContent className="space-y-6 pt-6">
 
-          {/* TALLER */}
-          <Select
-            key={`taller-${centroId || "none"}`}
-            value={tallerId ? String(tallerId) : undefined}
-            onValueChange={(v) => {
-              initialAppliedRef.current = false;
-              setTallerId(Number(v));
-              setDate(null);
-              setSlot(null);
-              setSlots([]);
-            }}
-            disabled={!centroId || talleres.length === 0}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Seleccione un taller" />
-            </SelectTrigger>
-            <SelectContent>
-              {talleres.length > 0 ? (
-                talleres.map((t) => (
-                  <SelectItem key={t.id} value={String(t.id)}>
-                    {t.nombre || t.name}
-                  </SelectItem>
-                ))
-              ) : (
-                <SelectItem value="__sin_taller" disabled>
-                  No tienes talleres asignados
-                </SelectItem>
-              )}
-            </SelectContent>
-          </Select>
+          {/* FILTROS SUPERIORES */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-purple-600 text-white text-xs flex items-center justify-center font-bold">1</span>
+              Selecciona ubicación y asesor
+            </h3>
 
-          {/* ASESOR */}
-          <Select
-            value={asesorId}
-            onValueChange={(v) => {
-              initialAppliedRef.current = false;
-              setAsesorId(v);
-              setSlot(null);
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Seleccione asesor" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="any">Cualquier asesor</SelectItem>
-              {asesores.map((a) => (
-                <SelectItem key={a.id} value={String(a.id)}>
-                  {a.fullname}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+            <div className="grid md:grid-cols-3 gap-3">
+              
+              {/* CENTRO */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-1">
+                  <Building2 size={16} className="text-purple-600" />
+                  <label className="text-sm font-semibold text-slate-900">Centro</label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info size={14} className="text-gray-400 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      Selecciona el centro de servicio donde deseas la cita
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Select
+                  value={centroId ? String(centroId) : ""}
+                  onValueChange={(v) => {
+                    initialAppliedRef.current = false;
+                    setCentroId(Number(v));
+                  }}
+                  disabled={centros.length === 0}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Seleccione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {centros.length > 0 ? (
+                      centros.map((c) => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          {c.nombre || c.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="__sin_centros" disabled>
+                        No tienes centros asignados
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* CALENDARIO */}
-          <div className="border rounded-xl p-4 shadow-sm bg-white">
-            <DayPicker
-              mode="single"
-              selected={date}
-              onSelect={(d) => {
-                initialAppliedRef.current = false;
-                setDate(d);
-                setSlot(null);
-              }}
-              locale={es}
-              fromDate={new Date()}
-              disabled={isDayDisabled}
-              className="mx-auto"
-            />
+              {/* TALLER */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-1">
+                  <Building2 size={16} className="text-purple-600" />
+                  <label className="text-sm font-semibold text-slate-900">Taller</label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info size={14} className="text-gray-400 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      Selecciona el taller específico dentro del centro
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Select
+                  key={`taller-${centroId || "none"}`}
+                  value={tallerId ? String(tallerId) : ""}
+                  onValueChange={(v) => {
+                    initialAppliedRef.current = false;
+                    setTallerId(Number(v));
+                    setDate(null);
+                    setSlot(null);
+                    setSlots([]);
+                  }}
+                  disabled={!centroId || talleres.length === 0 || loadingTalleres}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue 
+                      placeholder={loadingTalleres ? "Cargando talleres..." : "Seleccione"} 
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {talleres.length > 0 ? (
+                      talleres.map((t) => (
+                        <SelectItem key={t.id} value={String(t.id)}>
+                          {t.nombre || t.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="__sin_taller" disabled>
+                        {loadingTalleres ? "Cargando..." : "No tienes talleres asignados"}
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* ASESOR */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-1">
+                  <User size={16} className="text-purple-600" />
+                  <label className="text-sm font-semibold text-slate-900">Asesor</label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info size={14} className="text-gray-400 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      Selecciona un asesor específico o "Cualquier asesor" disponible
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Select
+                  value={asesorId}
+                  onValueChange={(v) => {
+                    initialAppliedRef.current = false;
+                    setAsesorId(v);
+                    setSlot(null);
+                  }}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Seleccione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">Cualquier asesor</SelectItem>
+                    {asesores.map((a) => (
+                      <SelectItem key={a.id} value={String(a.id)}>
+                        {a.fullname}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
 
-          {/* HORAS */}
-          <div className="space-y-4">
-            {slots.length > 0 && (
-              <div>
-                <div className="font-medium mb-2">Seleccione la hora</div>
-                <div className="flex flex-wrap gap-2">
-                  {slots.map((s) => (
-                    <Button
-                      key={s.start}
-                      type="button"
-                      size="sm"
-                      variant={slot?.start === s.start ? "default" : "outline"}
-                      onClick={() => setSlot(s)}
-                    >
-                      {s.start}
-                    </Button>
-                  ))}
+          {/* CALENDARIO Y HORARIOS */}
+          <div className="space-y-4 pt-4 border-t">
+            <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-purple-600 text-white text-xs flex items-center justify-center font-bold">2</span>
+              Selecciona fecha y hora
+            </h3>
+
+            {!centroId || !tallerId ? (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex gap-2">
+                <AlertCircle size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-blue-700">
+                  Selecciona primero el centro y taller para ver horarios disponibles
+                </p>
+              </div>
+            ) : loadingHorario ? (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex gap-2">
+                <Loader size={16} className="text-blue-600 flex-shrink-0 mt-0.5 animate-spin" />
+                <p className="text-sm text-blue-700">
+                  Cargando horarios disponibles...
+                </p>
+              </div>
+            ) : !horario || !horario.week_json ? (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex gap-2">
+                <AlertCircle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-700">
+                  No se encontró horario configurado para el centro seleccionado
+                </p>
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 gap-6">
+                
+                {/* CALENDARIO */}
+                <div className="border rounded-xl p-4 shadow-sm bg-white">
+                  <div className="mb-4 text-sm font-semibold text-slate-900 flex items-center gap-1">
+                    <Calendar size={16} className="text-purple-600" />
+                    Selecciona una fecha
+                  </div>
+                  <DayPicker
+                    mode="single"
+                    selected={date}
+                    onSelect={(d) => {
+                      initialAppliedRef.current = false;
+                      setDate(d);
+                      setSlot(null);
+                    }}
+                    locale={es}
+                    fromDate={new Date()}
+                    disabled={isDayDisabled}
+                    className="mx-auto"
+                  />
+                </div>
+
+                {/* HORAS */}
+                <div className="space-y-4">
+                  <div className="text-sm font-semibold text-slate-900 flex items-center gap-1">
+                    <Clock size={16} className="text-purple-600" />
+                    Horarios disponibles
+                  </div>
+
+                  {date && slots.length > 0 && (
+                    <div className="space-y-3">
+                      <p className="text-xs text-slate-600">
+                        {new Intl.DateTimeFormat('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(date)}
+                      </p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {slots.map((s) => {
+                          const isSelected = slot?.start === s.start;
+                          return (
+                            <Tooltip key={s.start}>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={isSelected ? "default" : "outline"}
+                                  onClick={() => setSlot(s)}
+                                  className={`font-semibold ${
+                                    isSelected
+                                      ? "bg-purple-600 hover:bg-purple-700"
+                                      : "hover:border-purple-300"
+                                  }`}
+                                >
+                                  {isSelected && <CheckCircle size={14} className="mr-1" />}
+                                  {s.start}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">
+                                {s.start} - {s.end}
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {date && slots.length === 0 && (
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex gap-2">
+                      <AlertCircle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-amber-900">
+                          Sin horarios disponibles
+                        </p>
+                        <p className="text-xs text-amber-700">
+                          El taller no tiene disponibilidad en la fecha seleccionada
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {!date && (
+                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-center">
+                      <p className="text-sm text-slate-600">
+                        Selecciona una fecha para ver los horarios disponibles
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
-
-            {slots.length === 0 && date && (
-              <p className="text-sm text-muted-foreground">
-                No hay horarios disponibles
-              </p>
-            )}
           </div>
-        </div>
-      </CardContent>
-    </Card>
+
+          {/* RESUMEN */}
+          {isComplete && (
+            <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex gap-2">
+              <CheckCircle size={18} className="text-green-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-green-900">
+                  Cita completamente configurada
+                </p>
+                <p className="text-xs text-green-700 mt-1">
+                  {centros.find(c => c.id === centroId)?.nombre} • 
+                  {" " + talleres.find(t => t.id === tallerId)?.nombre} • 
+                  {" " + (asesorId === "any" ? "Cualquier asesor" : asesores.find(a => a.id === Number(asesorId))?.fullname)}
+                </p>
+              </div>
+            </div>
+          )}
+
+        </CardContent>
+      </Card>
+    </TooltipProvider>
   );
 }

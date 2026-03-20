@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useUserScope } from "@/hooks/useUserScope";
 
 import {
   Dialog,
@@ -22,18 +23,38 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+import {
+  AlertCircle,
+  Calendar,
+  Clock,
+  FileText,
+  Info,
+  User,
+  CheckCircle,
+  Loader
+} from "lucide-react";
 
 export default function UserAbsenceDialog({
   open,
   onOpenChange,
-  fullname,
   absence,   // 👈 si existe → EDIT
   onSaved,
 }) {
-  const editing = Boolean(absence);
+  const { userId, loading: scopeLoading } = useUserScope();
 
   const [users, setUsers] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  const editing = Boolean(absence);
 
   const [form, setForm] = useState({
     user_id: "",
@@ -50,14 +71,53 @@ export default function UserAbsenceDialog({
     setForm(prev => ({ ...prev, [field]: value }));
   }
 
+  // ================= CARGAR USUARIO AUTENTICADO =================
+
+  useEffect(() => {
+    if (!open || !userId || scopeLoading) return;
+
+    setLoadingUsers(true);
+
+    fetch(`/api/usuarios/${userId}`, { cache: "no-store" })
+      .then(r => {
+        if (!r.ok) throw new Error();
+        return r.json();
+      })
+      .then(data => {
+        setCurrentUser({
+          id: data.id,
+          fullname: data.fullname,
+          nombre: data.nombre,
+          apellido: data.apellido,
+        });
+      })
+      .catch(e => {
+        console.error("Error cargando usuario autenticado:", e);
+        setCurrentUser(null);
+      })
+      .finally(() => setLoadingUsers(false));
+  }, [open, userId, scopeLoading]);
+
   // ================= LOAD USERS =================
 
   useEffect(() => {
     if (!open) return;
 
-    fetch("/api/usuarios")
+    setLoadingUsers(true);
+
+    fetch("/api/usuarios", { cache: "no-store" })
       .then(r => r.json())
-      .then(data => setUsers(data.filter(u => u.is_active)));
+      .then(data => {
+        const activos = Array.isArray(data) 
+          ? data.filter(u => u.is_active) 
+          : [];
+        setUsers(activos);
+      })
+      .catch(e => {
+        console.error("Error cargando usuarios:", e);
+        setUsers([]);
+      })
+      .finally(() => setLoadingUsers(false));
   }, [open]);
 
   // ================= LOAD DATA (EDIT) =================
@@ -99,7 +159,7 @@ export default function UserAbsenceDialog({
   async function handleSave() {
     if (!form.user_id) return toast.warning("Seleccione usuario");
     if (!form.reason) return toast.warning("Ingrese motivo");
-    if (!form.start_date) return toast.warning("Seleccione fecha");
+    if (!form.start_date) return toast.warning("Seleccione fecha inicio");
 
     try {
       setSaving(true);
@@ -146,130 +206,300 @@ export default function UserAbsenceDialog({
     }
   }
 
+  const selectedUser = users.find(u => u.id === Number(form.user_id));
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>
-            {editing ? "Editar ausencia" : "Nueva ausencia"}
-          </DialogTitle>
-
-          <p className="text-sm text-gray-500">
-            Persona que agenda:{" "}
-            <span className="font-semibold">{fullname}</span>
-          </p>
-        </DialogHeader>
-
-        <div className="space-y-4">
-
-          {/* USER */}
-          <div>
-            <Label>Miembro *</Label>
-            <Select
-              value={form.user_id}
-              onValueChange={(v) => setField("user_id", v)}
-            >
-              <SelectTrigger className="mt-1 w-full">
-                <SelectValue placeholder="Seleccionar" />
-              </SelectTrigger>
-              <SelectContent>
-                {users.map(u => (
-                  <SelectItem key={u.id} value={String(u.id)}>
-                    {u.fullname}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* MOTIVO */}
-          <div>
-            <Label>Motivo *</Label>
-            <Input
-              value={form.reason}
-              onChange={(e)=>setField("reason", e.target.value)}
-            />
-          </div>
-
-          {/* TODO EL DIA */}
-          <div className="flex items-center gap-3">
-            <Switch
-              checked={form.will_be_absent}
-              onCheckedChange={(v)=>setField("will_be_absent", v)}
-            />
-            <span className="text-sm">Todo el día</span>
-          </div>
-
-          {/* FECHAS */}
-          <div className="grid md:grid-cols-2 gap-3">
+    <TooltipProvider>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          
+          {/* HEADER */}
+          <DialogHeader className="pb-4 border-b">
             <div>
-              <Label>Fecha inicio *</Label>
-              <Input
-                type="date"
-                value={form.start_date}
-                onChange={(e)=>setField("start_date", e.target.value)}
-              />
-            </div>
+              <DialogTitle className="text-2xl flex items-center gap-2">
+                <AlertCircle size={24} className="text-blue-600" />
+                {editing ? "Editar ausencia" : "Agendar ausencia"}
+              </DialogTitle>
 
-            <div>
-              <Label>Fecha fin</Label>
-              <Input
-                type="date"
-                disabled={!form.will_be_absent}
-                value={form.end_date}
-                onChange={(e)=>setField("end_date", e.target.value)}
-              />
+              {/* USUARIO QUE AGENDA */}
+              {scopeLoading || loadingUsers ? (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2">
+                  <Loader size={16} className="text-blue-600 flex-shrink-0 animate-spin" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Cargando información...</p>
+                  </div>
+                </div>
+              ) : currentUser ? (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2">
+                  <User size={16} className="text-blue-600 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Persona que agenda:</p>
+                    <p className="font-semibold text-slate-900">{currentUser.fullname}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
+                  <AlertCircle size={16} className="text-amber-600 flex-shrink-0" />
+                  <p className="text-xs text-amber-700">No se pudo cargar la información del usuario</p>
+                </div>
+              )}
             </div>
-          </div>
+          </DialogHeader>
 
-          {/* HORAS */}
-          {!form.will_be_absent && (
-            <div className="grid md:grid-cols-2 gap-3">
+          {/* CONTENIDO */}
+          <div className="space-y-5">
+
+            {/* SECCIÓN 1: USUARIO Y MOTIVO */}
+            <div className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+              <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">1</span>
+                Información general
+              </h3>
+
+              {/* USUARIO */}
               <div>
-                <Label>Hora inicio</Label>
+                <div className="flex items-center gap-1 mb-2">
+                  <Label className="font-semibold">Miembro ausente *</Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info size={14} className="text-gray-400 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      Selecciona el miembro del equipo que estará ausente
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Select
+                  value={form.user_id}
+                  onValueChange={(v) => setField("user_id", v)}
+                  disabled={loadingUsers || users.length === 0}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue 
+                      placeholder={loadingUsers ? "Cargando usuarios..." : "Seleccionar miembro"} 
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.length > 0 ? (
+                      users.map(u => (
+                        <SelectItem key={u.id} value={String(u.id)}>
+                          {u.fullname}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="__sin_usuarios" disabled>
+                        {loadingUsers ? "Cargando..." : "No hay usuarios disponibles"}
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* MOTIVO */}
+              <div>
+                <div className="flex items-center gap-1 mb-2">
+                  <Label className="font-semibold">Motivo de ausencia *</Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info size={14} className="text-gray-400 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      Especifica la razón de la ausencia (vacaciones, enfermedad, etc.)
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
                 <Input
-                  type="time"
-                  value={form.start_time}
-                  onChange={(e)=>setField("start_time", e.target.value)}
+                  placeholder="Ej: Vacaciones, Enfermedad, Permiso, etc."
+                  value={form.reason}
+                  onChange={(e)=>setField("reason", e.target.value)}
+                  className="h-9"
                 />
               </div>
+            </div>
+
+            {/* SECCIÓN 2: DURACIÓN */}
+            <div className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+              <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-purple-600 text-white text-xs flex items-center justify-center font-bold">2</span>
+                Duración
+              </h3>
+
+              {/* TODO EL DÍA */}
+              <div className="flex items-center justify-between p-3 bg-white rounded border border-slate-200">
+                <div className="flex items-center gap-2">
+                  <Calendar size={16} className="text-purple-600" />
+                  <div>
+                    <p className="font-medium text-slate-900">Ausencia de día completo</p>
+                    <p className="text-xs text-muted-foreground">
+                      {form.will_be_absent ? "La persona estará ausente todo el día" : "Ausencia parcial (con horario específico)"}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={form.will_be_absent}
+                  onCheckedChange={(v)=>setField("will_be_absent", v)}
+                  className="data-[state=checked]:bg-purple-600"
+                />
+              </div>
+
+              {/* FECHAS */}
+              <div className="grid md:grid-cols-2 gap-3">
+                <div>
+                  <div className="flex items-center gap-1 mb-2">
+                    <Calendar size={14} className="text-purple-600" />
+                    <Label className="font-semibold">Fecha inicio *</Label>
+                  </div>
+                  <Input
+                    type="date"
+                    value={form.start_date}
+                    onChange={(e)=>setField("start_date", e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-1 mb-2">
+                    <Calendar size={14} className="text-purple-600" />
+                    <Label className="font-semibold">
+                      Fecha fin
+                      {form.will_be_absent && <span className="text-red-500">*</span>}
+                    </Label>
+                  </div>
+                  <Input
+                    type="date"
+                    disabled={!form.will_be_absent}
+                    value={form.end_date}
+                    onChange={(e)=>setField("end_date", e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+              </div>
+
+              {/* HORAS - SOLO SI NO ES TODO EL DÍA */}
+              {!form.will_be_absent && (
+                <div className="space-y-3 pt-3 border-t">
+                  <p className="text-sm font-medium text-slate-900">Horario específico</p>
+                  <div className="grid md:grid-cols-2 gap-3">
+                    <div>
+                      <div className="flex items-center gap-1 mb-2">
+                        <Clock size={14} className="text-purple-600" />
+                        <Label className="font-semibold">Hora inicio</Label>
+                      </div>
+                      <Input
+                        type="time"
+                        value={form.start_time}
+                        onChange={(e)=>setField("start_time", e.target.value)}
+                        className="h-9"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1 mb-2">
+                        <Clock size={14} className="text-purple-600" />
+                        <Label className="font-semibold">Hora fin</Label>
+                      </div>
+                      <Input
+                        type="time"
+                        value={form.end_time}
+                        onChange={(e)=>setField("end_time", e.target.value)}
+                        className="h-9"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* SECCIÓN 3: NOTAS */}
+            <div className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+              <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-green-600 text-white text-xs flex items-center justify-center font-bold">3</span>
+                Notas adicionales
+              </h3>
+
               <div>
-                <Label>Hora fin</Label>
-                <Input
-                  type="time"
-                  value={form.end_time}
-                  onChange={(e)=>setField("end_time", e.target.value)}
+                <div className="flex items-center gap-1 mb-2">
+                  <FileText size={14} className="text-green-600" />
+                  <Label className="font-semibold">Notas (opcional)</Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info size={14} className="text-gray-400 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      Agrega información adicional relevante sobre la ausencia
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Textarea
+                  rows={3}
+                  placeholder="Ej: Contacto alternativo, observaciones especiales, etc."
+                  value={form.notes}
+                  onChange={(e)=>setField("notes", e.target.value)}
+                  className="resize-none"
                 />
               </div>
             </div>
-          )}
 
-          {/* NOTAS */}
-          <div>
-            <Label>Notas</Label>
-            <Textarea
-              rows={3}
-              value={form.notes}
-              onChange={(e)=>setField("notes", e.target.value)}
-            />
+            {/* RESUMEN */}
+            {form.user_id && form.reason && form.start_date && (
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex gap-3">
+                <CheckCircle size={18} className="text-green-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-semibold text-green-900">Información completa</p>
+                  {currentUser && (
+                    <p className="text-xs text-green-700 mt-1">
+                      Agendado por: <span className="font-semibold">{currentUser.fullname}</span>
+                    </p>
+                  )}
+                  <p className="text-xs text-green-700">
+                    {selectedUser?.fullname} estará ausente por: {form.reason}
+                    {form.will_be_absent && form.end_date && form.end_date !== form.start_date
+                      ? ` (${form.start_date} al ${form.end_date})`
+                      : ` (${form.start_date})`
+                    }
+                  </p>
+                </div>
+              </div>
+            )}
+
           </div>
 
-          <div className="flex justify-end gap-3 pt-3">
-            <Button variant="outline" onClick={()=>onOpenChange(false)}>
-              Cancelar
-            </Button>
+          {/* ACCIONES */}
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  onClick={()=>onOpenChange(false)}
+                >
+                  Cancelar
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Descartar cambios</TooltipContent>
+            </Tooltip>
 
-            <Button onClick={handleSave} disabled={saving}>
-              {saving
-                ? "Guardando..."
-                : editing
-                ? "Actualizar"
-                : "Crear ausencia"}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  onClick={handleSave} 
+                  disabled={saving}
+                  className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
+                >
+                  {saving && <Loader size={16} className="animate-spin" />}
+                  {saving
+                    ? "Guardando..."
+                    : editing
+                    ? "Actualizar ausencia"
+                    : "Crear ausencia"}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                {editing ? "Guarda los cambios" : "Registra la nueva ausencia"}
+              </TooltipContent>
+            </Tooltip>
           </div>
 
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+    </TooltipProvider>
   );
 }

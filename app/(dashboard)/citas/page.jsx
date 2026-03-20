@@ -23,8 +23,37 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
-import { ChevronLeft, ChevronRight, Calendar, CalendarClock, Plus } from "lucide-react";
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  Calendar, 
+  CalendarClock, 
+  Plus,
+  X,
+  AlertCircle,
+  Users,
+  Check
+} from "lucide-react";
 
 import UserAbsenceDialog from "@/app/components/user-absences/AbsenceDialog";
 import AbsencesSheet from "@/app/components/user-absences/AbsencesSheet";
@@ -53,15 +82,19 @@ export default function CitasPage() {
   const [estadosTiempo, setEstadosTiempo] = useState([]);
 
   const [asesores, setAsesores] = useState([]);
+  const [clientesTotales, setClientesTotales] = useState([]);
+  
   const [asesorFiltro, setAsesorFiltro] = useState("all");
   const [estadoFiltro, setEstadoFiltro] = useState("all");
-  const [tipoFiltro, setTipoFiltro] = useState("all"); // "all", "op", "ld"
-  const [vistaFiltro, setVistaFiltro] = useState("semana"); // "semana", "mes"
+  const [tipoFiltro, setTipoFiltro] = useState("all");
+  const [clienteFiltro, setClienteFiltro] = useState("all");
+  const [vistaFiltro, setVistaFiltro] = useState("semana");
 
   const [openAbsences, setOpenAbsences] = useState(false);
   const [openAbsence, setOpenAbsence] = useState(false);
   const [openResumen, setOpenResumen] = useState(false);
   const [openOportunidadDialog, setOpenOportunidadDialog] = useState(false);
+  const [openClientePopover, setOpenClientePopover] = useState(false);
 
   const [selectedCita, setSelectedCita] = useState(null);
   const [selectedAbsence, setSelectedAbsence] = useState(null);
@@ -200,6 +233,58 @@ export default function CitasPage() {
 
     setSlots(arr);
   }, [horario]);
+
+  // ===== LOAD CLIENTES TOTALES (GENERAL) =====
+  async function loadClientesTotales() {
+    if (!centroId) {
+      setClientesTotales([]);
+      return;
+    }
+
+    if (userCentros.length > 0 && !userCentros.includes(Number(centroId))) {
+      setClientesTotales([]);
+      return;
+    }
+
+    try {
+      const r = await fetch(`/api/citas?centro_id=${centroId}`, { 
+        cache: "no-store" 
+      });
+      const data = await r.json();
+
+      let lista = [];
+      if (Array.isArray(data)) lista = data;
+      else if (Array.isArray(data?.rows)) lista = data.rows;
+
+      if (userTalleres.length > 0) {
+        lista = lista.filter((c) => {
+          if (c.taller_id == null) return true;
+          return userTalleres.includes(Number(c.taller_id));
+        });
+      }
+
+      const clientesUnicos = new Map();
+      lista.forEach((c) => {
+        if (c.cliente && c.cliente.trim()) {
+          clientesUnicos.set(c.cliente.trim(), {
+            id: c.cliente_id || c.cliente,
+            nombre: c.cliente.trim(),
+          });
+        }
+      });
+      
+      setClientesTotales(Array.from(clientesUnicos.values()).sort((a, b) => 
+        a.nombre.localeCompare(b.nombre)
+      ));
+    } catch {
+      setClientesTotales([]);
+    }
+  }
+
+  useEffect(() => {
+    if (scopeLoading) return;
+    loadClientesTotales();
+  }, [centroId, scopeLoading, userCentros, userTalleres]);
 
   // ===== LOAD CITAS =====
   async function loadCitas() {
@@ -448,6 +533,10 @@ export default function CitasPage() {
         return false;
       }
 
+      if (clienteFiltro !== "all" && c.cliente?.trim() !== clienteFiltro) {
+        return false;
+      }
+
       return (
         toLocalDate(c.start_at) === date &&
         toLocalHour(c.start_at) === hour
@@ -509,326 +598,539 @@ export default function CitasPage() {
 
   const canShowGrid = !scopeLoading && !!centroId;
 
-  // ===== RENDER MES VIEW =====
-  const renderMesView = () => {
-    const weeksInMonth = [];
-    let currentWeek = [];
+  return (
+    <TooltipProvider>
+      <div className="flex flex-col h-screen overflow-hidden bg-white">
+        
+        {/* HEADER - STICKY */}
+        <div className="flex-shrink-0 space-y-4 p-4 border-b">
+          
+          {/* Título y navegación */}
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Calendar size={24} className="text-blue-600" />
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-900">Calendario de Citas</h1>
+                  <p className="text-sm text-gray-600">
+                    {vistaFiltro === "semana" 
+                      ? `${format(days[0], "dd MMM", { locale: es })} - ${format(days[6], "dd MMM", { locale: es })}`
+                      : `${format(monthStart, "MMMM yyyy", { locale: es })}`
+                    }
+                  </p>
+                </div>
+              </div>
 
-    const firstDayOfMonth = days[0];
-    const startDay = firstDayOfMonth.getDay() === 0 ? 6 : firstDayOfMonth.getDay() - 1;
+              <div className="flex gap-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={() => 
+                        vistaFiltro === "semana" 
+                          ? setWeekStart(subWeeks(weekStart, 1))
+                          : setMonthStart(subMonths(monthStart, 1))
+                      }
+                    >
+                      <ChevronLeft size={18} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    {vistaFiltro === "semana" ? "Semana anterior" : "Mes anterior"}
+                  </TooltipContent>
+                </Tooltip>
 
-    for (let i = 0; i < startDay; i++) {
-      currentWeek.push(null);
-    }
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={() => 
+                        vistaFiltro === "semana"
+                          ? setWeekStart(addWeeks(weekStart, 1))
+                          : setMonthStart(addMonths(monthStart, 1))
+                      }
+                    >
+                      <ChevronRight size={18} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    {vistaFiltro === "semana" ? "Semana siguiente" : "Mes siguiente"}
+                  </TooltipContent>
+                </Tooltip>
 
-    days.forEach((day) => {
-      currentWeek.push(day);
-      if (currentWeek.length === 7) {
-        weeksInMonth.push([...currentWeek]);
-        currentWeek = [];
-      }
-    });
-
-    while (currentWeek.length < 7) {
-      currentWeek.push(null);
-    }
-    if (currentWeek.length > 0) {
-      weeksInMonth.push(currentWeek);
-    }
-
-    return (
-      <div className="border rounded overflow-hidden">
-        <div className="grid grid-cols-7">
-          {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((day) => (
-            <div key={day} className="p-2 text-center font-medium border-b bg-muted">
-              {day}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }));
+                        setMonthStart(startOfMonth(new Date()));
+                      }}
+                    >
+                      Hoy
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Ir a hoy</TooltipContent>
+                </Tooltip>
+              </div>
             </div>
-          ))}
-        </div>
 
-        {weeksInMonth.map((week, weekIdx) => (
-          <div key={weekIdx} className="grid grid-cols-7">
-            {week.map((day, dayIdx) => {
-              if (!day) {
-                return <div key={`empty-${dayIdx}`} className="border p-2 bg-gray-50 min-h-24" />;
-              }
+            <div className="flex gap-2 flex-wrap">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={() => (window.location.href = "/citas/nueva")}
+                    disabled={!centroId}
+                    className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
+                    size="sm"
+                  >
+                    <Calendar size={16} />
+                    Nueva cita
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Crear nueva cita</TooltipContent>
+              </Tooltip>
 
-              const dayString = format(day, "yyyy-MM-dd");
-              const dayOportunidades = oportunidades.filter((o) =>
-                normalizeDate(o.fecha_agenda) === dayString
-              );
-              const dayCitas = citas.filter((c) =>
-                toLocalDate(c.start_at) === dayString
-              );
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={() => {
+                      setSelectedOportunidad(null);
+                      setDialogType("op");
+                      setDialogDefaults({
+                        fecha: format(new Date(), "yyyy-MM-dd"),
+                        hora: "",
+                        oportunidadPadreId: "",
+                      });
+                      setOpenOportunidadDialog(true);
+                    }}
+                    disabled={!centroId}
+                    className="bg-green-600 hover:bg-green-700 text-white gap-2"
+                    size="sm"
+                  >
+                    <Plus size={16} />
+                    Nueva oportunidad
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Crear nueva oportunidad</TooltipContent>
+              </Tooltip>
 
-              return (
-                <div
-                  key={dayString}
-                  className="border p-2 min-h-24 overflow-auto cursor-pointer hover:bg-blue-50 relative"
-                  onClick={(e) => {
-                    openMenu(day, "10:00", e);
-                  }}
-                >
-                  <div className="text-xs font-semibold mb-1">
-                    {format(day, "d")}
-                  </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setOpenAbsences(true)} 
+                    disabled={!centroId}
+                    size="sm"
+                  >
+                    Ver ausencias
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Ver ausencias registradas</TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
 
-                  <div className="space-y-1 text-[9px]">
-                    {dayCitas.map((c, i) => (
-                      <div
-                        key={`cita-${i}`}
-                        className="rounded p-1 bg-white border truncate cursor-pointer"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openCita(c);
-                        }}
-                        style={{ borderLeft: `3px solid ${c.color || "#5e17eb"}` }}
-                      >
-                        <div className="font-semibold truncate">{c.placa}</div>
-                        <div className="truncate">{c.asesor}</div>
-                      </div>
-                    ))}
+          {/* FILTROS - ROW 1 */}
+          <div className="flex flex-wrap gap-2 items-center p-3 bg-slate-50 rounded-lg border border-slate-200">
+            
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <Select
+                    value={centroId ? String(centroId) : ""}
+                    onValueChange={(v) => setCentroId(Number(v))}
+                    disabled={scopeLoading || centros.length === 0}
+                  >
+                    <SelectTrigger className="w-[140px] h-9">
+                      <SelectValue placeholder="Centro" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {centros.map((c) => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          {c.nombre || c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top">Selecciona el centro</TooltipContent>
+            </Tooltip>
 
-                    {dayOportunidades.map((o) => {
-                      const tipo = getTipoCodigo(o.oportunidad_id);
-                      const minutosRestantes = getMinutosRestantes(
-                        o.fecha_agenda,
-                        o.hora_agenda
-                      );
-                      const colorTiempo = getColorEstadoTiempo(
-                        minutosRestantes,
-                        o.etapasconversionpv_id
-                      );
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <Select value={asesorFiltro} onValueChange={setAsesorFiltro}>
+                    <SelectTrigger className="w-[140px] h-9">
+                      <SelectValue placeholder="Asesor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      {asesores.map((a) => (
+                        <SelectItem key={a.id} value={String(a.id)}>
+                          {a.fullname}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top">Filtrar por asesor</TooltipContent>
+            </Tooltip>
 
-                      return (
-                        <div
-                          key={`${tipo}-${o.id}`}
-                          className="rounded p-1 bg-white border truncate cursor-pointer"
+            {/* ✅ FILTRO DE CLIENTE RESTAURADO */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Popover open={openClientePopover} onOpenChange={setOpenClientePopover}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-[140px] justify-between h-9"
+                    >
+                      <span className="truncate flex items-center gap-1">
+                        <Users size={12} />
+                        {clienteFiltro === "all" 
+                          ? "Cliente" 
+                          : clienteFiltro.length > 10 
+                            ? clienteFiltro.substring(0, 10) + "..." 
+                            : clienteFiltro
+                        }
+                      </span>
+                      {clienteFiltro !== "all" && (
+                        <X
+                          size={12}
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedOportunidad(o);
-                            setDialogType(tipo);
-                            setOpenOportunidadDialog(true);
+                            setClienteFiltro("all");
                           }}
-                          style={{ borderLeft: `3px solid ${colorTiempo}` }}
-                        >
-                          <div className="font-semibold truncate">
-                            {o.oportunidad_id}
-                          </div>
-                          <div className="truncate">{o.cliente_name || ""}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        />
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  
+                  <PopoverContent className="w-[160px] p-0">
+                    <Command>
+                      <CommandInput placeholder="Buscar cliente..." className="h-8 text-xs" />
+                      <CommandList>
+                        <CommandEmpty>No encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="all"
+                            onSelect={() => {
+                              setClienteFiltro("all");
+                              setOpenClientePopover(false);
+                            }}
+                            className="cursor-pointer text-xs"
+                          >
+                            <Check
+                              size={12}
+                              className={`mr-1 ${
+                                clienteFiltro === "all"
+                                  ? "opacity-100"
+                                  : "opacity-0"
+                              }`}
+                            />
+                            Todos los clientes
+                          </CommandItem>
 
-                  {menuCell &&
-                    menuCell.day === dayString && (
-                      <div
-                        ref={menuRef}
-                        onClick={(e) => e.stopPropagation()}
-                        className="absolute z-10 bg-white border rounded shadow p-2 top-2 left-2 w-48 space-y-1"
-                      >
-                        <button
-                          className="block w-full text-left hover:bg-gray-100 px-2 py-1 rounded text-sm"
-                          onClick={() => {
-                            window.location.href = "/citas/nueva";
-                          }}
-                        >
-                          Nueva cita
-                        </button>
+                          {clientesTotales.map((cliente) => (
+                            <CommandItem
+                              key={cliente.id}
+                              value={cliente.nombre}
+                              onSelect={() => {
+                                setClienteFiltro(cliente.nombre);
+                                setOpenClientePopover(false);
+                              }}
+                              className="cursor-pointer text-xs"
+                            >
+                              <Check
+                                size={12}
+                                className={`mr-1 ${
+                                  clienteFiltro === cliente.nombre
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                                }`}
+                              />
+                              {cliente.nombre.length > 15
+                                ? cliente.nombre.substring(0, 15) + "..."
+                                : cliente.nombre}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </TooltipTrigger>
+              <TooltipContent side="top">Filtrar por cliente (búsqueda general)</TooltipContent>
+            </Tooltip>
 
-                        <button
-                          className="block w-full text-left hover:bg-gray-100 px-2 py-1 rounded text-sm"
-                          onClick={() => {
-                            setSelectedOportunidad(null);
-                            setDialogType("op");
-                            setDialogDefaults({
-                              fecha: dayString,
-                              hora: "10:00",
-                              oportunidadPadreId: "",
-                            });
-                            setMenuCell(null);
-                            setOpenOportunidadDialog(true);
-                          }}
-                        >
-                          Nueva oportunidad
-                        </button>
-
-                        <button
-                          className="block w-full text-left hover:bg-gray-100 px-2 py-1 rounded text-sm"
-                          onClick={() => {
-                            setMenuCell(null);
-                            setSelectedAbsence(null);
-                            setOpenAbsence(true);
-                          }}
-                        >
-                          Agendar ausencia
-                        </button>
-                      </div>
-                    )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <Select value={estadoFiltro} onValueChange={setEstadoFiltro}>
+                    <SelectTrigger className="w-[120px] h-9">
+                      <SelectValue placeholder="Estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="confirmada">Confirmada</SelectItem>
+                      <SelectItem value="pendiente">Pendiente</SelectItem>
+                      <SelectItem value="cancelada">Cancelada</SelectItem>
+                      <SelectItem value="reprogramada">Reprogramada</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-    );
-  };
+              </TooltipTrigger>
+              <TooltipContent side="top">Filtrar por estado</TooltipContent>
+            </Tooltip>
 
-  if (canShowGrid && vistaFiltro === "mes") {
-    return (
-      <div className="space-y-4">
-        {/* HEADER */}
-        <div className="flex flex-wrap gap-3 items-center">
-          <span className="font-semibold">
-            {format(monthStart, "MMMM yyyy", { locale: es })}
-          </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-0.5 border rounded p-0.5 bg-white h-9">
+                  <Button
+                    type="button"
+                    variant={tipoFiltro === "all" ? "default" : "ghost"}
+                    onClick={() => setTipoFiltro("all")}
+                    size="sm"
+                    className="text-xs h-8"
+                  >
+                    Todos
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={tipoFiltro === "op" ? "default" : "ghost"}
+                    onClick={() => setTipoFiltro("op")}
+                    size="sm"
+                    className="text-xs h-8"
+                  >
+                    OP
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={tipoFiltro === "ld" ? "default" : "ghost"}
+                    onClick={() => setTipoFiltro("ld")}
+                    size="sm"
+                    className="text-xs h-8"
+                  >
+                    LD
+                  </Button>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top">Filtrar por tipo</TooltipContent>
+            </Tooltip>
 
-          <Button
-            size="icon"
-            onClick={() => setMonthStart(subMonths(monthStart, 1))}
-          >
-            <ChevronLeft />
-          </Button>
-
-          <Button
-            size="icon"
-            onClick={() => setMonthStart(addMonths(monthStart, 1))}
-          >
-            <ChevronRight />
-          </Button>
-
-          <Button
-            onClick={() =>
-              setMonthStart(startOfMonth(new Date()))
-            }
-          >
-            Hoy
-          </Button>
-
-          <Select value={vistaFiltro} onValueChange={setVistaFiltro}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Vista" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="semana">Por semana</SelectItem>
-              <SelectItem value="mes">Por mes</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={centroId ? String(centroId) : ""}
-            onValueChange={(v) => setCentroId(Number(v))}
-            disabled={scopeLoading || centros.length === 0}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Centro" />
-            </SelectTrigger>
-            <SelectContent>
-              {centros.map((c) => (
-                <SelectItem key={c.id} value={String(c.id)}>
-                  {c.nombre || c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={asesorFiltro} onValueChange={setAsesorFiltro}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Asesor" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              {asesores.map((a) => (
-                <SelectItem key={a.id} value={String(a.id)}>
-                  {a.fullname}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={estadoFiltro} onValueChange={setEstadoFiltro}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="confirmada">Confirmada</SelectItem>
-              <SelectItem value="pendiente">Pendiente</SelectItem>
-              <SelectItem value="cancelada">Cancelada</SelectItem>
-              <SelectItem value="reprogramada">Reprogramada</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <div className="flex items-center gap-2 border rounded-md p-1">
-            <Button
-              type="button"
-              variant={tipoFiltro === "all" ? "default" : "ghost"}
-              onClick={() => setTipoFiltro("all")}
-              size="sm"
-            >
-              Todos
-            </Button>
-
-            <Button
-              type="button"
-              variant={tipoFiltro === "op" ? "default" : "ghost"}
-              onClick={() => setTipoFiltro("op")}
-              size="sm"
-            >
-              OP
-            </Button>
-
-            <Button
-              type="button"
-              variant={tipoFiltro === "ld" ? "default" : "ghost"}
-              onClick={() => setTipoFiltro("ld")}
-              size="sm"
-            >
-              LD
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <Select value={vistaFiltro} onValueChange={setVistaFiltro}>
+                    <SelectTrigger className="w-[110px] h-9">
+                      <SelectValue placeholder="Vista" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="semana">Semana</SelectItem>
+                      <SelectItem value="mes">Mes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top">Cambiar vista</TooltipContent>
+            </Tooltip>
           </div>
 
-          <div className="flex gap-2">
-            <Button
-              onClick={() => (window.location.href = "/citas/nueva")}
-              disabled={!centroId}
-            >
-              <Calendar className="w-4 h-4 mr-2" />
-              Nueva cita
-            </Button>
-
-            <Button
-              onClick={() => {
-                setSelectedOportunidad(null);
-                setDialogType("op");
-                setDialogDefaults({
-                  fecha: format(new Date(), "yyyy-MM-dd"),
-                  hora: "",
-                  oportunidadPadreId: "",
-                });
-                setOpenOportunidadDialog(true);
-              }}
-              disabled={!centroId}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Nueva oportunidad
-            </Button>
-
-            <Button variant="outline" onClick={() => setOpenAbsences(true)} disabled={!centroId}>
-              Ver ausencias
-            </Button>
-          </div>
+          {!scopeLoading && centros.length === 0 && (
+            <div className="border border-amber-200 rounded p-3 bg-amber-50 flex gap-2">
+              <AlertCircle className="text-amber-600 flex-shrink-0" size={18} />
+              <div className="text-xs">
+                <p className="font-medium text-amber-900">No tienes centros asignados</p>
+                <p className="text-amber-700">Contacta administración</p>
+              </div>
+            </div>
+          )}
         </div>
 
-        {!scopeLoading && centros.length === 0 && (
-          <div className="border rounded-md p-4 text-sm text-muted-foreground">
-            No tienes centros asignados.
+        {/* CALENDARIO - CON SCROLL */}
+        {canShowGrid && (
+          <div className="flex-1 overflow-auto bg-white">
+            <table className="w-full text-xs border-collapse">
+              
+              {/* HEADER - STICKY */}
+              <thead className="sticky top-0 z-20 bg-white">
+                <tr className="bg-slate-50 border-b">
+                  <th className="border-r p-2 text-center font-semibold text-slate-700 bg-slate-100 w-16 min-w-16 sticky left-0 z-30">
+                    Hora
+                  </th>
+                  {days.map((d) => (
+                    <th 
+                      key={d.toISOString()} 
+                      className="border-r p-2 text-center font-semibold text-slate-900 bg-blue-50 min-w-[120px] w-[120px]"
+                    >
+                      <div className="text-sm font-bold">{format(d, "EEE", { locale: es })}</div>
+                      <div className="text-xs text-gray-600">{format(d, "dd MMM", { locale: es })}</div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+
+              {/* BODY */}
+              <tbody>
+                {slots.map((h) => (
+                  <tr key={h} className="border-b hover:bg-slate-50/50">
+                    <td className="border-r p-2 text-xs font-semibold text-gray-600 bg-slate-50 sticky left-0 z-10 text-center w-16 min-w-16">
+                      {h}
+                    </td>
+
+                    {days.map((d) => {
+                      const citasSlot = getCitas(d, h);
+                      const oportunidadesSlot = getOportunidades(d, h);
+                      const blocked = !enabled(d, h) || past(d, h);
+                      const dayString = format(d, "yyyy-MM-dd");
+
+                      return (
+                        <td
+                          key={`${dayString}-${h}`}
+                          className={`border-r p-1 relative min-h-16 ${
+                            blocked
+                              ? "bg-gray-100 cursor-not-allowed"
+                              : "hover:bg-blue-50/50 cursor-pointer transition-colors"
+                          }`}
+                          onClick={(e) => {
+                            if (blocked) return;
+                            if (citasSlot.length) return openCita(citasSlot[0]);
+                            if (oportunidadesSlot.length) {
+                              const o = oportunidadesSlot[0];
+                              setSelectedOportunidad(o);
+                              setDialogType(getTipoCodigo(o.oportunidad_id));
+                              setOpenOportunidadDialog(true);
+                              return;
+                            }
+                            openMenu(d, h, e);
+                          }}
+                        >
+                          <div className="space-y-0.5 text-[9px]">
+                            {/* CITAS */}
+                            {citasSlot.map((c, i) => (
+                              <div
+                                key={`cita-${i}`}
+                                className="rounded p-1 bg-white border border-slate-200 cursor-pointer hover:shadow-sm transition-shadow truncate"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openCita(c);
+                                }}
+                                title={`${c.placa} - ${c.cliente}`}
+                              >
+                                <div
+                                  className="h-0.5 rounded-full mb-0.5"
+                                  style={{ background: c.color || "#5e17eb" }}
+                                />
+                                <div className="font-semibold truncate">{c.placa}</div>
+                                <div className="truncate">{c.cliente}</div>
+                              </div>
+                            ))}
+
+                            {/* OPORTUNIDADES */}
+                            {oportunidadesSlot.map((o) => {
+                              const tipo = getTipoCodigo(o.oportunidad_id);
+                              const minutosRestantes = getMinutosRestantes(
+                                o.fecha_agenda,
+                                o.hora_agenda
+                              );
+                              const colorTiempo = getColorEstadoTiempo(
+                                minutosRestantes,
+                                o.etapasconversionpv_id
+                              );
+
+                              return (
+                                <div
+                                  key={`${tipo}-${o.id}`}
+                                  className="rounded p-1 bg-white border border-slate-200 cursor-pointer hover:shadow-sm transition-shadow truncate"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedOportunidad(o);
+                                    setDialogType(tipo);
+                                    setOpenOportunidadDialog(true);
+                                  }}
+                                  title={`${o.oportunidad_id} - ${o.cliente_name}`}
+                                >
+                                  <div className="flex items-center justify-between gap-0.5">
+                                    <div className="font-semibold truncate flex items-center gap-0.5 flex-1">
+                                      {o.oportunidad_id}
+                                      <CalendarClock
+                                        className="w-2 h-2 flex-shrink-0"
+                                        style={{ color: colorTiempo }}
+                                      />
+                                    </div>
+                                    <span className="text-[8px] font-bold bg-slate-100 px-0.5 rounded">
+                                      {tipo === "ld" ? "LD" : "OP"}
+                                    </span>
+                                  </div>
+                                  <div className="truncate text-[8px]">{o.cliente_name || "Sin cliente"}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* CONTEXT MENU */}
+                          {menuCell &&
+                            menuCell.day === dayString &&
+                            menuCell.hour === h && (
+                              <div
+                                ref={menuRef}
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute z-50 bg-white border border-slate-300 rounded shadow-lg p-1 top-1 left-1 w-32 space-y-0.5"
+                              >
+                                <button
+                                  className="block w-full text-left hover:bg-slate-100 px-2 py-1 rounded text-xs font-medium transition-colors"
+                                  onClick={() => {
+                                    window.location.href = "/citas/nueva";
+                                  }}
+                                >
+                                  Nueva cita
+                                </button>
+
+                                <button
+                                  className="block w-full text-left hover:bg-slate-100 px-2 py-1 rounded text-xs font-medium transition-colors"
+                                  onClick={() => {
+                                    setSelectedOportunidad(null);
+                                    setDialogType("op");
+                                    setDialogDefaults({
+                                      fecha: dayString,
+                                      hora: h,
+                                      oportunidadPadreId: "",
+                                    });
+                                    setMenuCell(null);
+                                    setOpenOportunidadDialog(true);
+                                  }}
+                                >
+                                  Nueva oportunidad
+                                </button>
+
+                                <button
+                                  className="block w-full text-left hover:bg-slate-100 px-2 py-1 rounded text-xs font-medium transition-colors"
+                                  onClick={() => {
+                                    setMenuCell(null);
+                                    setSelectedAbsence(null);
+                                    setOpenAbsence(true);
+                                  }}
+                                >
+                                  Agendar ausencia
+                                </button>
+                              </div>
+                            )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 
-        {canShowGrid && renderMesView()}
-
+        {/* DIALOGS */}
         <UserAbsenceDialog
           key={selectedAbsence?.id || "new"}
           open={openAbsence}
@@ -873,381 +1175,6 @@ export default function CitasPage() {
           onDelete={eliminarAusencia}
         />
       </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      {/* HEADER */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <span className="font-semibold">
-          {format(days[0], "dd MMM", { locale: es })} -{" "}
-          {format(days[6], "dd MMM", { locale: es })}
-        </span>
-
-        <Button
-          size="icon"
-          onClick={() => setWeekStart(subWeeks(weekStart, 1))}
-        >
-          <ChevronLeft />
-        </Button>
-
-        <Button
-          size="icon"
-          onClick={() => setWeekStart(addWeeks(weekStart, 1))}
-        >
-          <ChevronRight />
-        </Button>
-
-        <Button
-          onClick={() =>
-            setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))
-          }
-        >
-          Hoy
-        </Button>
-
-        <Select value={vistaFiltro} onValueChange={setVistaFiltro}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Vista" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="semana">Por semana</SelectItem>
-            <SelectItem value="mes">Por mes</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={centroId ? String(centroId) : ""}
-          onValueChange={(v) => setCentroId(Number(v))}
-          disabled={scopeLoading || centros.length === 0}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Centro" />
-          </SelectTrigger>
-          <SelectContent>
-            {centros.map((c) => (
-              <SelectItem key={c.id} value={String(c.id)}>
-                {c.nombre || c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={asesorFiltro} onValueChange={setAsesorFiltro}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Asesor" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            {asesores.map((a) => (
-              <SelectItem key={a.id} value={String(a.id)}>
-                {a.fullname}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={estadoFiltro} onValueChange={setEstadoFiltro}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Estado" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="confirmada">Confirmada</SelectItem>
-            <SelectItem value="pendiente">Pendiente</SelectItem>
-            <SelectItem value="cancelada">Cancelada</SelectItem>
-            <SelectItem value="reprogramada">Reprogramada</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <div className="flex items-center gap-2 border rounded-md p-1">
-          <Button
-            type="button"
-            variant={tipoFiltro === "all" ? "default" : "ghost"}
-            onClick={() => setTipoFiltro("all")}
-          >
-            Todos
-          </Button>
-
-          <Button
-            type="button"
-            variant={tipoFiltro === "op" ? "default" : "ghost"}
-            onClick={() => setTipoFiltro("op")}
-          >
-            OP
-          </Button>
-
-          <Button
-            type="button"
-            variant={tipoFiltro === "ld" ? "default" : "ghost"}
-            onClick={() => setTipoFiltro("ld")}
-          >
-            LD
-          </Button>
-        </div>
-
-        <div className="flex gap-2">
-          <Button
-            onClick={() => (window.location.href = "/citas/nueva")}
-            disabled={!centroId}
-          >
-            <Calendar className="w-4 h-4 mr-2" />
-            Nueva cita
-          </Button>
-
-          <Button
-            onClick={() => {
-              setSelectedOportunidad(null);
-              setDialogType("op");
-              setDialogDefaults({
-                fecha: format(new Date(), "yyyy-MM-dd"),
-                hora: "",
-                oportunidadPadreId: "",
-              });
-              setOpenOportunidadDialog(true);
-            }}
-            disabled={!centroId}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Nueva oportunidad
-          </Button>
-
-          <Button variant="outline" onClick={() => setOpenAbsences(true)} disabled={!centroId}>
-            Ver ausencias
-          </Button>
-        </div>
-      </div>
-
-      {!scopeLoading && centros.length === 0 && (
-        <div className="border rounded-md p-4 text-sm text-muted-foreground">
-          No tienes centros asignados.
-        </div>
-      )}
-
-      {/* GRID */}
-      {canShowGrid && (
-        <div className="border rounded overflow-hidden">
-          {/* DIAS */}
-          <div className="grid grid-cols-[80px_repeat(7,1fr)]">
-            <div />
-            {days.map((d) => (
-              <div key={d.toISOString()} className="p-2 text-center font-medium border-l">
-                {format(d, "EEEE dd", { locale: es })}
-              </div>
-            ))}
-          </div>
-
-          {/* HORAS */}
-          {slots.map((h) => (
-            <div key={h} className="grid grid-cols-[80px_repeat(7,1fr)]">
-              <div className="border-t p-2 text-sm text-gray-500">{h}</div>
-
-              {days.map((d) => {
-                const citasSlot = getCitas(d, h);
-                const oportunidadesSlot = getOportunidades(d, h);
-                const blocked = !enabled(d, h) || past(d, h);
-                const dayString = format(d, "yyyy-MM-dd");
-
-                return (
-                  <div
-                    key={`${dayString}-${h}`}
-                    className={`border-t border-l h-24 relative ${
-                      blocked
-                        ? "bg-gray-100 cursor-not-allowed"
-                        : "hover:bg-[#5e17eb]/10 cursor-pointer"
-                    }`}
-                    onClick={(e) => {
-                      if (blocked) return;
-                      if (citasSlot.length) return openCita(citasSlot[0]);
-                      if (oportunidadesSlot.length) {
-                        const o = oportunidadesSlot[0];
-                        setSelectedOportunidad(o);
-                        setDialogType(getTipoCodigo(o.oportunidad_id));
-                        setOpenOportunidadDialog(true);
-                        return;
-                      }
-                      openMenu(d, h, e);
-                    }}
-                  >
-                    <div className="absolute inset-1 overflow-auto space-y-1">
-                      {/* CITAS */}
-                      {citasSlot.map((c, i) => (
-                        <div
-                          key={`cita-${i}`}
-                          className="rounded shadow border text-[10px] p-1 overflow-hidden bg-white cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openCita(c);
-                          }}
-                        >
-                          <div
-                            className="h-1 mb-1 rounded"
-                            style={{ background: c.color || "#5e17eb" }}
-                          />
-                          <div className="font-semibold">{c.placa}</div>
-                          <div className="truncate">{c.cliente}</div>
-                          <div className="truncate">{c.asesor}</div>
-                          <div className="text-[9px]">{c.estado}</div>
-                        </div>
-                      ))}
-
-                      {/* OPORTUNIDADES */}
-                      {oportunidadesSlot.map((o) => {
-                        const tipo = getTipoCodigo(o.oportunidad_id);
-                        const minutosRestantes = getMinutosRestantes(
-                          o.fecha_agenda,
-                          o.hora_agenda
-                        );
-                        const colorTiempo = getColorEstadoTiempo(
-                          minutosRestantes,
-                          o.etapasconversionpv_id
-                        );
-
-                        return (
-                          <div
-                            key={`${tipo}-${o.id}`}
-                            className="rounded shadow border text-[10px] p-1 overflow-hidden bg-white cursor-pointer"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedOportunidad(o);
-                              setDialogType(tipo);
-                              setOpenOportunidadDialog(true);
-                            }}
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="font-semibold flex items-center gap-1">
-                                {o.oportunidad_id || "Registro"}
-                                <CalendarClock
-                                  className="w-3 h-3 inline-block"
-                                  style={{ color: colorTiempo }}
-                                />
-                              </div>
-                              <span className="text-[9px] font-semibold uppercase">
-                                {tipo === "ld" ? "LD" : "OP"}
-                              </span>
-                            </div>
-
-                            <div className="truncate">
-                              {o.cliente_name || "Sin cliente"}
-                            </div>
-
-                            <div className="truncate">
-                              {o.marca_name || ""}
-                              {o.marca_name && o.modelo_name ? " - " : ""}
-                              {o.modelo_name || ""}
-                            </div>
-
-                            <div className="truncate">
-                              {o.etapa_name || o.origen_name || "-"}
-                            </div>
-
-                            <div className="text-[9px]">
-                              {String(o.hora_agenda || "").slice(0, 8)}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* MENU */}
-                    {menuCell &&
-                      menuCell.day === dayString &&
-                      menuCell.hour === h && (
-                        <div
-                          ref={menuRef}
-                          onClick={(e) => e.stopPropagation()}
-                          className="absolute z-10 bg-white border rounded shadow p-2 top-2 left-2 w-48 space-y-1"
-                        >
-                          <button
-                            className="block w-full text-left hover:bg-gray-100 px-2 py-1 rounded text-sm"
-                            onClick={() => {
-                              window.location.href = "/citas/nueva";
-                            }}
-                          >
-                            Nueva cita
-                          </button>
-
-                          <button
-                            className="block w-full text-left hover:bg-gray-100 px-2 py-1 rounded text-sm"
-                            onClick={() => {
-                              setSelectedOportunidad(null);
-                              setDialogType("op");
-                              setDialogDefaults({
-                                fecha: dayString,
-                                hora: h,
-                                oportunidadPadreId: "",
-                              });
-                              setMenuCell(null);
-                              setOpenOportunidadDialog(true);
-                            }}
-                          >
-                            Nueva oportunidad
-                          </button>
-
-                          <button
-                            className="block w-full text-left hover:bg-gray-100 px-2 py-1 rounded text-sm"
-                            onClick={() => {
-                              setMenuCell(null);
-                              setSelectedAbsence(null);
-                              setOpenAbsence(true);
-                            }}
-                          >
-                            Agendar ausencia
-                          </button>
-                        </div>
-                      )}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      )}
-
-      <UserAbsenceDialog
-        key={selectedAbsence?.id || "new"}
-        open={openAbsence}
-        onOpenChange={(v) => {
-          setOpenAbsence(v);
-          if (!v) setSelectedAbsence(null);
-        }}
-        fullname="Oscar"
-        absence={selectedAbsence}
-        onSaved={loadAusencias}
-      />
-
-      <CitaResumenDialog
-        open={openResumen}
-        onOpenChange={(v) => {
-          setOpenResumen(v);
-          if (!v) setSelectedCita(null);
-        }}
-        cita={selectedCita}
-      />
-
-      <OportunidadDialog
-        open={openOportunidadDialog}
-        onOpenChange={setOpenOportunidadDialog}
-        defaultFecha={dialogDefaults.fecha}
-        defaultHora={dialogDefaults.hora}
-        oportunidadPadreId={dialogDefaults.oportunidadPadreId}
-        oportunidad={selectedOportunidad}
-        recordType={dialogType}
-        onSuccess={() => {
-          setOpenOportunidadDialog(false);
-          setSelectedOportunidad(null);
-          loadOportunidades();
-        }}
-      />
-
-      <AbsencesSheet
-        open={openAbsences}
-        onOpenChange={setOpenAbsences}
-        ausencias={ausencias}
-        onEdit={editarAusencia}
-        onDelete={eliminarAusencia}
-      />
-    </div>
+    </TooltipProvider>
   );
 }
