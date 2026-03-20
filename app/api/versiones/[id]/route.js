@@ -1,64 +1,20 @@
+import { NextResponse } from "next/server";
+import { db } from "@/lib/db";
 
-// ============================================
-// API DE VERSIONES - ID
-// archivo: app/api/versiones/[id]/route.js
-// ============================================
-
-export async function GET_ID(req, { params }) {
-  try {
-    const { id } = params;
-
-    if (!id || isNaN(id)) {
-      return NextResponse.json(
-        { message: "ID de versión inválido" },
-        { status: 400 }
-      );
-    }
-
-    const [rows] = await db.query("SELECT * FROM versiones WHERE id = ?", [id]);
-
-    if (rows.length === 0) {
-      return NextResponse.json(
-        { message: "Versión no encontrada" },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json(rows[0]);
-  } catch (error) {
-    console.error("GET /api/versiones/[id] error:", error);
-    return NextResponse.json(
-      { message: "Error al obtener versión", error: error.message },
-      { status: 500 }
-    );
-  }
-}
-
-// ============================================
-// PUT: Actualizar versión
-// ============================================
 export async function PUT(req, { params }) {
   try {
-    const { id } = params;
-    const body = await req.json();
-    const { nombre, descripcion } = body;
-
-    if (!id || isNaN(id)) {
-      return NextResponse.json(
-        { message: "ID de versión inválido" },
-        { status: 400 }
-      );
-    }
+    const { id } = await params;
+    const { nombre, descripcion } = await req.json();
 
     // Validaciones
-    if (!nombre || nombre.trim() === "") {
+    if (!nombre || !nombre.trim()) {
       return NextResponse.json(
-        { message: "El nombre de la versión es obligatorio" },
+        { message: "El nombre es requerido" },
         { status: 400 }
       );
     }
 
-    // Verificar que existe
+    // Verificar que la versión existe
     const [existing] = await db.query(
       "SELECT id FROM versiones WHERE id = ?",
       [id]
@@ -71,7 +27,7 @@ export async function PUT(req, { params }) {
       );
     }
 
-    // Verificar que no exista otro con el mismo nombre
+    // Verificar que no exista otra versión con el mismo nombre
     const [duplicate] = await db.query(
       "SELECT id FROM versiones WHERE nombre = ? AND id != ?",
       [nombre.trim(), id]
@@ -80,45 +36,38 @@ export async function PUT(req, { params }) {
     if (duplicate.length > 0) {
       return NextResponse.json(
         { message: "Ya existe otra versión con este nombre" },
-        { status: 409 }
+        { status: 400 }
       );
     }
 
+    // Actualizar versión
     await db.query(
       "UPDATE versiones SET nombre = ?, descripcion = ? WHERE id = ?",
-      [nombre.trim(), descripcion || null, id]
+      [nombre.trim(), descripcion?.trim() || null, id]
     );
 
     return NextResponse.json({
       message: "Versión actualizada exitosamente",
-      id,
-      nombre,
-      descripcion,
+      data: {
+        id,
+        nombre: nombre.trim(),
+        descripcion: descripcion?.trim() || null,
+      },
     });
-  } catch (error) {
-    console.error("PUT /api/versiones/[id] error:", error);
+  } catch (e) {
+    console.error("Error updating versión:", e);
     return NextResponse.json(
-      { message: "Error al actualizar versión", error: error.message },
+      { message: "Error al actualizar versión" },
       { status: 500 }
     );
   }
 }
 
-// ============================================
-// DELETE: Eliminar versión
-// ============================================
 export async function DELETE(req, { params }) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
-    if (!id || isNaN(id)) {
-      return NextResponse.json(
-        { message: "ID de versión inválido" },
-        { status: 400 }
-      );
-    }
-
-    // Verificar que existe
+    // Verificar que la versión existe
     const [existing] = await db.query(
       "SELECT id, nombre FROM versiones WHERE id = ?",
       [id]
@@ -131,48 +80,33 @@ export async function DELETE(req, { params }) {
       );
     }
 
-    // Verificar si está siendo usada en otras tablas
-    const [modeloVersiones] = await db.query(
-      "SELECT COUNT(*) as count FROM modelo_versiones WHERE nombre_version = (SELECT nombre FROM versiones WHERE id = ?)",
+    // Verificar si la versión está siendo usada en otras tablas
+    // Ajusta esto según tu estructura de BD
+    const [used] = await db.query(
+      "SELECT COUNT(*) as count FROM camionetas WHERE version_id = ?",
       [id]
     );
 
-    if (modeloVersiones[0]?.count > 0) {
+    if (used[0]?.count > 0) {
       return NextResponse.json(
         {
-          message:
-            "No se puede eliminar. Esta versión está siendo usada en modelos de vehículos",
+          message: `No se puede eliminar: esta versión está siendo usada en ${used[0].count} camioneta(s)`,
         },
-        { status: 409 }
+        { status: 400 }
       );
     }
 
-    const [promocionesVersiones] = await db.query(
-      "SELECT COUNT(*) as count FROM promociones_versiones WHERE version_id = ?",
-      [id]
-    );
-
-    if (promocionesVersiones[0]?.count > 0) {
-      return NextResponse.json(
-        {
-          message:
-            "No se puede eliminar. Esta versión está siendo usada en promociones",
-        },
-        { status: 409 }
-      );
-    }
-
+    // Eliminar versión
     await db.query("DELETE FROM versiones WHERE id = ?", [id]);
 
     return NextResponse.json({
       message: "Versión eliminada exitosamente",
-      id,
-      nombre: existing[0].nombre,
+      data: { id, nombre: existing[0].nombre },
     });
-  } catch (error) {
-    console.error("DELETE /api/versiones/[id] error:", error);
+  } catch (e) {
+    console.error("Error deleting versión:", e);
     return NextResponse.json(
-      { message: "Error al eliminar versión", error: error.message },
+      { message: "Error al eliminar versión" },
       { status: 500 }
     );
   }

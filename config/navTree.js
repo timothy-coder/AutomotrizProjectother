@@ -99,7 +99,6 @@ export const NAV_TREE = [
       { to: "/configagenda", label: "Configuración de Agenda", icon: Settings, perm: ["configagenda", "view"] },
       { to: "/configcotizacion", label: "Configuración de Citas", icon: Settings, perm: ["configcotizacion", "view"] },
       { to: "/configinventario", label: "Configuración de Inventario", icon: Settings, perm: ["configinventario", "view"] },
-      { to: "/configpicaje", label: "Configuración de Picaje", icon: Settings, perm: ["configpicaje", "view"] },
       
     ],
   }

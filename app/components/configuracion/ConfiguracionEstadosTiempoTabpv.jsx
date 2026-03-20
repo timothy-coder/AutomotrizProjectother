@@ -11,11 +11,33 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
-import { Pencil, Trash2, Plus, AlertTriangle, Loader2 } from "lucide-react";
+import {
+  Pencil,
+  Trash2,
+  Plus,
+  AlertTriangle,
+  Loader2,
+  Info,
+  Clock,
+  Palette,
+  calendarRange,
+  FileText,
+  CheckCircle,
+  TrendingUp,
+  Copy,
+} from "lucide-react";
 
 export default function ConfiguracionEstadosTiempoTabpv() {
   const [rows, setRows] = useState([]);
@@ -234,175 +256,536 @@ export default function ConfiguracionEstadosTiempoTabpv() {
   }
 
   const sorted = useMemo(() => {
-    return [...rows].sort((a, b) => Number(a.minutos_desde) - Number(b.minutos_desde));
+    return [...rows].sort(
+      (a, b) => Number(a.minutos_desde) - Number(b.minutos_desde)
+    );
   }, [rows]);
 
+  const stats = useMemo(() => {
+    return {
+      total: rows.length,
+      minRange: sorted.length > 0 ? sorted[0].minutos_desde : 0,
+      maxRange: sorted.length > 0 ? sorted[sorted.length - 1].minutos_hasta : 0,
+    };
+  }, [sorted, rows]);
+
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle>Configuración de Estados de Tiempo</CardTitle>
+    <TooltipProvider delayDuration={200}>
+      <div className="space-y-6 pb-8">
+        {/* HEADER ESTADÍSTICAS */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 cursor-help shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-blue-600 font-medium">
+                        Total Estados
+                      </p>
+                      <p className="text-3xl font-bold text-blue-900 mt-2">
+                        {stats.total}
+                      </p>
+                    </div>
+                    <Clock className="h-12 w-12 text-blue-200" />
+                  </div>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              Cantidad total de estados configurados
+            </TooltipContent>
+          </Tooltip>
 
-        <Button onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-2" />
-          Agregar
-        </Button>
-      </CardHeader>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 cursor-help shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-green-600 font-medium">
+                        Rango Mínimo
+                      </p>
+                      <p className="text-3xl font-bold text-green-900 mt-2">
+                        {stats.minRange}
+                      </p>
+                      <p className="text-xs text-green-600 mt-1">minutos</p>
+                    </div>
+                    <TrendingUp className="h-12 w-12 text-green-200" />
+                  </div>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              Inicio del rango de tiempo más bajo
+            </TooltipContent>
+          </Tooltip>
 
-      <CardContent>
-        {loading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground py-8">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Cargando...
-          </div>
-        ) : sorted.length === 0 ? (
-          <div className="text-sm text-muted-foreground py-8">
-            No hay registros.
-          </div>
-        ) : (
-          <div className="w-full overflow-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-2">ID</th>
-                  <th className="text-left p-2">Nombre</th>
-                  <th className="text-left p-2">Estado</th>
-                  <th className="text-left p-2">Minutos Desde</th>
-                  <th className="text-left p-2">Minutos Hasta</th>
-                  <th className="text-left p-2">Color</th>
-                  <th className="text-left p-2">Descripción</th>
-                  <th className="text-right p-2">Acciones</th>
-                </tr>
-              </thead>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 cursor-help shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-purple-600 font-medium">
+                        Rango Máximo
+                      </p>
+                      <p className="text-3xl font-bold text-purple-900 mt-2">
+                        {stats.maxRange}
+                      </p>
+                      <p className="text-xs text-purple-600 mt-1">minutos</p>
+                    </div>
+                    <calendarRange className="h-12 w-12 text-purple-200" />
+                  </div>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              Fin del rango de tiempo más alto
+            </TooltipContent>
+          </Tooltip>
+        </div>
 
-              <tbody>
-                {sorted.map((item) => (
-                  <tr key={item.id} className="border-b">
-                    <td className="p-2">{item.id}</td>
-                    <td className="p-2">{item.nombre}</td>
-                    <td className="p-2">
-                      <span className="px-2 py-1 bg-gray-100 rounded text-xs font-medium">
-                        {item.estado}
-                      </span>
-                    </td>
-                    <td className="p-2">{item.minutos_desde}</td>
-                    <td className="p-2">{item.minutos_hasta}</td>
-                    <td className="p-2">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-6 h-6 rounded border"
-                          style={{ backgroundColor: item.color_hexadecimal }}
-                          title={item.color_hexadecimal}
-                        />
-                        <span className="text-xs">{item.color_hexadecimal}</span>
-                      </div>
-                    </td>
-                    <td className="p-2 text-xs text-muted-foreground">
-                      {item.descripcion || "-"}
-                    </td>
-                    <td className="p-2">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openEdit(item)}
-                        >
-                          <Pencil className="h-4 w-4 mr-2" />
-                          Editar
-                        </Button>
+        {/* MAIN CARD */}
+        <Card className="border-l-4 border-l-blue-500 shadow-lg overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg shadow-md">
+                <Clock className="h-6 w-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <CardTitle className="text-lg font-bold text-gray-900">
+                  Estados de Tiempo
+                </CardTitle>
+                <p className="text-sm text-gray-600 mt-1">
+                  Gestiona los estados y rangos de tiempo para el seguimiento
+                </p>
+              </div>
+            </div>
 
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() =>
-                            setDeleteDialog({ open: true, item })
-                          }
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Eliminar
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="flex flex-wrap gap-2 pt-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={openCreate}
+                    className="bg-blue-600 hover:bg-blue-700 text-white shadow-md gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Nuevo Estado
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  Crear nuevo estado de tiempo
+                </TooltipContent>
+              </Tooltip>
+
+              <Badge variant="secondary" className="bg-blue-100 text-blue-900 border-blue-300">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                {stats.total} registros
+              </Badge>
+            </div>
+          </CardHeader>
+
+          <CardContent className="pt-6">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center gap-3 py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                <p className="text-sm text-gray-600">Cargando configuración...</p>
+              </div>
+            ) : sorted.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="p-4 bg-gray-100 rounded-full mb-3">
+                  <Clock className="h-8 w-8 text-gray-400" />
+                </div>
+                <p className="text-sm text-gray-600 font-medium">
+                  No hay registros configurados
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Crea el primero haciendo clic en "Nuevo Estado"
+                </p>
+              </div>
+            ) : (
+              <div className="w-full overflow-x-auto rounded-lg border border-gray-200">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b-2 border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <th className="text-left p-3 font-semibold text-gray-700 cursor-help">
+                            ID
+                          </th>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          Identificador único del registro
+                        </TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <th className="text-left p-3 font-semibold text-gray-700 cursor-help">
+                            Nombre
+                          </th>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          Nombre descriptivo del estado
+                        </TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <th className="text-left p-3 font-semibold text-gray-700 cursor-help">
+                            Estado
+                          </th>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          Identificador del estado (verde, amarillo, rojo)
+                        </TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <th className="text-left p-3 font-semibold text-gray-700 cursor-help">
+                            Desde (min)
+                          </th>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          Rango mínimo en minutos
+                        </TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <th className="text-left p-3 font-semibold text-gray-700 cursor-help">
+                            Hasta (min)
+                          </th>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          Rango máximo en minutos
+                        </TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <th className="text-left p-3 font-semibold text-gray-700 cursor-help">
+                            Color
+                          </th>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          Color hexadecimal de representación
+                        </TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <th className="text-left p-3 font-semibold text-gray-700 cursor-help">
+                            Descripción
+                          </th>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          Detalles adicionales sobre el estado
+                        </TooltipContent>
+                      </Tooltip>
+
+                      <th className="text-right p-3 font-semibold text-gray-700">
+                        Acciones
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {sorted.map((item, idx) => (
+                      <tr
+                        key={item.id}
+                        className={`border-b hover:bg-blue-50 transition-colors ${
+                          idx % 2 === 0 ? "bg-white" : "bg-gray-50"
+                        }`}
+                      >
+                        <td className="p-3">
+                          <Badge variant="outline" className="text-xs font-mono">
+                            {item.id}
+                          </Badge>
+                        </td>
+                        <td className="p-3 font-medium text-gray-900">
+                          {item.nombre}
+                        </td>
+                        <td className="p-3">
+                          <Badge className="bg-blue-100 text-blue-900 hover:bg-blue-200 border border-blue-300">
+                            {item.estado}
+                          </Badge>
+                        </td>
+                        <td className="p-3">
+                          <span className="text-gray-900 font-semibold">
+                            {item.minutos_desde}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <span className="text-gray-900 font-semibold">
+                            {item.minutos_hasta}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center gap-2 cursor-help">
+                                <div
+                                  className="w-7 h-7 rounded-lg border-2 border-gray-300 shadow-sm hover:shadow-md transition-shadow"
+                                  style={{
+                                    backgroundColor: item.color_hexadecimal,
+                                  }}
+                                />
+                                <span className="text-xs font-mono text-gray-600">
+                                  {item.color_hexadecimal}
+                                </span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              {item.color_hexadecimal}
+                            </TooltipContent>
+                          </Tooltip>
+                        </td>
+                        <td className="p-3 text-xs text-gray-600">
+                          {item.descripcion ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="cursor-help truncate block max-w-xs line-clamp-2">
+                                  {item.descripcion}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs">
+                                {item.descripcion}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          <div className="flex justify-end gap-2">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openEdit(item)}
+                                  className="border-amber-300 text-amber-700 hover:bg-amber-50 hover:border-amber-400 gap-1"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                  <span className="hidden sm:inline">Editar</span>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">
+                                Editar este estado
+                              </TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() =>
+                                    setDeleteDialog({ open: true, item })
+                                  }
+                                  className="gap-1"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  <span className="hidden sm:inline">Eliminar</span>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">
+                                Eliminar este estado
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* INFO BOX */}
+        {!loading && sorted.length > 0 && (
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex gap-3">
+            <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-blue-700 space-y-1">
+              <p className="font-semibold">Información importante:</p>
+              <ul className="list-disc list-inside space-y-1 text-xs">
+                <li>Los estados se ordenan automáticamente por minutos desde</li>
+                <li>Los rangos no deben solaparse para evitar conflictos</li>
+                <li>El color se usa para identificación visual en reportes</li>
+                <li>Eliminar un estado puede afectar datos históricos</li>
+              </ul>
+            </div>
           </div>
         )}
-      </CardContent>
+      </div>
 
+      {/* DIALOG CREATE/EDIT */}
       <Dialog open={dialog.open} onOpenChange={closeDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              {dialog.mode === "edit"
-                ? "Editar estado de tiempo"
-                : "Nuevo estado de tiempo"}
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              {dialog.mode === "edit" ? (
+                <>
+                  <Pencil className="h-5 w-5 text-blue-600" />
+                  Editar Estado
+                </>
+              ) : (
+                <>
+                  <Plus className="h-5 w-5 text-blue-600" />
+                  Nuevo Estado
+                </>
+              )}
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Nombre */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Nombre *</label>
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-semibold text-gray-700">
+                  Nombre
+                </label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-4 w-4 text-gray-400 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    Nombre descriptivo (ej: Tiempo Suficiente)
+                  </TooltipContent>
+                </Tooltip>
+                <span className="text-red-500">*</span>
+              </div>
               <Input
                 value={form.nombre}
-                onChange={(e) =>
-                  setForm({ ...form, nombre: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, nombre: e.target.value })}
                 placeholder="Ej: Tiempo suficiente"
+                disabled={saving}
+                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
 
+            {/* Estado */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Estado *</label>
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-semibold text-gray-700">
+                  Estado
+                </label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-4 w-4 text-gray-400 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    Código (ej: verde, amarillo, rojo)
+                  </TooltipContent>
+                </Tooltip>
+                <span className="text-red-500">*</span>
+              </div>
               <Input
                 value={form.estado}
-                onChange={(e) =>
-                  setForm({ ...form, estado: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, estado: e.target.value })}
                 placeholder="Ej: verde"
+                disabled={saving}
+                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
 
+            {/* Rango de Minutos */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Minutos Desde *</label>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-semibold text-gray-700">
+                    Desde
+                  </label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-gray-400 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      Minuto inicial del rango
+                    </TooltipContent>
+                  </Tooltip>
+                  <span className="text-red-500">*</span>
+                </div>
                 <Input
                   type="number"
                   value={form.minutos_desde}
                   onChange={(e) =>
                     setForm({ ...form, minutos_desde: e.target.value })
                   }
-                  placeholder="Ej: 15"
+                  placeholder="0"
+                  disabled={saving}
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Minutos Hasta *</label>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-semibold text-gray-700">
+                    Hasta
+                  </label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-gray-400 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      Minuto final del rango
+                    </TooltipContent>
+                  </Tooltip>
+                  <span className="text-red-500">*</span>
+                </div>
                 <Input
                   type="number"
                   value={form.minutos_hasta}
                   onChange={(e) =>
                     setForm({ ...form, minutos_hasta: e.target.value })
                   }
-                  placeholder="Ej: 999999"
+                  placeholder="999999"
+                  disabled={saving}
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                 />
               </div>
             </div>
 
+            {/* Color */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Color Hexadecimal *</label>
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-semibold text-gray-700">
+                  Color
+                </label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-4 w-4 text-gray-400 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    Selecciona o ingresa código hexadecimal
+                  </TooltipContent>
+                </Tooltip>
+                <span className="text-red-500">*</span>
+              </div>
               <div className="flex gap-2">
-                <Input
-                  type="color"
-                  value={form.color_hexadecimal}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      color_hexadecimal: e.target.value,
-                    })
-                  }
-                  className="h-10 w-20 cursor-pointer"
-                />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Input
+                      type="color"
+                      value={form.color_hexadecimal}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          color_hexadecimal: e.target.value,
+                        })
+                      }
+                      disabled={saving}
+                      className="h-10 w-16 cursor-pointer border-gray-300 rounded"
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Selector de color</TooltipContent>
+                </Tooltip>
+
                 <Input
                   value={form.color_hexadecimal}
                   onChange={(e) =>
@@ -412,68 +795,110 @@ export default function ConfiguracionEstadosTiempoTabpv() {
                     })
                   }
                   placeholder="#28a745"
+                  disabled={saving}
+                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 font-mono text-sm"
                 />
               </div>
             </div>
 
+            {/* Descripción */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Descripción</label>
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-semibold text-gray-700">
+                  Descripción
+                </label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-4 w-4 text-gray-400 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    Opcional: detalles adicionales
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               <Input
                 value={form.descripcion}
                 onChange={(e) =>
                   setForm({ ...form, descripcion: e.target.value })
                 }
-                placeholder="Ej: Más de 15 minutos antes de la hora agendada"
+                placeholder="Ej: Más de 15 minutos antes..."
+                disabled={saving}
+                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
           </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="gap-2 pt-4">
             <Button
               variant="outline"
               onClick={() => closeDialog(false)}
               disabled={saving}
+              className="border-gray-300"
             >
               Cancelar
             </Button>
-            <Button onClick={save} disabled={saving}>
+            <Button
+              onClick={save}
+              disabled={saving}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
               {saving ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Guardando
                 </>
               ) : (
-                "Guardar"
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Guardar
+                </>
               )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* DELETE DIALOG */}
       <Dialog open={deleteDialog.open} onOpenChange={closeDeleteDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 text-red-600">
               <AlertTriangle className="h-5 w-5" />
               Confirmar eliminación
             </DialogTitle>
           </DialogHeader>
 
-          <div className="text-sm text-muted-foreground">
-            ¿Seguro que deseas eliminar este registro?
-            <div className="mt-2 space-y-1">
-              <div>
-                <b>ID:</b> {deleteDialog.item?.id ?? "-"}
+          <div className="space-y-4 py-4">
+            <div className="p-4 bg-red-50 border-l-4 border-l-red-500 rounded-lg">
+              <p className="text-sm text-red-900 font-semibold">
+                ¿Estás seguro de que deseas eliminar este registro?
+              </p>
+              <p className="text-xs text-red-700 mt-2">
+                ⚠️ Esta acción no se puede deshacer.
+              </p>
+            </div>
+
+            <div className="space-y-3 text-sm bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-gray-700">ID:</span>
+                <Badge variant="outline">{deleteDialog.item?.id ?? "-"}</Badge>
               </div>
-              <div>
-                <b>Nombre:</b> {deleteDialog.item?.nombre ?? "-"}
+              <div className="flex justify-between">
+                <span className="font-semibold text-gray-700">Nombre:</span>
+                <span className="text-gray-900">{deleteDialog.item?.nombre ?? "-"}</span>
               </div>
-              <div>
-                <b>Estado:</b> {deleteDialog.item?.estado ?? "-"}
+              <div className="flex justify-between">
+                <span className="font-semibold text-gray-700">Estado:</span>
+                <Badge className="bg-blue-100 text-blue-900">
+                  {deleteDialog.item?.estado ?? "-"}
+                </Badge>
               </div>
-              <div>
-                <b>Minutos:</b> {deleteDialog.item?.minutos_desde ?? "-"} a{" "}
-                {deleteDialog.item?.minutos_hasta ?? "-"}
+              <div className="flex justify-between">
+                <span className="font-semibold text-gray-700">Rango:</span>
+                <span className="text-gray-900 font-mono">
+                  {deleteDialog.item?.minutos_desde ?? "-"}-
+                  {deleteDialog.item?.minutos_hasta ?? "-"} min
+                </span>
               </div>
             </div>
           </div>
@@ -483,6 +908,7 @@ export default function ConfiguracionEstadosTiempoTabpv() {
               variant="outline"
               onClick={() => closeDeleteDialog(false)}
               disabled={deleting}
+              className="border-gray-300"
             >
               Cancelar
             </Button>
@@ -490,6 +916,7 @@ export default function ConfiguracionEstadosTiempoTabpv() {
               variant="destructive"
               onClick={confirmDelete}
               disabled={deleting}
+              className="bg-red-600 hover:bg-red-700"
             >
               {deleting ? (
                 <>
@@ -497,12 +924,15 @@ export default function ConfiguracionEstadosTiempoTabpv() {
                   Eliminando
                 </>
               ) : (
-                "Eliminar"
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Eliminar
+                </>
               )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </TooltipProvider>
   );
 }

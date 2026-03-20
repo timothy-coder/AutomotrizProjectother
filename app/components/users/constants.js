@@ -26,10 +26,7 @@ export const SECTIONS = [
   { key: "leadspv", label: "Leads PV", actions: ["view", "create", "edit", "asignar", "asignar"] },
   { key: "oportunidadespv", label: "Oportunidades PV", actions: ["view", "create", "edit", "asignar"] },
   { key: "agenda", label: "Agenda", actions: ["view", "create", "edit", "viewall"] },
-  { key: "picaje", label: "Picaje", actions: ["view", "create", "edit", "delete"] },
-
   { key: "mensajes", label: "Mensajes", actions: ["view", "create", "edit", "delete"] },
-
   { key: "reportes", label: "Reportes", actions: ["view", "create", "edit", "delete"] },
   { key: "ordenes", label: "Órdenes", actions: ["view", "create", "edit", "delete"] },
   { key: "cotizacion", label: "Cotización", actions: ["view", "create", "edit", "delete"] },
@@ -37,7 +34,6 @@ export const SECTIONS = [
   { key: "configagenda", label: "Configuración de Agenda", actions: ["view", "create", "edit", "delete"] },
   { key: "leads", label: "Leads", actions: ["view", "create", "edit", "asignar", "asignar"] },
   { key: "oportunidades", label: "Oportunidades", actions: ["view", "create", "edit", "asignar"] },
-  { key: "configpicaje", label: "Configuración de Picaje", actions: ["view", "create", "edit", "delete"] },
   { key: "configinventario", label: "Configuración de Inventario", actions: ["view", "create", "edit", "delete"] },
   { key: "configcotizacion", label: "Configuración de Cotización", actions: ["view", "create", "edit", "delete"] }
 ];
