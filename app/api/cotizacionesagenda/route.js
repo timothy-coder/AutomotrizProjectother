@@ -1,5 +1,5 @@
 // ============================================
-// API DE COTIZACIONES AGENDA
+// API DE COTIZACIONES AGENDA - CORREGIDA
 // archivo: app/api/cotizacionesagenda/route.js
 // ============================================
 
@@ -20,7 +20,6 @@ export async function GET(req) {
         m.name as marca,
         mo.name as modelo,
         o.oportunidad_id as numero_oportunidad,
-        o.cliente_name,
         u.nombre as created_by_name
       FROM cotizacionesagenda ca
       INNER JOIN marcas m ON m.id = ca.marca_id

@@ -76,7 +76,7 @@ export default function Header({
 
         {/* ===== LOGO + TITULO ===== */}
         <div className="flex items-center gap-2">
-          <img src="/Logoarriba.png" className="h-7 w-7" />
+          <img src="/Logopreview.png" className="h-10 w-25" />
 
           <div className="leading-tight">
             <p className="text-sm font-semibold">Dashboard</p>

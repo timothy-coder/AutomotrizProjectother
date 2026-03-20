@@ -6,21 +6,32 @@ export const HOME_ITEM = { to: "/home", label: "Panel de Control", icon: Home, p
 export const NAV_TREE = [
   {
     key: "admin",
-    label: "Administración",
+    label: "Administración General",
     items: [
       { to: "/usuarios", label: "Usuarios", icon: Users, perm: ["usuarios", "view"] },
-      { to: "/etapas", label: "Etapas", icon: Milestone, perm: ["etapas", "view"] },
-      { to: "/tiposactividades", label: "Actividades", icon: ListChecks, perm: ["tiposactividades", "view"] },
       { to: "/clientes", label: "Clientes", icon: UserRound, perm: ["clientes", "view"] },
       { to: "/marcas", label: "Marcas", icon: Blinds, perm: ["marcas", "view"] },
+    ],
+  },
+  {
+    key: "ppventa",
+    label: "Inventario PostVenta",
+    items: [
       { to: "/combomantenimiento", label: "Mantenimiento", icon: Columns3, perm: ["combomantenimiento", "view"] },
       { to: "/precios", label: "Precios", icon: Coins, perm: ["precios", "view"] },
 
     ],
   },
   {
+    key: "pventa",
+    label: "Inventario Venta",
+    items: [
+      { to: "/carros", label: "Inventario de Carros", icon: Boxes, perm: ["inventariocarros", "view"] },
+    ],
+  },
+  {
     key: "citas",
-    label: "Citas",
+    label: "PostVenta",
     items: [
       { to: "/citas", label: "Citas", icon: Calendar, perm: ["citas", "view"] },
       { to: "/recepcion", label: "Recepción", icon: CalendarCheck, perm: ["recepcion", "view"] },
@@ -31,7 +42,7 @@ export const NAV_TREE = [
   },
   {
     key: "agenda",
-    label: "Agenda",
+    label: "Ventas",
     items: [
       { to: "/agenda", label: "Agenda", icon: Calendar, perm: ["agenda", "view"] },
       { to: "/oportunidades", label: "Oportunidades", icon: Calendar, perm: ["oportunidades", "view"] },
@@ -42,11 +53,10 @@ export const NAV_TREE = [
     key: "inventario",
     label: "Inventario",
     items: [{ to: "/inventario", label: "Inventario", icon: Boxes, perm: ["inventario", "view"] },],
-    items: [{ to: "/carros", label: "Inventario de Carros", icon: Boxes, perm: ["inventariocarros", "view"] },],
   },
   {
     key: "cotizacion",
-    label: "Cotizacion",
+    label: "Cotizacion Postventa",
     items: [{ to: "/cotizacion", label: "Cotizacion", icon: Receipt, perm: ["cotizacion", "view"] }],
   },
   {

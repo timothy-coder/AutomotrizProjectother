@@ -28,12 +28,12 @@ export default function Home() {
               background: `${BRAND}14`,
             }}
           >
-            <img src="/Logoarribasin.png" alt="Logo"  />
+            <img src="/Logopreview.png" alt="Logo"  />
 
           </div>
 
           <div className="leading-tight">
-            <p className="font-semibold tracking-wide">Post Venta Automotriz</p>
+            <p className="font-semibold tracking-wide">One Solution CRM</p>
             <p className="text-xs" style={{ color: GRAY }}>
               Sistema administrativo
             </p>
@@ -156,7 +156,7 @@ export default function Home() {
         className="relative mx-auto max-w-6xl px-4 pb-10 text-xs"
         style={{ color: GRAY }}
       >
-        {new Date().getFullYear()} © Post Venta Automotriz
+        {new Date().getFullYear()} © One Solution CRM
       </footer>
     </main>
   );
