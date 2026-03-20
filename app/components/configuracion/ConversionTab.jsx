@@ -28,9 +28,17 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 import {
   Pencil,
@@ -39,6 +47,10 @@ import {
   AlertTriangle,
   Loader2,
   GripVertical,
+  GitBranch,
+  Info,
+  CheckCircle2,
+  Circle,
 } from "lucide-react";
 
 function normalizeArray(x) {
@@ -68,88 +80,162 @@ function SortableRow({ item, onEdit, onDelete, onToggleActive }) {
     opacity: isDragging ? 0.65 : 1,
   };
 
+  const isActive = Number(item.is_active);
+
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="flex items-center gap-3 border rounded-lg p-3 bg-background"
-    >
-      <button
-        type="button"
-        className="cursor-grab active:cursor-grabbing text-muted-foreground"
-        {...attributes}
-        {...listeners}
-        aria-label="Arrastrar"
+    <TooltipProvider>
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={`flex items-center gap-3 border-2 rounded-lg p-4 transition-all ${
+          isDragging
+            ? "bg-slate-100 border-blue-400 shadow-lg"
+            : isActive
+            ? "bg-white border-slate-200 hover:border-blue-300 hover:shadow-md"
+            : "bg-slate-50 border-slate-200 opacity-60"
+        }`}
       >
-        <GripVertical className="h-5 w-5" />
-      </button>
+        {/* Drag Handle */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0"
+              {...attributes}
+              {...listeners}
+              aria-label="Arrastrar para reordenar"
+            >
+              <GripVertical className="h-5 w-5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Arrastra para reordenar las etapas</TooltipContent>
+        </Tooltip>
 
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="font-medium truncate">{item.nombre}</div>
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="font-semibold text-slate-900 truncate">
+              {item.nombre}
+            </div>
 
-          <span
-            className="inline-flex items-center gap-2 text-xs px-2 py-1 rounded-full border"
-            title={item.color || ""}
-          >
-            <span
-              className="h-3 w-3 rounded-full border"
-              style={{ background: item.color || "transparent" }}
-            />
-            {item.color || "sin color"}
-          </span>
+            {/* Color Badge */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center gap-2 text-xs px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 cursor-help hover:bg-slate-100 transition-colors">
+                  <span
+                    className="h-3 w-3 rounded-full border-2 border-slate-300 shadow-sm"
+                    style={{ background: item.color || "#ccc" }}
+                  />
+                  <span className="text-slate-600 font-mono">
+                    {item.color || "sin color"}
+                  </span>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>Color de identificación</TooltipContent>
+            </Tooltip>
 
-          <span
-            className={`text-xs px-2 py-1 rounded-full border ${
-              Number(item.is_active) ? "" : "text-muted-foreground"
-            }`}
-          >
-            {Number(item.is_active) ? "Activo" : "Inactivo"}
-          </span>
+            {/* Status Badge */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge
+                  className={`text-xs font-semibold gap-1 ${
+                    isActive
+                      ? "bg-green-100 text-green-700 border border-green-300"
+                      : "bg-slate-200 text-slate-600 border border-slate-300"
+                  }`}
+                >
+                  {isActive ? (
+                    <CheckCircle2 className="h-3 w-3" />
+                  ) : (
+                    <Circle className="h-3 w-3" />
+                  )}
+                  {isActive ? "Activo" : "Inactivo"}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                {isActive
+                  ? "Esta etapa está disponible"
+                  : "Esta etapa está desactivada"}
+              </TooltipContent>
+            </Tooltip>
 
-          <span className="text-xs text-muted-foreground">
-            Orden: {item.sort_order ?? "—"}
-          </span>
+            {/* Sort Order */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="text-xs text-slate-500 font-medium px-2 py-1 bg-slate-100 rounded cursor-help">
+                  #{item.sort_order ?? "—"}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>Orden en el flujo de conversión</TooltipContent>
+            </Tooltip>
+          </div>
+
+          {item.descripcion && (
+            <div className="text-xs text-slate-600 truncate mt-1">
+              {item.descripcion}
+            </div>
+          )}
         </div>
 
-        {item.descripcion ? (
-          <div className="text-xs text-muted-foreground truncate">
-            {item.descripcion}
-          </div>
-        ) : null}
+        {/* Actions */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onToggleActive(item)}
+                className={`border-slate-300 ${
+                  isActive
+                    ? "hover:bg-red-50 hover:border-red-300"
+                    : "hover:bg-green-50 hover:border-green-300"
+                }`}
+              >
+                {isActive ? (
+                  <Circle className="h-4 w-4 text-red-600" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {isActive ? "Desactivar etapa" : "Activar etapa"}
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onEdit(item)}
+                className="border-slate-300 hover:bg-amber-50 hover:border-amber-300"
+              >
+                <Pencil className="h-4 w-4 text-amber-600" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Editar etapa</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onDelete(item)}
+                className="border-slate-300 hover:bg-red-50 hover:border-red-300"
+              >
+                <Trash2 className="h-4 w-4 text-red-600" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Eliminar etapa</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
-
-      <div className="flex items-center gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => onToggleActive(item)}
-        >
-          {Number(item.is_active) ? "Desactivar" : "Activar"}
-        </Button>
-
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => onEdit(item)}
-        >
-          <Pencil className="h-4 w-4 mr-2" />
-          Editar
-        </Button>
-
-        <Button
-          type="button"
-          variant="destructive"
-          size="sm"
-          onClick={() => onDelete(item)}
-        >
-          <Trash2 className="h-4 w-4 mr-2" />
-          Eliminar
-        </Button>
-      </div>
-    </div>
+    </TooltipProvider>
   );
 }
 
@@ -280,7 +366,7 @@ export default function ConversionTab() {
         const data = await r.json().catch(() => ({}));
         if (!r.ok) return toast.error(data?.message || "No se pudo crear");
 
-        toast.success("Etapa creada");
+        toast.success("Etapa creada correctamente");
       } else {
         const original = items.find(
           (x) => Number(x.id) === Number(dialog.data.id)
@@ -301,7 +387,7 @@ export default function ConversionTab() {
         const data = await r.json().catch(() => ({}));
         if (!r.ok) return toast.error(data?.message || "No se pudo actualizar");
 
-        toast.success("Etapa actualizada");
+        toast.success("Etapa actualizada correctamente");
       }
 
       setDialog({ open: false, mode: "create", data: null });
@@ -339,6 +425,8 @@ export default function ConversionTab() {
           x.id === id ? { ...x, is_active: Number(x.is_active) ? 0 : 1 } : x
         )
       );
+
+      toast.success(Number(item.is_active) ? "Etapa desactivada" : "Etapa activada");
     } catch (e) {
       console.log(e);
       toast.error("Error actualizando");
@@ -359,7 +447,7 @@ export default function ConversionTab() {
       const data = await r.json().catch(() => ({}));
       if (!r.ok) return toast.error(data?.message || "No se pudo eliminar");
 
-      toast.success("Etapa eliminada");
+      toast.success("Etapa eliminada correctamente");
       setDeleteDialog({ open: false, item: null });
       setItems((prev) => prev.filter((x) => x.id !== id));
     } catch (e) {
@@ -393,7 +481,7 @@ export default function ConversionTab() {
         )
       );
 
-      toast.success("Orden guardado");
+      toast.success("Orden guardado correctamente");
     } catch (e) {
       console.log(e);
       toast.error("No se pudo guardar el orden");
@@ -427,166 +515,369 @@ export default function ConversionTab() {
     });
   }
 
+  const activeCount = items.filter((x) => Number(x.is_active)).length;
+
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle>Etapas de conversión</CardTitle>
+    <TooltipProvider>
+      <div className="space-y-6 pb-8">
+        {/* HEADER */}
+        <div className="border-b border-slate-200 pb-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg">
+                <GitBranch className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-slate-900">
+                  Etapas de Conversión
+                </h1>
+                <p className="text-sm text-slate-500 mt-1">
+                  Define y ordena las etapas del flujo de conversión de leads
+                </p>
+              </div>
+            </div>
 
-        <Button onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-2" />
-          Agregar
-        </Button>
-      </CardHeader>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={openCreate}
+                  className="gap-2 bg-blue-600 hover:bg-blue-700"
+                >
+                  <Plus className="h-4 w-4" />
+                  Nueva Etapa
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Crear una nueva etapa de conversión</TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
 
-      <CardContent className="space-y-4">
-        {loading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground py-8">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Cargando...
+        {/* ESTADÍSTICAS */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-blue-600 font-medium">
+                    Total de Etapas
+                  </p>
+                  <p className="text-3xl font-bold text-blue-900 mt-2">
+                    {items.length}
+                  </p>
+                </div>
+                <GitBranch className="h-12 w-12 text-blue-200" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-green-600 font-medium">
+                    Etapas Activas
+                  </p>
+                  <p className="text-3xl font-bold text-green-900 mt-2">
+                    {activeCount}
+                  </p>
+                </div>
+                <CheckCircle2 className="h-12 w-12 text-green-200" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-slate-50 to-slate-100 border-slate-200">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-slate-600 font-medium">
+                    Inactivas
+                  </p>
+                  <p className="text-3xl font-bold text-slate-900 mt-2">
+                    {items.length - activeCount}
+                  </p>
+                </div>
+                <Circle className="h-12 w-12 text-slate-200" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* LISTA */}
+        <Card className="border-slate-200 shadow-sm">
+          <CardHeader className="pb-4 border-b border-slate-100">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <GitBranch className="h-5 w-5 text-blue-600" />
+                Flujo de Conversión
+              </CardTitle>
+              <Badge variant="secondary" className="text-xs">
+                {items.length} etapas
+              </Badge>
+            </div>
+            <p className="text-xs text-slate-500 mt-2">
+              Arrastra para reordenar las etapas en el flujo
+            </p>
+          </CardHeader>
+
+          <CardContent className="pt-6">
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center space-y-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto" />
+                  <p className="text-sm text-slate-500">Cargando etapas...</p>
+                </div>
+              </div>
+            ) : items.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 space-y-3">
+                <div className="p-3 bg-slate-100 rounded-lg">
+                  <GitBranch className="h-6 w-6 text-slate-400" />
+                </div>
+                <p className="text-sm text-slate-500 font-medium">
+                  No hay etapas de conversión
+                </p>
+                <p className="text-xs text-slate-400">
+                  Crea la primera etapa para comenzar
+                </p>
+              </div>
+            ) : (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={onDragEnd}
+              >
+                <SortableContext
+                  items={ids}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-2">
+                    {items.map((item) => (
+                      <SortableRow
+                        key={item.id}
+                        item={item}
+                        onEdit={openEdit}
+                        onDelete={(it) =>
+                          setDeleteDialog({ open: true, item: it })
+                        }
+                        onToggleActive={toggleActive}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* INFO BOX */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex gap-3">
+            <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-blue-700">
+              <p className="font-medium mb-1">Información importante:</p>
+              <ul className="list-disc list-inside space-y-1 text-xs">
+                <li>
+                  Arrastra las etapas para cambiar el orden en el flujo de conversión
+                </li>
+                <li>Las etapas inactivas no apareceran en los formularios</li>
+                <li>El color identifica visualmente cada etapa</li>
+                <li>Los cambios se guardan automáticamente</li>
+              </ul>
+            </div>
           </div>
-        ) : items.length === 0 ? (
-          <div className="text-sm text-muted-foreground py-8">
-            No hay etapas.
-          </div>
-        ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={onDragEnd}
-          >
-            <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+        </div>
+
+        {/* DIALOG CREATE / EDIT */}
+        <Dialog open={dialog.open} onOpenChange={closeDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <GitBranch className="h-5 w-5 text-blue-600" />
+                {dialog.mode === "edit"
+                  ? "Editar Etapa"
+                  : "Nueva Etapa de Conversión"}
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
               <div className="space-y-2">
-                {items.map((item) => (
-                  <SortableRow
-                    key={item.id}
-                    item={item}
-                    onEdit={openEdit}
-                    onDelete={(it) => setDeleteDialog({ open: true, item: it })}
-                    onToggleActive={toggleActive}
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-semibold text-slate-700">
+                    Nombre
+                  </label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-slate-400 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Nombre descriptivo de la etapa (ej: Lead, Cotización, etc)
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Input
+                  value={form.nombre}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, nombre: e.target.value }))
+                  }
+                  placeholder="Ej: Cotización"
+                  className="border-slate-300 focus:border-blue-500"
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-semibold text-slate-700">
+                    Descripción
+                  </label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-slate-400 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Descripción adicional de la etapa
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <Input
+                  value={form.descripcion}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, descripcion: e.target.value }))
+                  }
+                  placeholder="Ej: Cliente ha solicitado cotización"
+                  className="border-slate-300 focus:border-blue-500"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-semibold text-slate-700">
+                    Color
+                  </label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-slate-400 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Color para identificar esta etapa visualmente
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="color"
+                    value={form.color || "#000000"}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, color: e.target.value }))
+                    }
+                    className="h-10 w-16 p-1 cursor-pointer border-slate-300"
                   />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        )}
-      </CardContent>
-
-      <Dialog open={dialog.open} onOpenChange={closeDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {dialog.mode === "edit" ? "Editar etapa" : "Nueva etapa"}
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <div className="text-sm font-medium">Nombre</div>
-              <Input
-                value={form.nombre}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, nombre: e.target.value }))
-                }
-              />
-            </div>
-
-            <div className="space-y-1">
-              <div className="text-sm font-medium">Descripción</div>
-              <Input
-                value={form.descripcion}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, descripcion: e.target.value }))
-                }
-              />
-            </div>
-
-            <div className="space-y-1">
-              <div className="text-sm font-medium">Color</div>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="color"
-                  value={form.color || "#000000"}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, color: e.target.value }))
-                  }
-                  className="w-16 p-1"
-                />
-                <Input
-                  value={form.color}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, color: e.target.value }))
-                  }
-                  placeholder="#RRGGBB"
-                />
+                  <Input
+                    value={form.color}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, color: e.target.value }))
+                    }
+                    placeholder="#3B82F6"
+                    className="border-slate-300 focus:border-blue-500"
+                  />
+                </div>
+                <p className="text-xs text-slate-500">
+                  Formato: #RRGGBB (ej: #3B82F6)
+                </p>
               </div>
             </div>
-          </div>
 
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => closeDialog(false)}
-              disabled={saving}
-            >
-              Cancelar
-            </Button>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                onClick={() => closeDialog(false)}
+                disabled={saving}
+                className="border-slate-300"
+              >
+                Cancelar
+              </Button>
 
-            <Button onClick={save} disabled={saving}>
-              {saving ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Guardando
-                </>
-              ) : (
-                "Guardar"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              <Button
+                onClick={save}
+                disabled={saving}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Guardando
+                  </>
+                ) : (
+                  "Guardar"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      <Dialog open={deleteDialog.open} onOpenChange={closeDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
-              Confirmar eliminación
-            </DialogTitle>
-          </DialogHeader>
+        {/* DELETE DIALOG */}
+        <Dialog open={deleteDialog.open} onOpenChange={closeDeleteDialog}>
+          <DialogContent className="sm:max-w-md">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="bg-red-100 p-4 rounded-full">
+                <AlertTriangle className="h-6 w-6 text-red-600" />
+              </div>
 
-          <div className="text-sm text-muted-foreground">
-            ¿Seguro que deseas eliminar esta etapa?
-            <div className="mt-2">
-              <b>{deleteDialog.item?.nombre ?? "-"}</b>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">
+                  ¿Eliminar etapa?
+                </h3>
+
+                <p className="text-sm text-slate-600 mt-2">
+                  Se eliminará permanentemente esta etapa de conversión:
+                </p>
+
+                <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="font-semibold text-red-900">
+                    {deleteDialog.item?.nombre ?? "-"}
+                  </p>
+                  {deleteDialog.item?.descripcion && (
+                    <p className="text-xs text-red-700 mt-1">
+                      {deleteDialog.item.descripcion}
+                    </p>
+                  )}
+                </div>
+
+                <p className="text-xs text-slate-500 mt-3 font-medium">
+                  ⚠️ Esta acción no se puede deshacer
+                </p>
+              </div>
+
+              <div className="flex gap-3 w-full pt-4">
+                <Button
+                  variant="outline"
+                  className="flex-1 border-slate-300"
+                  onClick={() => closeDeleteDialog(false)}
+                  disabled={deleting}
+                >
+                  Cancelar
+                </Button>
+
+                <Button
+                  variant="destructive"
+                  className="flex-1"
+                  onClick={confirmDelete}
+                  disabled={deleting}
+                >
+                  {deleting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Eliminando
+                    </>
+                  ) : (
+                    "Eliminar"
+                  )}
+                </Button>
+              </div>
             </div>
-          </div>
-
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => closeDeleteDialog(false)}
-              disabled={deleting}
-            >
-              Cancelar
-            </Button>
-
-            <Button
-              variant="destructive"
-              onClick={confirmDelete}
-              disabled={deleting}
-            >
-              {deleting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Eliminando
-                </>
-              ) : (
-                "Eliminar"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </Card>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </TooltipProvider>
   );
 }
