@@ -33,13 +33,18 @@ export async function PATCH(req) {
     return NextResponse.json({ message: "phone requerido" }, { status: 400 });
   }
 
-  await db.query(
-    `UPDATE conversation_sessions
-     SET source = 'taller', updated_at = NOW()
-     WHERE REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') = ?
-       AND source = 'ventas_ia'`,
-    [phone]
-  );
+  try {
+    await db.query(
+      `UPDATE conversation_sessions
+       SET source = 'taller', updated_at = NOW()
+       WHERE REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') = ?
+         AND source = 'ventas_ia'`,
+      [phone]
+    );
+  } catch (e) {
+    console.error("[route-dispatch PATCH] DB error:", e.message);
+    return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true, phone, cleared: true });
 }
