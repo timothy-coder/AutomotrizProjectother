@@ -92,21 +92,27 @@ export default function Paso3Horario({
     [allowedTalleres]
   );
 
+  console.log("🔍 allowedCentros:", allowedCentros);
+  console.log("🔍 allowedTalleres:", allowedTalleres);
+  console.log("🔍 allowedCentrosSet size:", allowedCentrosSet.size);
+  console.log("🔍 allowedTalleresSet size:", allowedTalleresSet.size);
+
   // cargar centros y filtrar por scope
   useEffect(() => {
     fetch("/api/centros", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         const lista = Array.isArray(data) ? data : [];
+        console.log("✅ Centros recibidos:", lista);
 
         const filtrados =
           allowedCentrosSet.size > 0
             ? lista.filter((c) => allowedCentrosSet.has(Number(c.id)))
-            : [];
+            : lista; // Si no hay restricción, usa todos
 
+        console.log("✅ Centros filtrados:", filtrados);
         setCentros(filtrados);
 
-        // si hay initialValue, priorizarlo
         if (
           initialValue?.centro_id &&
           filtrados.some((c) => Number(c.id) === Number(initialValue.centro_id))
@@ -123,7 +129,7 @@ export default function Paso3Horario({
         });
       })
       .catch((e) => {
-        console.log(e);
+        console.error("❌ Error cargando centros:", e);
         setCentros([]);
         setCentroId(null);
       });
@@ -132,6 +138,7 @@ export default function Paso3Horario({
   // cargar talleres cuando cambia centro y filtrar por scope
   useEffect(() => {
     if (!centroId) {
+      console.log("❌ No hay centroId, limpiando talleres");
       setTalleres([]);
       setTallerId(null);
       setDate(null);
@@ -140,6 +147,7 @@ export default function Paso3Horario({
       return;
     }
 
+    console.log("📍 Cargando talleres para centro:", centroId);
     setLoadingTalleres(true);
     setTalleres([]);
     setTallerId(null);
@@ -150,34 +158,41 @@ export default function Paso3Horario({
     fetch(`/api/talleres/bycentro?centro_id=${centroId}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
+        console.log("✅ Talleres recibidos:", data);
         const lista = Array.isArray(data) ? data : [];
 
+        // 🔥 CORRECCIÓN: Si no hay restricción de talleres, usa todos
         const filtrados =
           allowedTalleresSet.size > 0
             ? lista.filter((t) => allowedTalleresSet.has(Number(t.id)))
-            : [];
+            : lista; // Si no hay restricción, usa todos los talleres
 
+        console.log("✅ Talleres filtrados:", filtrados);
+        console.log("📊 allowedTalleresSet:", allowedTalleresSet);
         setTalleres(filtrados);
 
         if (
           initialValue?.taller_id &&
           filtrados.some((t) => Number(t.id) === Number(initialValue.taller_id))
         ) {
+          console.log("✅ Usando taller inicial:", initialValue.taller_id);
           setTallerId(Number(initialValue.taller_id));
           setLoadingTalleres(false);
           return;
         }
 
         if (filtrados.length > 0) {
+          console.log("✅ Usando primer taller:", filtrados[0].id);
           setTallerId(Number(filtrados[0].id));
         } else {
+          console.log("❌ No hay talleres disponibles después de filtrar");
           setTallerId(null);
         }
 
         setLoadingTalleres(false);
       })
       .catch((e) => {
-        console.log(e);
+        console.error("❌ Error cargando talleres:", e);
         setTalleres([]);
         setTallerId(null);
         setLoadingTalleres(false);
@@ -192,10 +207,11 @@ export default function Paso3Horario({
         const validos = (Array.isArray(data) ? data : []).filter(
           (u) => u.is_active && u.work_schedule
         );
+        console.log("✅ Asesores cargados:", validos.length);
         setAsesores(validos);
       })
       .catch((e) => {
-        console.log(e);
+        console.error("❌ Error cargando asesores:", e);
         setAsesores([]);
       });
   }, []);
@@ -203,17 +219,30 @@ export default function Paso3Horario({
   // cargar horario del centro
   useEffect(() => {
     if (!centroId) {
+      console.log("❌ No hay centroId, limpiando horario");
       setHorario(null);
       return;
     }
 
+    console.log("⏰ Cargando horario para centro:", centroId);
     setLoadingHorario(true);
+    setDate(null);
+    setSlot(null);
+    setSlots([]);
 
     fetch(`/api/horacitas_centro/by-centro/${centroId}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         console.log("✅ Horario cargado:", data);
-        setHorario(data);
+        
+        if (data && typeof data === 'object' && data.week_json) {
+          console.log("✅ week_json válido:", Object.keys(data.week_json));
+          setHorario(data);
+        } else {
+          console.error("❌ week_json no encontrado en horario");
+          setHorario(null);
+        }
+        
         setLoadingHorario(false);
       })
       .catch((e) => {
@@ -224,7 +253,9 @@ export default function Paso3Horario({
   }, [centroId]);
 
   const isDayDisabled = (day) => {
-    if (!horario?.week_json) return true;
+    if (!horario?.week_json) {
+      return true;
+    }
 
     const key = DAY_ES[day.getDay()];
     const cfg = horario.week_json[key];
@@ -243,6 +274,7 @@ export default function Paso3Horario({
     if (!initialValue) return;
     if (!centroId || !tallerId) return;
 
+    console.log("📌 Aplicando valores iniciales");
     const initialDate = parseDateFromValue(initialValue.start);
     const initialStart = parseHourMinute(initialValue.start);
     const initialEnd = parseHourMinute(initialValue.end);
@@ -270,6 +302,7 @@ export default function Paso3Horario({
   // generar slots
   useEffect(() => {
     if (!date || !horario || !tallerId) {
+      console.log("❌ No se pueden generar slots. date:", !!date, "horario:", !!horario, "tallerId:", !!tallerId);
       setSlots([]);
       return;
     }
@@ -277,13 +310,18 @@ export default function Paso3Horario({
     const key = DAY_ES[date.getDay()];
     const cfgCentro = horario.week_json?.[key];
 
+    console.log(`📅 Generando slots para ${key}:`, cfgCentro);
+
     if (!cfgCentro?.active) {
+      console.log(`❌ Centro no activo el ${key}`);
       setSlots([]);
       return;
     }
 
     let start = parseTime(cfgCentro.start);
     let end = parseTime(cfgCentro.end);
+
+    console.log(`⏰ Horario base centro: ${cfgCentro.start} - ${cfgCentro.end}`);
 
     if (asesorId !== "any") {
       const asesor = asesores.find((a) => String(a.id) === asesorId);
@@ -299,6 +337,7 @@ export default function Paso3Horario({
           const cfgAsesor = schedule?.[keyEn];
 
           if (!cfgAsesor) {
+            console.log(`❌ Asesor no trabaja el ${keyEn}`);
             setSlots([]);
             return;
           }
@@ -309,7 +348,7 @@ export default function Paso3Horario({
           start = Math.max(start, aStart);
           end = Math.min(end, aEnd);
         } catch (e) {
-          console.error("Error parseando horario asesor:", e);
+          console.error("❌ Error parseando horario asesor:", e);
           setSlots([]);
           return;
         }
@@ -318,8 +357,9 @@ export default function Paso3Horario({
 
     const arr = [];
     const now = new Date();
+    const slotMinutes = horario.slot_minutes || 30;
 
-    for (let m = start; m < end; m += horario.slot_minutes) {
+    for (let m = start; m < end; m += slotMinutes) {
       const slotDate = new Date(date);
       slotDate.setHours(Math.floor(m / 60), m % 60, 0, 0);
 
@@ -328,15 +368,17 @@ export default function Paso3Horario({
         parseDateFromValue(initialValue.start)?.toDateString() === date.toDateString() &&
         parseHourMinute(initialValue.start) === minutesToTime(m);
 
-      if (slotDate < now && !isInitialSlot) continue;
+      if (slotDate < now && !isInitialSlot) {
+        continue;
+      }
 
       arr.push({
         start: minutesToTime(m),
-        end: minutesToTime(m + horario.slot_minutes),
+        end: minutesToTime(m + slotMinutes),
       });
     }
 
-    console.log(`📅 Slots generados para ${date.toDateString()}:`, arr);
+    console.log(`✅ ${arr.length} slots generados para ${date.toDateString()}`);
     setSlots(arr);
   }, [date, asesorId, horario, tallerId, asesores, initialValue]);
 
@@ -348,6 +390,7 @@ export default function Paso3Horario({
     const alreadyExists = slots.some((s) => s.start === initialStart);
 
     if (!alreadyExists && initialStart === slot.start) {
+      console.log(`📌 Agregando slot inicial: ${initialStart}`);
       setSlots((prev) => {
         const next = [...prev, slot];
         next.sort((a, b) => a.start.localeCompare(b.start));
@@ -362,6 +405,13 @@ export default function Paso3Horario({
 
     const day = date.toISOString().slice(0, 10);
 
+    console.log("📤 Emitiendo selección:", {
+      centro_id: centroId,
+      taller_id: tallerId,
+      start: `${day} ${slot.start}:00`,
+      end: `${day} ${slot.end}:00`,
+    });
+
     onChange({
       centro_id: centroId,
       taller_id: tallerId,
@@ -373,6 +423,8 @@ export default function Paso3Horario({
 
   // Determinar estado de completitud
   const isComplete = centroId && tallerId && date && slot;
+
+  console.log("🎯 Estado actual:", { centroId, tallerId, date: !!date, slot: !!slot, isComplete });
 
   return (
     <TooltipProvider>
@@ -415,6 +467,7 @@ export default function Paso3Horario({
                 <Select
                   value={centroId ? String(centroId) : ""}
                   onValueChange={(v) => {
+                    console.log("🔄 Centro cambiado a:", v);
                     initialAppliedRef.current = false;
                     setCentroId(Number(v));
                   }}
@@ -457,6 +510,7 @@ export default function Paso3Horario({
                   key={`taller-${centroId || "none"}`}
                   value={tallerId ? String(tallerId) : ""}
                   onValueChange={(v) => {
+                    console.log("🔄 Taller cambiado a:", v);
                     initialAppliedRef.current = false;
                     setTallerId(Number(v));
                     setDate(null);
@@ -467,7 +521,15 @@ export default function Paso3Horario({
                 >
                   <SelectTrigger className="h-9">
                     <SelectValue 
-                      placeholder={loadingTalleres ? "Cargando talleres..." : "Seleccione"} 
+                      placeholder={
+                        loadingTalleres 
+                          ? "Cargando talleres..." 
+                          : !centroId 
+                          ? "Seleccione centro primero"
+                          : talleres.length === 0
+                          ? "No hay talleres"
+                          : "Seleccione"
+                      } 
                     />
                   </SelectTrigger>
                   <SelectContent>
@@ -479,7 +541,7 @@ export default function Paso3Horario({
                       ))
                     ) : (
                       <SelectItem value="__sin_taller" disabled>
-                        {loadingTalleres ? "Cargando..." : "No tienes talleres asignados"}
+                        {loadingTalleres ? "Cargando..." : "No hay talleres disponibles"}
                       </SelectItem>
                     )}
                   </SelectContent>
@@ -503,6 +565,7 @@ export default function Paso3Horario({
                 <Select
                   value={asesorId}
                   onValueChange={(v) => {
+                    console.log("🔄 Asesor cambiado a:", v);
                     initialAppliedRef.current = false;
                     setAsesorId(v);
                     setSlot(null);
@@ -535,10 +598,13 @@ export default function Paso3Horario({
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex gap-2">
                 <AlertCircle size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-blue-700">
-                  Selecciona primero el centro y taller para ver horarios disponibles
+                  {!centroId 
+                    ? "Selecciona un centro para continuar"
+                    : "Selecciona un taller para ver horarios disponibles"
+                  }
                 </p>
               </div>
-            ) : loadingHorario ? (
+            ) : loadingHorario || loadingTalleres ? (
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex gap-2">
                 <Loader size={16} className="text-blue-600 flex-shrink-0 mt-0.5 animate-spin" />
                 <p className="text-sm text-blue-700">
@@ -549,7 +615,7 @@ export default function Paso3Horario({
               <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex gap-2">
                 <AlertCircle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-amber-700">
-                  No se encontró horario configurado para el centro seleccionado
+                  No se encontró horario configurado para el centro seleccionado.
                 </p>
               </div>
             ) : (
@@ -565,6 +631,7 @@ export default function Paso3Horario({
                     mode="single"
                     selected={date}
                     onSelect={(d) => {
+                      console.log("📅 Fecha seleccionada:", d);
                       initialAppliedRef.current = false;
                       setDate(d);
                       setSlot(null);
@@ -577,70 +644,77 @@ export default function Paso3Horario({
                 </div>
 
                 {/* HORAS */}
-                <div className="space-y-4">
-                  <div className="text-sm font-semibold text-slate-900 flex items-center gap-1">
-                    <Clock size={16} className="text-purple-600" />
-                    Horarios disponibles
-                  </div>
+                {/* HORAS */}
+<div className="space-y-4">
+  <div className="text-sm font-semibold text-slate-900 flex items-center gap-1">
+    <Clock size={16} className="text-purple-600" />
+    Horarios disponibles
+  </div>
 
-                  {date && slots.length > 0 && (
-                    <div className="space-y-3">
-                      <p className="text-xs text-slate-600">
-                        {new Intl.DateTimeFormat('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(date)}
-                      </p>
-                      <div className="grid grid-cols-3 gap-2">
-                        {slots.map((s) => {
-                          const isSelected = slot?.start === s.start;
-                          return (
-                            <Tooltip key={s.start}>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant={isSelected ? "default" : "outline"}
-                                  onClick={() => setSlot(s)}
-                                  className={`font-semibold ${
-                                    isSelected
-                                      ? "bg-purple-600 hover:bg-purple-700"
-                                      : "hover:border-purple-300"
-                                  }`}
-                                >
-                                  {isSelected && <CheckCircle size={14} className="mr-1" />}
-                                  {s.start}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">
-                                {s.start} - {s.end}
-                              </TooltipContent>
-                            </Tooltip>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+  {date && slots.length > 0 && (
+    <div className="space-y-3">
+      <p className="text-xs text-slate-600">
+        {new Intl.DateTimeFormat('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(date)}
+      </p>
+      <div className="grid grid-cols-3 gap-2">
+        {slots.map((s, index) => {
+          const isSelected = slot?.start === s.start;
+          // 🔥 Key única: combinación de start + end + index
+          const uniqueKey = `${s.start}-${s.end}-${index}`;
+          
+          return (
+            <Tooltip key={uniqueKey}>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={isSelected ? "default" : "outline"}
+                  onClick={() => {
+                    console.log("⏰ Slot seleccionado:", s);
+                    setSlot(s);
+                  }}
+                  className={`font-semibold ${
+                    isSelected
+                      ? "bg-purple-600 hover:bg-purple-700"
+                      : "hover:border-purple-300"
+                  }`}
+                >
+                  {isSelected && <CheckCircle size={14} className="mr-1" />}
+                  {s.start}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                {s.start} - {s.end}
+              </TooltipContent>
+            </Tooltip>
+          );
+        })}
+      </div>
+    </div>
+  )}
 
-                  {date && slots.length === 0 && (
-                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex gap-2">
-                      <AlertCircle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-medium text-amber-900">
-                          Sin horarios disponibles
-                        </p>
-                        <p className="text-xs text-amber-700">
-                          El taller no tiene disponibilidad en la fecha seleccionada
-                        </p>
-                      </div>
-                    </div>
-                  )}
+  {date && slots.length === 0 && (
+    <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex gap-2">
+      <AlertCircle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+      <div>
+        <p className="text-sm font-medium text-amber-900">
+          Sin horarios disponibles
+        </p>
+        <p className="text-xs text-amber-700">
+          El taller no tiene disponibilidad en la fecha seleccionada
+        </p>
+      </div>
+    </div>
+  )}
 
-                  {!date && (
-                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-center">
-                      <p className="text-sm text-slate-600">
-                        Selecciona una fecha para ver los horarios disponibles
-                      </p>
-                    </div>
-                  )}
-                </div>
+  {!date && (
+    <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-center">
+      <p className="text-sm text-slate-600">
+        Selecciona una fecha para ver los horarios disponibles
+      </p>
+    </div>
+  )}
+</div>
               </div>
             )}
           </div>

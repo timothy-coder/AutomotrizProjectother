@@ -30,6 +30,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
@@ -37,10 +44,15 @@ import {
   Plus,
   RefreshCcw,
   Loader2,
-  SlidersHorizontal,Eye, Pencil, Trash2,
-  Boxes
+  SlidersHorizontal,
+  Eye,
+  Pencil,
+  Trash2,
+  Boxes,
+  BarChart3,
+  TrendingUp,
+  AlertTriangle,
 } from "lucide-react";
-
 
 import ProductDialog from "@/app/components/inventario/ProductDialog";
 import ConfirmDeleteDialog from "@/app/components/inventario/ConfirmDeleteDialog";
@@ -164,6 +176,27 @@ export default function InventarioPage() {
   }
 
   // =========================
+  // ESTADÍSTICAS
+  // =========================
+  const stats = useMemo(() => {
+    const totalStock = items.reduce((sum, item) => sum + (Number(item.stock_disponible) || 0), 0);
+    const lowStockCount = items.filter((item) => Number(item.stock_disponible || 0) <= minStock).length;
+    const totalProducts = items.length;
+    const totalValue = items.reduce((sum, item) => {
+      const qty = Number(item.stock_disponible) || 0;
+      const price = Number(item.precio_venta) || 0;
+      return sum + (qty * price);
+    }, 0);
+
+    return {
+      totalStock,
+      lowStockCount,
+      totalProducts,
+      totalValue,
+    };
+  }, [items, minStock]);
+
+  // =========================
   // TABLE
   // =========================
   const columns = useMemo(() => {
@@ -172,14 +205,14 @@ export default function InventarioPage() {
         accessorKey: "numero_parte",
         header: "N° Parte",
         cell: ({ row }) => (
-          <div className="font-medium">{row.original.numero_parte}</div>
+          <div className="font-mono font-semibold text-sm">{row.original.numero_parte}</div>
         ),
       },
       {
         accessorKey: "descripcion",
         header: "Descripción",
         cell: ({ row }) => (
-          <div className="max-w-[420px] truncate text-sm text-muted-foreground">
+          <div className="max-w-[300px] truncate text-sm text-slate-700">
             {row.original.descripcion}
           </div>
         ),
@@ -190,9 +223,9 @@ export default function InventarioPage() {
         cell: ({ row }) => {
           const tipo = row.original.tipo_nombre;
           return tipo ? (
-            <Badge variant="outline">{tipo}</Badge>
+            <Badge variant="secondary" className="text-xs">{tipo}</Badge>
           ) : (
-            <span className="text-xs text-muted-foreground">Sin tipo</span>
+            <span className="text-xs text-slate-400">-</span>
           );
         },
       },
@@ -204,22 +237,47 @@ export default function InventarioPage() {
           const low = v <= Number(minStock || 0);
 
           return (
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">{v}</span>
-              {low && <Badge variant="destructive">Bajo</Badge>}
-            </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-2 cursor-help">
+                    <span className={`font-bold text-sm ${low ? "text-red-600" : "text-green-600"}`}>
+                      {v}
+                    </span>
+                    {low && (
+                      <Badge variant="destructive" className="text-xs gap-1">
+                        <AlertTriangle size={12} />
+                        Bajo
+                      </Badge>
+                    )}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {low ? `Por debajo del mínimo (${minStock})` : `Stock saludable (mínimo: ${minStock})`}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           );
         },
       },
       {
-        accessorKey: "precio_venta",
-        header: "Venta",
-        cell: ({ row }) => (
-          <span className="text-sm">
-            {row.original.precio_venta == null ? "-" : `S/ ${row.original.precio_venta}`}
+  accessorKey: "precio_venta",
+  header: "Precio Venta",
+  cell: ({ row }) => (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="text-sm font-medium cursor-help">
+            {row.original.precio_venta == null ? "-" : `S/ ${Number(row.original.precio_venta).toFixed(2)}`}
           </span>
-        ),
-      },
+        </TooltipTrigger>
+        <TooltipContent>
+          Valor total: S/ {((Number(row.original.stock_disponible) || 0) * (Number(row.original.precio_venta) || 0)).toFixed(2)}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  ),
+},
       {
         id: "acciones",
         header: "Acciones",
@@ -227,59 +285,85 @@ export default function InventarioPage() {
           const p = row.original;
 
           return (
-            <div className="flex flex-wrap gap-2 justify-end">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setActiveProduct(p);
-                  setDialogMode("view");
-                  setOpenDialog(true);
-                }}
-              >
-                <Eye size={16} />
-              </Button>
+            <TooltipProvider>
+              <div className="flex flex-wrap gap-1 justify-end">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0"
+                      onClick={() => {
+                        setActiveProduct(p);
+                        setDialogMode("view");
+                        setOpenDialog(true);
+                      }}
+                    >
+                      <Eye size={16} className="text-blue-600" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Ver detalles</TooltipContent>
+                </Tooltip>
 
-              {permEdit && (
-                <>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setActiveProduct(p);
-                      setDialogMode("edit");
-                      setOpenDialog(true);
-                    }}
-                  >
-                    <Pencil size={16} />
-                  </Button>
+                {permEdit && (
+                  <>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0"
+                          onClick={() => {
+                            setActiveProduct(p);
+                            setDialogMode("edit");
+                            setOpenDialog(true);
+                          }}
+                        >
+                          <Pencil size={16} className="text-amber-600" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Editar producto</TooltipContent>
+                    </Tooltip>
 
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setDistProduct(p);
-                      setOpenDist(true);
-                    }}
-                  >
-                    <Boxes size={16} />Distribución
-                  </Button>
-                </>
-              )}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0"
+                          onClick={() => {
+                            setDistProduct(p);
+                            setOpenDist(true);
+                          }}
+                        >
+                          <Boxes size={16} className="text-purple-600" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Distribuir stock</TooltipContent>
+                    </Tooltip>
+                  </>
+                )}
 
-              {permDelete && (
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => {
-                    setDeleteTarget(p);
-                    setOpenDelete(true);
-                  }}
-                >
-                  <Trash2 size={16} />
-                </Button>
-              )}
-            </div>
+                {permDelete && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                        onClick={() => {
+                          setDeleteTarget(p);
+                          setOpenDelete(true);
+                        }}
+                      >
+                        <Trash2 size={16} className="text-red-600" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Eliminar producto</TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+            </TooltipProvider>
           );
         },
       },
@@ -314,155 +398,296 @@ export default function InventarioPage() {
   // UI
   // =========================
   return (
-    <div className="space-y-4">
-
+    <div className="space-y-6 pb-8">
       {/* HEADER */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="border-b border-slate-200 pb-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg">
+              <Package className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900">Inventario</h1>
+              <p className="text-sm text-slate-500 mt-1">Gestión de productos y stock</p>
+            </div>
+          </div>
 
-        <div className="flex items-center gap-2">
-          <Package className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-semibold">Inventario</h1>
-        </div>
+          <div className="flex flex-wrap gap-2 justify-start sm:justify-end">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    onClick={loadAll} 
+                    disabled={loading}
+                    className="gap-2"
+                  >
+                    {loading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCcw className="h-4 w-4" />
+                    )}
+                    Recargar
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Actualizar inventario</TooltipContent>
+              </Tooltip>
 
-        <div className="flex flex-wrap gap-2 justify-end">
-          <Button variant="outline" onClick={loadAll} disabled={loading}>
-            Recargar
-            {loading ? (
-              <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCcw className="ml-2 h-4 w-4" />
-            )}
-          </Button>
-
-          {permCreate && (
-            <Button
-              onClick={() => {
-                setActiveProduct(null);
-                setDialogMode("create");
-                setOpenDialog(true);
-              }}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Nuevo
-            </Button>
-          )}
+              {permCreate && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={() => {
+                        setActiveProduct(null);
+                        setDialogMode("create");
+                        setOpenDialog(true);
+                      }}
+                      className="gap-2 bg-blue-600 hover:bg-blue-700"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Nuevo Producto
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Crear nuevo producto</TooltipContent>
+                </Tooltip>
+              )}
+            </TooltipProvider>
+          </div>
         </div>
       </div>
 
+      {/* ESTADÍSTICAS */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 cursor-help">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-blue-600 font-medium">Total Productos</p>
+                      <p className="text-2xl font-bold text-blue-900 mt-1">{stats.totalProducts}</p>
+                    </div>
+                    <Package className="h-10 w-10 text-blue-300" />
+                  </div>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>Cantidad total de productos en el sistema</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 cursor-help">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-green-600 font-medium">Stock Total</p>
+                      <p className="text-2xl font-bold text-green-900 mt-1">{stats.totalStock.toLocaleString()}</p>
+                    </div>
+                    <BarChart3 className="h-10 w-10 text-green-300" />
+                  </div>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>Cantidad total de unidades en stock</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card className="bg-gradient-to-br from-red-50 to-red-100 border-red-200 cursor-help">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-red-600 font-medium">Stock Bajo</p>
+                      <p className="text-2xl font-bold text-red-900 mt-1">{stats.lowStockCount}</p>
+                    </div>
+                    <AlertTriangle className="h-10 w-10 text-red-300" />
+                  </div>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>Productos por debajo del mínimo establecido</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 cursor-help">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-purple-600 font-medium">Valor Total</p>
+                      <p className="text-2xl font-bold text-purple-900 mt-1">S/ {stats.totalValue.toFixed(2)}</p>
+                    </div>
+                    <TrendingUp className="h-10 w-10 text-purple-300" />
+                  </div>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>Valor total del inventario en stock</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+
       {/* CONTROLES */}
-      <Card>
-        <CardHeader className="pb-2">
+      <Card className="border-slate-200 shadow-sm">
+        <CardHeader className="pb-3 border-b border-slate-100">
           <CardTitle className="text-base flex items-center gap-2">
-            <SlidersHorizontal className="h-4 w-4" />
-            Filtros
+            <SlidersHorizontal className="h-4 w-4 text-slate-600" />
+            Filtros y búsqueda
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-3">
-          <div className="space-y-1 md:col-span-2">
-            <Input placeholder="Buscar por N° parte o descripción..." value={q} onChange={(e) => setQ(e.target.value)} />
+        <CardContent className="grid gap-4 md:grid-cols-3 pt-6">
+          <div className="md:col-span-2 space-y-2">
+            <label className="text-sm font-medium text-slate-700">Buscar producto</label>
+            <Input 
+              placeholder="Buscar por N° parte o descripción..." 
+              value={q} 
+              onChange={(e) => setQ(e.target.value)}
+              className="border-slate-300 focus:border-blue-500"
+            />
           </div>
 
-          <div className="space-y-1">
-            <Input
-              type="number"
-              min={0}
-              placeholder="Mínimo stock (alerta)"
-              value={String(minStock)}
-              onChange={(e) => setMinStock(Number(e.target.value || 0))}
-            />
-            <p className="text-xs text-muted-foreground">
-              Marca “Bajo” si disponible ≤ mínimo.
-            </p>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-700">Mínimo stock</label>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Input
+                    type="number"
+                    min={0}
+                    placeholder="Mínimo stock (alerta)"
+                    value={String(minStock)}
+                    onChange={(e) => setMinStock(Number(e.target.value || 0))}
+                    className="border-slate-300 focus:border-blue-500 cursor-help"
+                  />
+                </TooltipTrigger>
+                <TooltipContent>Define el nivel mínimo de stock para mostrar alerta "Bajo"</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </CardContent>
       </Card>
 
       {/* TABLA */}
-      <div className="rounded-md border overflow-hidden">
-        <Table>
+      <Card className="border-slate-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-slate-50 border-b-2 border-slate-200">
+              {table.getHeaderGroups().map((hg) => (
+                <TableRow key={hg.id} className="hover:bg-slate-50">
+                  {hg.headers.map((h) => {
+                    const sorted = h.column.getIsSorted();
 
-          <TableHeader>
-            {table.getHeaderGroups().map((hg) => (
-              <TableRow key={hg.id}>
-                {hg.headers.map((h) => {
-                  const sorted = h.column.getIsSorted();
+                    return (
+                      <TableHead key={h.id} className="font-semibold text-slate-700">
+                        {h.isPlaceholder ? null : (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  className="flex items-center gap-2 cursor-pointer hover:text-slate-900 transition-colors"
+                                  onClick={h.column.getToggleSortingHandler()}
+                                >
+                                  {flexRender(h.column.columnDef.header, h.getContext())}
 
-                  return (
-                    <TableHead key={h.id}>
-                      {h.isPlaceholder ? null : (
-                        <button
-                          className="flex items-center gap-1"
-                          onClick={h.column.getToggleSortingHandler()}
-                        >
-                          {flexRender(h.column.columnDef.header, h.getContext())}
-
-                          {sorted === "asc" && <ArrowUp className="h-4 w-4" />}
-                          {sorted === "desc" && <ArrowDown className="h-4 w-4" />}
-                          {!sorted && <ArrowUpDown className="h-4 w-4 opacity-40" />}
-                        </button>
-                      )}
-                    </TableHead>
-                  );
-                })}
-              </TableRow>
-            ))}
-          </TableHeader>
-
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="text-center py-8">
-                  <Loader2 className="animate-spin mx-auto" />
-                </TableCell>
-              </TableRow>
-            ) : table.getPaginationRowModel().rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="text-center py-8 text-sm text-muted-foreground">
-                  Sin resultados
-                </TableCell>
-              </TableRow>
-            ) : (
-              table.getPaginationRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell ?? cell.getValue(), cell.getContext())}
-                    </TableCell>
-                  ))}
+                                  {sorted === "asc" && <ArrowUp className="h-3.5 w-3.5 text-blue-600" />}
+                                  {sorted === "desc" && <ArrowDown className="h-3.5 w-3.5 text-blue-600" />}
+                                  {!sorted && <ArrowUpDown className="h-3.5 w-3.5 opacity-30" />}
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>Haz clic para ordenar</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </TableHead>
+                    );
+                  })}
                 </TableRow>
-              ))
-            )}
-          </TableBody>
+              ))}
+            </TableHeader>
 
-        </Table>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="text-center py-12">
+                    <div className="flex flex-col items-center gap-3">
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                      <p className="text-sm text-slate-500">Cargando inventario...</p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : table.getPaginationRowModel().rows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="text-center py-12">
+                    <p className="text-sm text-slate-400">No hay productos que coincidan con tu búsqueda</p>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                table.getPaginationRowModel().rows.map((row) => (
+                  <TableRow 
+                    key={row.id} 
+                    className="border-b border-slate-100 hover:bg-blue-50 transition-colors"
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id} className="py-3">
+                        {flexRender(cell.column.columnDef.cell ?? cell.getValue(), cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
 
         {/* PAGINACIÓN */}
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between p-4">
-          <span className="text-sm text-muted-foreground">
-            Página {table.getState().pagination.pageIndex + 1} de {table.getPageCount()}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-slate-50 border-t border-slate-200">
+          <span className="text-sm font-medium text-slate-600">
+            Página <span className="text-blue-600 font-bold">{table.getState().pagination.pageIndex + 1}</span> de <span className="text-blue-600 font-bold">{table.getPageCount()}</span>
+            {" • "}
+            <span className="text-slate-500">{table.getPaginationRowModel().rows.length} de {filteredData.length} productos</span>
           </span>
 
           <div className="space-x-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
-            >
-              Anterior
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => table.previousPage()}
+                    disabled={!table.getCanPreviousPage()}
+                  >
+                    Anterior
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Ir a página anterior</TooltipContent>
+              </Tooltip>
 
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-            >
-              Siguiente
-            </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => table.nextPage()}
+                    disabled={!table.getCanNextPage()}
+                  >
+                    Siguiente
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Ir a página siguiente</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* DIALOG PRODUCTO */}
       <ProductDialog
@@ -491,15 +716,14 @@ export default function InventarioPage() {
         description={
           deleteTarget ? (
             <>
-              ¿Seguro que deseas eliminar <b>{deleteTarget.numero_parte}</b>?
+              ¿Seguro que deseas eliminar <b className="text-slate-900">{deleteTarget.numero_parte}</b>?
               <br />
-              <span className="text-xs text-muted-foreground">{deleteTarget.descripcion}</span>
+              <span className="text-xs text-slate-500 mt-1 block">{deleteTarget.descripcion}</span>
             </>
           ) : null
         }
         loading={loading}
         onConfirm={confirmDelete}
-        
       />
     </div>
   );

@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Save, X, Edit2, Loader2, Plus, Trash2, Pencil } from "lucide-react";
+import { ChevronLeft, ChevronRight, Save, X, Edit2, Loader2, Plus, Trash2, Pencil, MessageSquare, Check, Calendar, FileText, Lock, History } from "lucide-react";
 import { toast } from "sonner";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import {
   Dialog,
   DialogContent,
@@ -19,14 +21,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useUserScope } from "@/hooks/useUserScope";
 import CotizacionAgendaSection from "@/app/components/agenda/CotizacionAgendaSection";
 
 export default function OportunidadDetailPage() {
   const router = useRouter();
   const params = useParams();
   const oportunidadId = params?.id;
+  const { userId, loading: loadingUserScope } = useUserScope();
 
   const [oportunidad, setOportunidad] = useState(null);
   const [etapaActual, setEtapaActual] = useState(null);
@@ -35,6 +54,43 @@ export default function OportunidadDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({});
+  const [actividades, setActividades] = useState([]);
+  const [loadingActividades, setLoadingActividades] = useState(false);
+  const [guardandoActividad, setGuardandoActividad] = useState(false);
+  const [detalleAccion, setDetalleAccion] = useState("");
+  const [etapaProxima, setEtapaProxima] = useState("sin-cambio");
+
+  // Test Drives
+  const [testDrives, setTestDrives] = useState([]);
+  const [dialogTestDriveOpen, setDialogTestDriveOpen] = useState(false);
+  const [editingTestDrive, setEditingTestDrive] = useState(null);
+  const [deleteTestDriveDialog, setDeleteTestDriveDialog] = useState(false);
+  const [deleteTestDriveTarget, setDeleteTestDriveTarget] = useState(null);
+  const [testDriveFormData, setTestDriveFormData] = useState({
+    fecha_testdrive: "",
+    hora_inicio: "",
+    hora_fin: "",
+    modelo_id: "",
+    vin: "",
+    placa: "",
+    descripcion: "",
+    estado: "programado",
+  });
+
+  // Reservas
+  const [reservas, setReservas] = useState([]);
+  const [deleteReservaDialog, setDeleteReservaDialog] = useState(false);
+  const [deleteReservaTarget, setDeleteReservaTarget] = useState(null);
+
+  // Cierres
+  const [cierres, setCierres] = useState([]);
+  const [dialogCierreOpen, setDialogCierreOpen] = useState(false);
+  const [editingCierre, setEditingCierre] = useState(null);
+  const [deleteCierreDialog, setDeleteCierreDialog] = useState(false);
+  const [deleteCierreTarget, setDeleteCierreTarget] = useState(null);
+  const [cierreFormData, setCierreFormData] = useState({
+    detalle: "",
+  });
 
   // Vehículos de interés
   const [vehiculosInteres, setVehiculosInteres] = useState([]);
@@ -51,92 +107,220 @@ export default function OportunidadDetailPage() {
     source: "manual",
   });
 
-  // Etapas disponibles (sin "Reprogramado")
+  // Etapas disponibles
   const etapas = [
     { id: 2, nombre: "Nuevo", label: "Nuevo" },
     { id: 3, nombre: "Asignado", label: "Asignado" },
     { id: 4, nombre: "En Atención", label: "En Atención" },
     { id: 5, nombre: "Test Drive", label: "Test Drive" },
     { id: 6, nombre: "Cotización", label: "Cotización" },
-    { id: 7, nombre: "Evaluación Crédito", label: "Evaluación Crédit..." },
+    { id: 7, nombre: "Evaluación Crédito", label: "Eval. Crédito" },
     { id: 8, nombre: "Reserva", label: "Reserva" },
-    { id: 9, nombre: "Venta Facturada", label: "Venta Facturada" },
+    { id: 9, nombre: "Venta Facturada", label: "Venta" },
     { id: 10, nombre: "Cerrada", label: "Cerrada" },
   ];
 
   const indiceEtapaActual = etapas.findIndex((e) => e.id === etapaActual);
 
+  const getLabel = (etapa) => etapa.label || etapa.nombre;
+
+  // Función para cambiar etapa
+  const cambiarEtapa = async (nuevoEtapaId, detalle) => {
+    try {
+      if (!userId) return false;
+
+      const response = await fetch(`/api/oportunidades/${oportunidadId}/cambiar-etapa`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          etapasconversion_id: nuevoEtapaId,
+          created_by: userId,
+        }),
+      });
+
+      if (response.ok) {
+        setEtapaActual(nuevoEtapaId);
+        await cargarActividades(oportunidadId);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Error cambiando etapa:", error);
+      return false;
+    }
+  };
+
   useEffect(() => {
-    if (!oportunidadId) return;
+    if (!oportunidadId || loadingUserScope) return;
 
     const cargarDatos = async () => {
       try {
-        // Cargar oportunidad
         const resOp = await fetch(`/api/oportunidades/${oportunidadId}`, {
           cache: "no-store",
         });
+        if (!resOp.ok) throw new Error("Error cargando oportunidad");
         const dataOp = await resOp.json();
         setOportunidad(dataOp);
         setFormData(dataOp);
+        setEtapaActual(dataOp.etapasconversion_id);
 
-        // Cargar preguntas
         const resPreg = await fetch("/api/preguntas-atencion?activa=true", {
           cache: "no-store",
         });
-        const dataPreg = await resPreg.json();
-        setPreguntas(Array.isArray(dataPreg) ? dataPreg : []);
+        if (resPreg.ok) {
+          const dataPreg = await resPreg.json();
+          setPreguntas(Array.isArray(dataPreg) ? dataPreg : []);
+        }
 
-        // Cargar respuestas existentes
         const resResp = await fetch(
           `/api/respuestas-atencion?oportunidad_id=${oportunidadId}`,
           { cache: "no-store" }
         );
-        const dataResp = await resResp.json();
-
-        if (Array.isArray(dataResp)) {
-          const respuestasMap = {};
-          dataResp.forEach((r) => {
-            respuestasMap[r.pregunta_id] = r.respuesta;
-          });
-          setRespuestas(respuestasMap);
+        if (resResp.ok) {
+          const dataResp = await resResp.json();
+          if (Array.isArray(dataResp)) {
+            const respuestasMap = {};
+            dataResp.forEach((r) => {
+              respuestasMap[r.pregunta_id] = r.respuesta;
+            });
+            setRespuestas(respuestasMap);
+          }
         }
 
-        // Cargar vehículos de interés
         const resVeh = await fetch(
           `/api/client-interest-vehicles?client_id=${dataOp.cliente_id}`,
           { cache: "no-store" }
         );
-        const dataVeh = await resVeh.json();
-        setVehiculosInteres(Array.isArray(dataVeh) ? dataVeh : []);
+        if (resVeh.ok) {
+          const dataVeh = await resVeh.json();
+          setVehiculosInteres(Array.isArray(dataVeh) ? dataVeh : []);
+        }
 
-        // Cargar marcas y modelos
+        await cargarActividades(oportunidadId);
+
+        const resTestDrives = await fetch(
+          `/api/test-drives?oportunidad_id=${oportunidadId}`,
+          { cache: "no-store" }
+        );
+        if (resTestDrives.ok) {
+          const dataTestDrives = await resTestDrives.json();
+          setTestDrives(Array.isArray(dataTestDrives) ? dataTestDrives : []);
+        }
+
+        const resReservas = await fetch(
+          `/api/reservas?oportunidad_id=${oportunidadId}`,
+          { cache: "no-store" }
+        );
+        if (resReservas.ok) {
+          const dataReservas = await resReservas.json();
+          setReservas(Array.isArray(dataReservas) ? dataReservas : []);
+        }
+
+        const resCierres = await fetch(
+          `/api/cierres?oportunidad_id=${oportunidadId}`,
+          { cache: "no-store" }
+        );
+        if (resCierres.ok) {
+          const dataCierres = await resCierres.json();
+          setCierres(Array.isArray(dataCierres) ? dataCierres : []);
+        }
+
         const [m, mo] = await Promise.all([
-          fetch("/api/marcas", { cache: "no-store" }).then((r) => r.json()),
-          fetch("/api/modelos", { cache: "no-store" }).then((r) => r.json()),
+          fetch("/api/marcas", { cache: "no-store" }).then((r) => r.ok ? r.json() : []),
+          fetch("/api/modelos", { cache: "no-store" }).then((r) => r.ok ? r.json() : []),
         ]);
 
         setMarcas(Array.isArray(m) ? m : []);
         setModelos(Array.isArray(mo) ? mo : []);
-
-        // Cambiar a "En Atención" automáticamente (id: 4)
-        setEtapaActual(4);
       } catch (error) {
         console.error("Error cargando datos:", error);
-        toast.error("Error cargando datos");
+        toast.error("Error cargando datos: " + error.message);
       } finally {
         setLoading(false);
       }
     };
 
     cargarDatos();
-  }, [oportunidadId]);
+  }, [oportunidadId, loadingUserScope]);
+
+  const cargarActividades = async (opId) => {
+    try {
+      setLoadingActividades(true);
+      const resActividades = await fetch(
+        `/api/actividades-oportunidades?oportunidad_id=${opId}`,
+        { cache: "no-store" }
+      );
+      if (resActividades.ok) {
+        const dataActividades = await resActividades.json();
+        setActividades(Array.isArray(dataActividades) ? dataActividades : []);
+      }
+    } catch (error) {
+      console.error("Error cargando actividades:", error);
+    } finally {
+      setLoadingActividades(false);
+    }
+  };
+
+  const handleGuardarActividad = async () => {
+    if (!detalleAccion.trim()) {
+      toast.warning("El detalle es requerido");
+      return;
+    }
+
+    if (!userId) {
+      toast.error("Usuario no identificado");
+      return;
+    }
+
+    setGuardandoActividad(true);
+    try {
+      const nuevaEtapa = etapaProxima !== "sin-cambio" ? Number(etapaProxima) : etapaActual;
+
+      const resActividad = await fetch("/api/actividades-oportunidades", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          oportunidad_id: Number(oportunidadId),
+          etapasconversion_id: nuevaEtapa,
+          detalle: detalleAccion,
+          created_by: userId,
+        }),
+      });
+
+      if (!resActividad.ok) {
+        const data = await resActividad.json();
+        throw new Error(data.message);
+      }
+
+      if (etapaProxima !== "sin-cambio") {
+        const cambioExitoso = await cambiarEtapa(nuevaEtapa);
+        if (!cambioExitoso) throw new Error("Error cambiando etapa");
+      }
+
+      toast.success("Actividad guardada");
+      setDetalleAccion("");
+      setEtapaProxima("sin-cambio");
+
+      await cargarActividades(oportunidadId);
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error: " + error.message);
+    } finally {
+      setGuardandoActividad(false);
+    }
+  };
 
   const handleGuardar = async () => {
     setSaving(true);
     try {
       const etapaSeleccionada = etapas.find((e) => e.id === etapaActual);
 
-      // Guardar cambios de la oportunidad
+      if (!userId) {
+        toast.error("Usuario no identificado");
+        setSaving(false);
+        return;
+      }
+
       await fetch(`/api/oportunidades/${oportunidadId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -147,19 +331,16 @@ export default function OportunidadDetailPage() {
         }),
       });
 
-      // Guardar respuestas de preguntas
-      const usuarioId = localStorage.getItem("usuario_id");
-
       for (const pregunta of preguntas) {
         if (respuestas[pregunta.id] !== undefined) {
           await fetch("/api/respuestas-atencion", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              oportunidad_id: oportunidadId,
+              oportunidad_id: Number(oportunidadId),
               pregunta_id: pregunta.id,
               respuesta: respuestas[pregunta.id],
-              created_by: usuarioId,
+              created_by: userId,
             }),
           });
         }
@@ -180,13 +361,17 @@ export default function OportunidadDetailPage() {
 
   const handleAvanzar = () => {
     if (indiceEtapaActual < etapas.length - 1) {
-      setEtapaActual(etapas[indiceEtapaActual + 1].id);
+      const nuevaEtapa = etapas[indiceEtapaActual + 1];
+      setEtapaActual(nuevaEtapa.id);
+      setFormData((prev) => ({ ...prev, detalle: "" }));
     }
   };
 
   const handleRetroceder = () => {
     if (indiceEtapaActual > 0) {
-      setEtapaActual(etapas[indiceEtapaActual - 1].id);
+      const nuevaEtapa = etapas[indiceEtapaActual - 1];
+      setEtapaActual(nuevaEtapa.id);
+      setFormData((prev) => ({ ...prev, detalle: "" }));
     }
   };
 
@@ -205,7 +390,319 @@ export default function OportunidadDetailPage() {
     }));
   };
 
-  // Vehículos de Interés
+  // TEST DRIVE FUNCTIONS
+  function openCreateTestDrive() {
+    setEditingTestDrive(null);
+    setTestDriveFormData({
+      fecha_testdrive: "",
+      hora_inicio: "",
+      hora_fin: "",
+      modelo_id: "",
+      vin: "",
+      placa: "",
+      descripcion: "",
+      estado: "programado",
+    });
+    setDialogTestDriveOpen(true);
+  }
+
+  function openEditTestDrive(testDrive) {
+    setEditingTestDrive(testDrive);
+    setTestDriveFormData({
+      fecha_testdrive: testDrive.fecha_testdrive || "",
+      hora_inicio: testDrive.hora_inicio || "",
+      hora_fin: testDrive.hora_fin || "",
+      modelo_id: testDrive.modelo_id || "",
+      vin: testDrive.vin || "",
+      placa: testDrive.placa || "",
+      descripcion: testDrive.descripcion || "",
+      estado: testDrive.estado || "programado",
+    });
+    setDialogTestDriveOpen(true);
+  }
+
+  async function saveTestDrive() {
+    if (!testDriveFormData.fecha_testdrive) {
+      return toast.warning("Fecha es requerida");
+    }
+    if (!testDriveFormData.hora_inicio) {
+      return toast.warning("Hora de inicio es requerida");
+    }
+    if (!userId) {
+      return toast.error("Usuario no identificado");
+    }
+    if (!oportunidad?.cliente_id) {
+      return toast.error("Cliente no identificado");
+    }
+
+    try {
+      const url = editingTestDrive
+        ? `/api/test-drives/${editingTestDrive.id}`
+        : "/api/test-drives";
+
+      const method = editingTestDrive ? "PUT" : "POST";
+
+      const body = editingTestDrive
+        ? {
+          hora_inicio: testDriveFormData.hora_inicio,
+          hora_fin: testDriveFormData.hora_fin || null,
+          vin: testDriveFormData.vin || null,
+          placa: testDriveFormData.placa || null,
+          descripcion: testDriveFormData.descripcion || null,
+          estado: testDriveFormData.estado || "programado",
+        }
+        : {
+          oportunidad_id: Number(oportunidadId),
+          cliente_id: Number(oportunidad.cliente_id),
+          fecha_testdrive: testDriveFormData.fecha_testdrive,
+          hora_inicio: testDriveFormData.hora_inicio,
+          hora_fin: testDriveFormData.hora_fin || null,
+          modelo_id: testDriveFormData.modelo_id ? Number(testDriveFormData.modelo_id) : null,
+          vin: testDriveFormData.vin || null,
+          placa: testDriveFormData.placa || null,
+          descripcion: testDriveFormData.descripcion || null,
+          estado: testDriveFormData.estado || "programado",
+          created_by: userId,
+        };
+
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (response.ok) {
+        toast.success(editingTestDrive ? "Test Drive actualizado" : "Test Drive creado");
+        setDialogTestDriveOpen(false);
+
+        // Cambiar automáticamente a etapa "Test Drive" (id: 5) si es nueva creación
+        if (!editingTestDrive) {
+          const cambioExitoso = await cambiarEtapa(5, "Test drive programado");
+          if (cambioExitoso) {
+            toast.success("Etapa cambiada a Test Drive");
+          }
+        }
+
+        const resTestDrives = await fetch(
+          `/api/test-drives?oportunidad_id=${oportunidadId}`,
+          { cache: "no-store" }
+        );
+        if (resTestDrives.ok) {
+          const dataTestDrives = await resTestDrives.json();
+          setTestDrives(Array.isArray(dataTestDrives) ? dataTestDrives : []);
+        }
+      } else {
+        const data = await response.json();
+        toast.error(data.message || "Error guardando test drive");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Error guardando test drive: " + error.message);
+    }
+  }
+
+  async function deleteTestDrive() {
+    try {
+      const response = await fetch(
+        `/api/test-drives/${deleteTestDriveTarget.id}`,
+        { method: "DELETE" }
+      );
+
+      if (response.ok) {
+        toast.success("Test Drive eliminado");
+        setDeleteTestDriveDialog(false);
+
+        const resTestDrives = await fetch(
+          `/api/test-drives?oportunidad_id=${oportunidadId}`,
+          { cache: "no-store" }
+        );
+        if (resTestDrives.ok) {
+          const dataTestDrives = await resTestDrives.json();
+          setTestDrives(Array.isArray(dataTestDrives) ? dataTestDrives : []);
+        }
+      } else {
+        toast.error("Error eliminando test drive");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Error eliminando test drive: " + error.message);
+    }
+  }
+
+  // RESERVA FUNCTIONS
+  async function createReserva() {
+    if (!userId) {
+      return toast.error("Usuario no identificado");
+    }
+
+    try {
+      const response = await fetch("/api/reservas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          oportunidad_id: Number(oportunidadId),
+          created_by: userId,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success("Reserva creada");
+
+        // Cambiar automáticamente a etapa "Reserva" (id: 8)
+        const cambioExitoso = await cambiarEtapa(8, "Reserva creada");
+        if (cambioExitoso) {
+          toast.success("Etapa cambiada a Reserva");
+        }
+
+        const resReservas = await fetch(
+          `/api/reservas?oportunidad_id=${oportunidadId}`,
+          { cache: "no-store" }
+        );
+        if (resReservas.ok) {
+          const dataReservas = await resReservas.json();
+          setReservas(Array.isArray(dataReservas) ? dataReservas : []);
+        }
+      } else {
+        const data = await response.json();
+        toast.error(data.message || "Error creando reserva");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Error creando reserva: " + error.message);
+    }
+  }
+
+  async function deleteReserva() {
+    try {
+      const response = await fetch(
+        `/api/reservas/${deleteReservaTarget.id}`,
+        { method: "DELETE" }
+      );
+
+      if (response.ok) {
+        toast.success("Reserva eliminada");
+        setDeleteReservaDialog(false);
+
+        const resReservas = await fetch(
+          `/api/reservas?oportunidad_id=${oportunidadId}`,
+          { cache: "no-store" }
+        );
+        if (resReservas.ok) {
+          const dataReservas = await resReservas.json();
+          setReservas(Array.isArray(dataReservas) ? dataReservas : []);
+        }
+      } else {
+        toast.error("Error eliminando reserva");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Error eliminando reserva: " + error.message);
+    }
+  }
+
+  // CIERRE FUNCTIONS
+  function openCreateCierre() {
+    setEditingCierre(null);
+    setCierreFormData({ detalle: "" });
+    setDialogCierreOpen(true);
+  }
+
+  function openEditCierre(cierre) {
+    setEditingCierre(cierre);
+    setCierreFormData({ detalle: cierre.detalle });
+    setDialogCierreOpen(true);
+  }
+
+  async function saveCierre() {
+    if (!cierreFormData.detalle.trim()) {
+      return toast.warning("Detalle del cierre es requerido");
+    }
+
+    if (!userId) {
+      return toast.error("Usuario no identificado");
+    }
+
+    try {
+      const url = editingCierre
+        ? `/api/cierres/${editingCierre.id}`
+        : "/api/cierres";
+
+      const method = editingCierre ? "PUT" : "POST";
+
+      const body = editingCierre
+        ? { detalle: cierreFormData.detalle }
+        : {
+          oportunidad_id: Number(oportunidadId),
+          detalle: cierreFormData.detalle,
+          created_by: userId,
+        };
+
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (response.ok) {
+        toast.success(editingCierre ? "Cierre actualizado" : "Cierre creado");
+        setDialogCierreOpen(false);
+        setCierreFormData({ detalle: "" });
+
+        // Cambiar automáticamente a etapa "Cerrada" (id: 10) si es nueva creación
+        if (!editingCierre) {
+          const cambioExitoso = await cambiarEtapa(10, "Oportunidad cerrada: " + cierreFormData.detalle);
+          if (cambioExitoso) {
+            toast.success("Etapa cambiada a Cerrada");
+          }
+        }
+
+        const resCierres = await fetch(
+          `/api/cierres?oportunidad_id=${oportunidadId}`,
+          { cache: "no-store" }
+        );
+        if (resCierres.ok) {
+          const dataCierres = await resCierres.json();
+          setCierres(Array.isArray(dataCierres) ? dataCierres : []);
+        }
+      } else {
+        const data = await response.json();
+        toast.error(data.message || "Error guardando cierre");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Error guardando cierre: " + error.message);
+    }
+  }
+
+  async function deleteCierre() {
+    try {
+      const response = await fetch(
+        `/api/cierres/${deleteCierreTarget.id}`,
+        { method: "DELETE" }
+      );
+
+      if (response.ok) {
+        toast.success("Cierre eliminado");
+        setDeleteCierreDialog(false);
+
+        const resCierres = await fetch(
+          `/api/cierres?oportunidad_id=${oportunidadId}`,
+          { cache: "no-store" }
+        );
+        if (resCierres.ok) {
+          const dataCierres = await resCierres.json();
+          setCierres(Array.isArray(dataCierres) ? dataCierres : []);
+        }
+      } else {
+        toast.error("Error eliminando cierre");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Error eliminando cierre: " + error.message);
+    }
+  }
+
+  // VEHÍCULOS FUNCTIONS
   function openCreateVehiculo() {
     setEditingVehiculo(null);
     setVehiculoFormData({
@@ -259,13 +756,14 @@ export default function OportunidadDetailPage() {
         );
         setDialogVehiculoOpen(false);
 
-        // Recargar vehículos
         const resVeh = await fetch(
           `/api/client-interest-vehicles?client_id=${oportunidad.cliente_id}`,
           { cache: "no-store" }
         );
-        const dataVeh = await resVeh.json();
-        setVehiculosInteres(Array.isArray(dataVeh) ? dataVeh : []);
+        if (resVeh.ok) {
+          const dataVeh = await resVeh.json();
+          setVehiculosInteres(Array.isArray(dataVeh) ? dataVeh : []);
+        }
       } else {
         const data = await response.json();
         toast.error(data.message);
@@ -292,13 +790,14 @@ export default function OportunidadDetailPage() {
         toast.success("Vehículo eliminado");
         setDeleteVehiculoDialog(false);
 
-        // Recargar vehículos
         const resVeh = await fetch(
           `/api/client-interest-vehicles?client_id=${oportunidad.cliente_id}`,
           { cache: "no-store" }
         );
-        const dataVeh = await resVeh.json();
-        setVehiculosInteres(Array.isArray(dataVeh) ? dataVeh : []);
+        if (resVeh.ok) {
+          const dataVeh = await resVeh.json();
+          setVehiculosInteres(Array.isArray(dataVeh) ? dataVeh : []);
+        }
       } else {
         toast.error("Error eliminando vehículo");
       }
@@ -404,9 +903,9 @@ export default function OportunidadDetailPage() {
     }
   };
 
-  if (loading) {
+  if (loading || loadingUserScope) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
       </div>
     );
@@ -414,8 +913,8 @@ export default function OportunidadDetailPage() {
 
   if (!oportunidad) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-600">Oportunidad no encontrada</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <p className="text-slate-600">Oportunidad no encontrada</p>
       </div>
     );
   }
@@ -425,500 +924,1209 @@ export default function OportunidadDetailPage() {
     ? modelos.filter((m) => m.marca_id === parseInt(vehiculoFormData.marca_id))
     : [];
 
+  const temperaturaNum = oportunidad.temperatura || 0;
+  let temperaturaColor = "bg-slate-400";
+  let temperaturaLabel = "Fría";
+
+  if (temperaturaNum >= 75) {
+    temperaturaColor = "bg-red-500";
+    temperaturaLabel = "Muy caliente";
+  } else if (temperaturaNum >= 50) {
+    temperaturaColor = "bg-orange-500";
+    temperaturaLabel = "Caliente";
+  } else if (temperaturaNum >= 25) {
+    temperaturaColor = "bg-yellow-500";
+    temperaturaLabel = "Templada";
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b p-6 sticky top-0 z-10">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold">{oportunidad.cliente_name}</h1>
-            <p className="text-gray-600">{oportunidad.oportunidad_id}</p>
-          </div>
-          <button
-            onClick={handleCancelar}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        {/* Etapas Navigator */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-4">
-          {etapas.map((etapa, index) => (
-            <div key={etapa.id} className="flex items-center gap-2 flex-shrink-0">
-              <button
-                onClick={() => setEtapaActual(etapa.id)}
-                className={`px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap transition-all ${etapaActual === etapa.id
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                  }`}
-              >
-                {etapa.label}
-              </button>
-
-              {index < etapas.length - 1 && (
-                <div className="w-8 h-0.5 bg-gray-300" />
-              )}
+    <TooltipProvider>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        {/* HEADER */}
+        <div className="bg-white border-b border-slate-200 p-6 sticky top-0 z-20 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900">{oportunidad.cliente_name}</h1>
+              <p className="text-slate-600 text-sm mt-1">{oportunidad.oportunidad_id}</p>
             </div>
-          ))}
-        </div>
-      </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleCancelar}
+                  className="text-slate-500 hover:text-slate-700 p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Cerrar</TooltipContent>
+            </Tooltip>
+          </div>
 
-      {/* Content */}
-      <div className="p-6 max-w-6xl mx-auto">
-        <div className="grid grid-cols-3 gap-6">
-          {/* Left: Información de la Oportunidad */}
-          <div className="col-span-2 space-y-6">
-            {/* Información General */}
-            <div className="bg-white rounded-lg border p-6">
-              <h2 className="text-lg font-semibold mb-4">Información General</h2>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Cliente</label>
-                    <p className="text-gray-900 font-medium">{oportunidad.cliente_name}</p>
+          {/* ETAPAS NAVIGATOR */}
+          <div className="overflow-x-auto pb-2">
+            <div className="flex items-center gap-1 min-w-min">
+              {etapas.map((etapa, index) => {
+                const isCompleted = indiceEtapaActual > index;
+                const isActive = etapaActual === etapa.id;
+
+                return (
+                  <div key={etapa.id} className="flex items-center gap-1 flex-shrink-0">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => setEtapaActual(etapa.id)}
+                          className={`px-3 py-2 rounded-lg font-medium text-xs whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                            isActive
+                              ? "bg-blue-600 text-white shadow-lg"
+                              : isCompleted
+                              ? "bg-green-100 text-green-700 hover:bg-green-200"
+                              : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+                          }`}
+                        >
+                          {isCompleted && <Check size={14} />}
+                          {etapa.label}
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">{etapa.nombre}</TooltipContent>
+                    </Tooltip>
+
+                    {index < etapas.length - 1 && (
+                      <div className={`w-6 h-0.5 ${isCompleted ? "bg-green-400" : "bg-slate-300"}`} />
+                    )}
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Código</label>
-                    <p className="text-gray-900 font-medium">{oportunidad.oportunidad_id}</p>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* CONTENT */}
+        <div className="p-6 max-w-7xl mx-auto">
+          <div className="grid grid-cols-3 gap-6">
+            {/* LEFT COLUMN */}
+            <div className="col-span-2 space-y-6">
+              {/* INFORMACIÓN GENERAL */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Información General</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-slate-600 font-semibold uppercase">Cliente</p>
+                      <p className="text-slate-900 font-medium">{oportunidad.cliente_name}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 font-semibold uppercase">Código</p>
+                      <p className="text-slate-900 font-mono font-medium">{oportunidad.oportunidad_id}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 font-semibold uppercase">Vehículo</p>
+                      <p className="text-slate-900">{oportunidad.marca_name} {oportunidad.modelo_name}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 font-semibold uppercase">Origen</p>
+                      <p className="text-slate-900">{oportunidad.origen_name}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 font-semibold uppercase">Suborigen</p>
+                      <p className="text-slate-900">{oportunidad.suborigen_name}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 font-semibold uppercase">Asignado a</p>
+                      <p className="text-slate-900">{oportunidad.asignado_a_name}</p>
+                    </div>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* INFORMACIÓN ADICIONAL */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Información Adicional</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-xs text-slate-600 font-semibold uppercase">Correo</p>
+                      <p className="text-slate-900">{oportunidad.email || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 font-semibold uppercase">Teléfono</p>
+                      <p className="text-slate-900">{oportunidad.telefono || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 font-semibold uppercase">Celular</p>
+                      <p className="text-slate-900">{oportunidad.celular || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-600 font-semibold uppercase">DNI</p>
+                      <p className="text-slate-900">{oportunidad.documento || "-"}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* VEHÍCULOS DE INTERÉS */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-lg">Vehículos de Interés</CardTitle>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button onClick={openCreateVehiculo} size="sm" className="gap-2">
+                        <Plus className="h-4 w-4" /> Agregar
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Agregar vehículo de interés</TooltipContent>
+                  </Tooltip>
+                </CardHeader>
+                <CardContent>
+                  {vehiculosInteres.length === 0 ? (
+                    <p className="text-slate-500 text-sm py-4">Sin vehículos de interés</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {vehiculosInteres.map((vehiculo) => (
+                        <div
+                          key={vehiculo.id}
+                          className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors"
+                        >
+                          <div>
+                            <p className="font-medium text-slate-900">
+                              {vehiculo.marca || "Sin marca"} {vehiculo.modelo || ""}
+                            </p>
+                            <p className="text-xs text-slate-600">
+                              {vehiculo.anio_interes || "Sin año"} • {vehiculo.source}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  onClick={() => openEditVehiculo(vehiculo)}
+                                  className="h-8 w-8"
+                                >
+                                  <Pencil size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Editar</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="destructive"
+                                  onClick={() => openDeleteVehiculo(vehiculo)}
+                                  className="h-8 w-8"
+                                >
+                                  <Trash2 size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Eliminar</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* INFORMACIÓN DE ETAPA */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">
+                    Información de {etapaActualObj?.nombre}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Vehículo</label>
-                    <p className="text-gray-900">
-                      {oportunidad.modelo_name} - {oportunidad.marca_name}
+                    <label className="text-sm font-semibold text-slate-700 block mb-2">
+                      Notas de la Etapa
+                    </label>
+                    <textarea
+                      name="detalle"
+                      value={formData.detalle || ""}
+                      onChange={handleInputChange}
+                      placeholder="Añade notas sobre esta etapa"
+                      className="w-full p-3 border border-slate-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
+                      rows="3"
+                    />
+                  </div>
+
+                  {/* PREGUNTAS */}
+                  {preguntas.length > 0 && (
+                    <div className="space-y-4 pt-4 border-t border-slate-200">
+                      <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                        <MessageSquare size={18} />
+                        Preguntas de Atención
+                      </h3>
+
+                      {preguntas.map((pregunta) => (
+                        <div key={pregunta.id}>
+                          <label className="text-sm font-medium text-slate-700 flex items-center gap-1">
+                            {pregunta.pregunta}
+                            {pregunta.es_obligatoria && (
+                              <span className="text-red-500">*</span>
+                            )}
+                          </label>
+                          {renderCampoPregunta(pregunta)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* TEST DRIVES */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Calendar size={18} />
+                    Test Drives
+                  </CardTitle>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button onClick={openCreateTestDrive} size="sm" className="gap-2">
+                        <Plus className="h-4 w-4" /> Agregar
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Programar nuevo test drive</TooltipContent>
+                  </Tooltip>
+                </CardHeader>
+                <CardContent>
+                  {testDrives.length === 0 ? (
+                    <p className="text-slate-500 text-sm py-4">Sin test drives registrados</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {testDrives.map((testDrive) => (
+                        <div
+                          key={testDrive.id}
+                          className="flex items-start justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"
+                        >
+                          <div className="flex-1">
+                            <p className="font-medium text-slate-900">
+                              {new Date(testDrive.fecha_testdrive).toLocaleDateString("es-ES")} a las {testDrive.hora_inicio}
+                            </p>
+                            <p className="text-xs text-slate-600 mt-1">
+                              {testDrive.placa && `Placa: ${testDrive.placa}`}
+                              {testDrive.vin && ` • VIN: ${testDrive.vin}`}
+                            </p>
+                            {testDrive.descripcion && (
+                              <p className="text-xs text-slate-700 mt-1">{testDrive.descripcion}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs px-2 py-1 rounded-full font-semibold ${
+                              testDrive.estado === 'realizado' ? 'bg-green-100 text-green-700' :
+                              testDrive.estado === 'cancelado' ? 'bg-red-100 text-red-700' :
+                              'bg-blue-100 text-blue-700'
+                            }`}>
+                              {testDrive.estado}
+                            </span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  onClick={() => openEditTestDrive(testDrive)}
+                                  className="h-8 w-8"
+                                >
+                                  <Pencil size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Editar</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="destructive"
+                                  onClick={() => {
+                                    setDeleteTestDriveTarget(testDrive);
+                                    setDeleteTestDriveDialog(true);
+                                  }}
+                                  className="h-8 w-8"
+                                >
+                                  <Trash2 size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Eliminar</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* RESERVAS */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <FileText size={18} />
+                    Reservas
+                  </CardTitle>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        onClick={createReserva} 
+                        size="sm" 
+                        className="gap-2"
+                        disabled={reservas.length > 0}
+                      >
+                        <Plus className="h-4 w-4" /> Agregar
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      {reservas.length > 0 ? "Ya existe una reserva" : "Crear nueva reserva"}
+                    </TooltipContent>
+                  </Tooltip>
+                </CardHeader>
+                <CardContent>
+                  {reservas.length === 0 ? (
+                    <p className="text-slate-500 text-sm py-4">Sin reservas registradas</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {reservas.map((reserva) => (
+                        <div
+                          key={reserva.id}
+                          className="flex items-start justify-between p-3 bg-green-50 rounded-lg border border-green-200"
+                        >
+                          <div>
+                            <p className="font-medium text-green-900">
+                              Reserva creada el {new Date(reserva.created_at).toLocaleDateString("es-ES")}
+                            </p>
+                            <p className="text-xs text-green-700 mt-1">
+                              ID: {reserva.id}
+                            </p>
+                          </div>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="destructive"
+                                onClick={() => {
+                                  setDeleteReservaTarget(reserva);
+                                  setDeleteReservaDialog(true);
+                                }}
+                                className="h-8 w-8"
+                              >
+                                <Trash2 size={14} />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Eliminar</TooltipContent>
+                          </Tooltip>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* CIERRES */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Lock size={18} />
+                    Cierres
+                  </CardTitle>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button onClick={openCreateCierre} size="sm" className="gap-2">
+                        <Plus className="h-4 w-4" /> Agregar
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Registrar cierre de oportunidad</TooltipContent>
+                  </Tooltip>
+                </CardHeader>
+                <CardContent>
+                  {cierres.length === 0 ? (
+                    <p className="text-slate-500 text-sm py-4">Sin cierres registrados</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {cierres.map((cierre) => (
+                        <div
+                          key={cierre.id}
+                          className="flex items-start justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"
+                        >
+                          <div className="flex-1">
+                            <p className="text-xs font-semibold text-slate-600 uppercase mb-1">
+                              {new Date(cierre.created_at).toLocaleString("es-ES")}
+                            </p>
+                            <p className="text-sm text-slate-900">{cierre.detalle}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  onClick={() => openEditCierre(cierre)}
+                                  className="h-8 w-8"
+                                >
+                                  <Pencil size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Editar</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="destructive"
+                                  onClick={() => {
+                                    setDeleteCierreTarget(cierre);
+                                    setDeleteCierreDialog(true);
+                                  }}
+                                  className="h-8 w-8"
+                                >
+                                  <Trash2 size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Eliminar</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* COTIZACIÓN */}
+              <div className="bg-white rounded-lg border border-slate-200 p-6">
+                <CotizacionAgendaSection
+                  oportunidadId={oportunidadId}
+                  clienteId={oportunidad.cliente_id}
+                  oportunidadData={oportunidad}
+                  onCotizacionCreated={async () => {
+                    // Cambiar automáticamente a etapa "Cotización" (id: 6)
+                    const cambioExitoso = await cambiarEtapa(6, "Cotización creada");
+                    if (cambioExitoso) {
+                      toast.success("Etapa cambiada a Cotización");
+                    }
+                  }}
+                />
+              </div>
+
+              {/* REGISTRAR ACTIVIDAD Y HISTORIAL */}
+              <div className="md:col-span-2 space-y-4 pt-6 border-t-2 border-slate-200">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 space-y-3 border border-blue-200">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare size={18} className="text-blue-600" />
+                    <h3 className="text-sm font-semibold text-slate-900">
+                      Registrar nueva actividad
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-sm font-medium text-slate-700 block mb-2">
+                        Actividad a realizar (opcional)
+                      </label>
+                      <Select
+                        value={etapaProxima}
+                        onValueChange={setEtapaProxima}
+                        disabled={guardandoActividad}
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Seleccionar etapa" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="sin-cambio">
+                            Sin actividad
+                          </SelectItem>
+                          {etapas.map((item) => (
+                            <SelectItem key={item.id} value={String(item.id)}>
+                              {getLabel(item)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 block mb-2">
+                      Detalle *
+                    </label>
+                    <textarea
+                      className="w-full h-20 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
+                      value={detalleAccion}
+                      onChange={(e) => setDetalleAccion(e.target.value)}
+                      placeholder="Describe qué acción se realizó, qué se comentó, etc."
+                      disabled={guardandoActividad}
+                    />
+                  </div>
+
+                  <Button
+                    onClick={handleGuardarActividad}
+                    disabled={guardandoActividad || !detalleAccion.trim()}
+                    className="w-full bg-blue-600 hover:bg-blue-700"
+                    size="sm"
+                  >
+                    {guardandoActividad
+                      ? "Guardando..."
+                      : "Guardar actividad" +
+                      (etapaProxima !== "sin-cambio"
+                        ? " y cambiar etapa"
+                        : "")}
+                  </Button>
+                </div>
+
+                {/* HISTORIAL */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <History size={18} className="text-slate-600" />
+                    <h3 className="text-sm font-semibold text-slate-900">
+                      Historial ({actividades.length})
+                    </h3>
+                  </div>
+
+                  {loadingActividades ? (
+                    <div className="text-center text-muted-foreground text-sm py-4 bg-slate-50 rounded">
+                      Cargando...
+                    </div>
+                  ) : actividades.length === 0 ? (
+                    <div className="text-center text-muted-foreground text-sm py-4 bg-slate-50 rounded border border-dashed border-slate-300">
+                      No hay actividades
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2">
+                      {actividades.map((actividad) => {
+                        const etapaActividad = actividad.etapasconversion_id
+                          ? etapas.find(
+                            (e) => e.id === actividad.etapasconversion_id
+                          )
+                          : null;
+
+                        return (
+                          <div
+                            key={actividad.id}
+                            className="border border-slate-200 rounded p-3 bg-white text-xs space-y-2 hover:shadow-md hover:border-blue-300 transition-all"
+                          >
+                            <div className="flex justify-between items-start gap-2">
+                              <div>
+                                <p className="font-semibold text-slate-800">
+                                  {actividad.created_by_name ||
+                                    `ID ${actividad.created_by}`}
+                                </p>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <p className="text-slate-500">
+                                  {format(
+                                    new Date(actividad.created_at),
+                                    "dd/MM HH:mm",
+                                    { locale: es }
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+
+                            {etapaActividad && (
+                              <div>
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 rounded-full text-xs font-semibold border border-blue-200">
+                                  {getLabel(etapaActividad)}
+                                </span>
+                              </div>
+                            )}
+
+                            <p className="text-slate-700 line-clamp-3 leading-relaxed">
+                              {actividad.detalle}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN */}
+            <div className="space-y-4">
+              {/* ETAPA ACTUAL */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Estado Actual</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg">
+                    <p className="text-2xl font-bold text-blue-900">
+                      {etapaActualObj?.nombre}
+                    </p>
+                    <p className="text-xs text-blue-700 mt-2">
+                      Etapa {indiceEtapaActual + 1} de {etapas.length}
                     </p>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Origen</label>
-                    <p className="text-gray-900">{oportunidad.origen_name}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Suborigen</label>
-                    <p className="text-gray-900">{oportunidad.suborigen_name}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Asignado a</label>
-                    <p className="text-gray-900">{oportunidad.asignado_a_name}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            {/* Información Adicional */}
-            <div className="bg-white rounded-lg border p-6">
-              <h2 className="text-lg font-semibold mb-4">Información Adicional</h2>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-600">Correo Electrónico</p>
-                  <p className="font-medium">{oportunidad.email || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Teléfono</p>
-                  <p className="font-medium">{oportunidad.telefono || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Celular</p>
-                  <p className="font-medium">{oportunidad.celular || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">DNI</p>
-                  <p className="font-medium">{oportunidad.documento || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Fecha de Creación</p>
-                  <p className="font-medium">
-                    {oportunidad.created_at
-                      ? new Date(oportunidad.created_at).toLocaleDateString("es-ES")
-                      : "-"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Última Actualización</p>
-                  <p className="font-medium">
-                    {oportunidad.updated_at
-                      ? new Date(oportunidad.updated_at).toLocaleDateString("es-ES")
-                      : "-"}
-                  </p>
-                </div>
-              </div>
-            </div>
-            {/* Vehículos de Interés */}
-            <div className="bg-white rounded-lg border p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold">Vehículos de Interés</h2>
-                <Button onClick={openCreateVehiculo} size="sm">
-                  <Plus className="h-4 w-4 mr-2" /> Agregar
-                </Button>
-              </div>
+                </CardContent>
+              </Card>
 
-              {vehiculosInteres.length === 0 ? (
-                <p className="text-gray-500 text-sm py-4">No hay vehículos de interés registrados</p>
-              ) : (
-                <div className="space-y-2">
-                  {vehiculosInteres.map((vehiculo) => (
-                    <div
-                      key={vehiculo.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded border"
-                    >
-                      <div>
-                        <p className="font-medium">
-                          {vehiculo.marca || "Sin marca"} {vehiculo.modelo || ""}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {vehiculo.anio_interes || "Sin año"} • {vehiculo.source}
-                        </p>
+              {/* TEMPERATURA */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Temperatura</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="cursor-help">
+                        <div className="text-4xl font-bold text-slate-900 mb-2">
+                          {temperaturaNum}%
+                        </div>
+                        <div className={`text-sm font-semibold text-white p-2 rounded-lg text-center ${
+                          temperaturaNum >= 75 ? "bg-red-500" :
+                          temperaturaNum >= 50 ? "bg-orange-500" :
+                          temperaturaNum >= 25 ? "bg-yellow-500" :
+                          "bg-slate-500"
+                        }`}>
+                          {temperaturaLabel}
+                        </div>
+                        <div className="mt-3 w-full h-3 bg-slate-200 rounded-full overflow-hidden">
+                          <div
+                            className={temperaturaColor}
+                            style={{ width: `${temperaturaNum}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          onClick={() => openEditVehiculo(vehiculo)}
-                        >
-                          <Pencil size={16} />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="destructive"
-                          onClick={() => openDeleteVehiculo(vehiculo)}
-                        >
-                          <Trash2 size={16} />
-                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <div className="text-xs">
+                        <div>Indicador de temperatura</div>
+                        <div className="mt-1">0-24%: Fría | 25-49%: Templada | 50-74%: Caliente | 75-100%: Muy caliente</div>
                       </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </CardContent>
+              </Card>
+
+              {/* PROGRESO */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Progreso</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="text-slate-600">Avance</span>
+                      <span className="font-semibold text-slate-900">
+                        {Math.round(((indiceEtapaActual + 1) / etapas.length) * 100)}%
+                      </span>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Información de la Etapa */}
-            <div className="bg-white rounded-lg border p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">
-                  Información de {etapaActualObj?.nombre}
-                </h2>
-                <Edit2 className="w-5 h-5 text-gray-400" />
-              </div>
-
-              <div className="space-y-4">
-                {/* Notas */}
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Notas</label>
-                  <textarea
-                    name="detalle"
-                    value={formData.detalle || ""}
-                    onChange={handleInputChange}
-                    placeholder="Añade notas sobre esta etapa"
-                    className="w-full mt-1 p-2 border rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
-                    rows="3"
-                  />
-                </div>
-
-                {/* Preguntas del Formulario */}
-                {preguntas.length > 0 && (
-                  <div className="space-y-4 mt-6 pt-6 border-t">
-                    <h3 className="font-semibold text-gray-900">
-                      Preguntas de Atención
-                    </h3>
-
-                    {preguntas.map((pregunta) => (
-                      <div key={pregunta.id}>
-                        <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                          {pregunta.pregunta}
-                          {pregunta.es_obligatoria && (
-                            <span className="text-red-500">*</span>
-                          )}
-                        </label>
-                        {renderCampoPregunta(pregunta)}
-                      </div>
-                    ))}
+                    <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all"
+                        style={{
+                          width: `${((indiceEtapaActual + 1) / etapas.length) * 100}%`,
+                        }}
+                      />
+                    </div>
                   </div>
-                )}
+                </CardContent>
+              </Card>
 
-                {preguntas.length === 0 && (
-                  <div className="p-4 bg-yellow-50 rounded text-yellow-700 text-sm">
-                    No hay preguntas configuradas para esta etapa.
+              {/* ACCIONES */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Acciones</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex gap-2">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          onClick={handleRetroceder}
+                          disabled={indiceEtapaActual === 0}
+                          variant="outline"
+                          className="flex-1 gap-2"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                          Atrás
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">Ir a etapa anterior</TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          onClick={handleAvanzar}
+                          disabled={indiceEtapaActual === etapas.length - 1}
+                          variant="outline"
+                          className="flex-1 gap-2"
+                        >
+                          Adelante
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">Ir a etapa siguiente</TooltipContent>
+                    </Tooltip>
                   </div>
-                )}
-              </div>
-            </div>
 
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        onClick={handleGuardar}
+                        disabled={saving}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white gap-2"
+                      >
+                        {saving ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Guardando...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="h-4 w-4" />
+                            Guardar
+                          </>
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Guardar cambios</TooltipContent>
+                  </Tooltip>
 
-          </div>
-
-          {/* Right: Panel de Acciones */}
-          <div className="space-y-4">
-            <div className="bg-white rounded-lg border p-6">
-              <h3 className="font-semibold mb-4">Etapa Actual</h3>
-              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded">
-                <p className="text-lg font-bold text-blue-900">
-                  {etapaActualObj?.nombre}
-                </p>
-              </div>
-
-              {/* Botones de navegación */}
-              <div className="space-y-3">
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleRetroceder}
-                    disabled={indiceEtapaActual === 0}
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    <ChevronLeft className="w-4 h-4 mr-1" />
-                    Atrás
-                  </Button>
-                  <Button
-                    onClick={handleAvanzar}
-                    disabled={indiceEtapaActual === etapas.length - 1}
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    Adelante
-                    <ChevronRight className="w-4 h-4 ml-1" />
-                  </Button>
-                </div>
-
-                <Button
-                  onClick={handleGuardar}
-                  disabled={saving}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white"
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Guardando...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      Guardar
-                    </>
-                  )}
-                </Button>
-
-                <Button
-                  onClick={handleCancelar}
-                  variant="outline"
-                  className="w-full"
-                >
-                  Cancelar
-                </Button>
-              </div>
-            </div>
-
-            {/* Resumen de Etapas */}
-            <div className="bg-white rounded-lg border p-6">
-              <h3 className="font-semibold mb-4">Progreso</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Etapa</span>
-                  <span className="font-medium">
-                    {indiceEtapaActual + 1} de {etapas.length}
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full transition-all"
-                    style={{
-                      width: `${((indiceEtapaActual + 1) / etapas.length) * 100}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Status Card */}
-            <div className="bg-white rounded-lg border p-6">
-              <h3 className="font-semibold mb-4">Estado</h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Etapa Actual:</span>
-                  <span className="font-medium text-blue-600">
-                    {etapaActualObj?.nombre}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Fecha Agenda:</span>
-                  <span className="font-medium">
-                    {oportunidad.fecha_agenda
-                      ? new Date(oportunidad.fecha_agenda).toLocaleDateString("es-ES")
-                      : "-"}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Hora:</span>
-                  <span className="font-medium">
-                    {oportunidad.hora_agenda
-                      ? String(oportunidad.hora_agenda).slice(0, 5)
-                      : "-"}
-                  </span>
-                </div>
-              </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        onClick={handleCancelar}
+                        variant="outline"
+                        className="w-full"
+                      >
+                        Cancelar
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Volver atrás sin guardar</TooltipContent>
+                  </Tooltip>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>
+
+        {/* DIALOGS */}
+
+        {/* VEHÍCULO DIALOG */}
+        <Dialog open={dialogVehiculoOpen} onOpenChange={setDialogVehiculoOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {editingVehiculo ? "Editar Vehículo" : "Agregar Vehículo de Interés"}
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-slate-700 block mb-2">
+                  Marca
+                </label>
+                <Select
+                  value={vehiculoFormData.marca_id.toString()}
+                  onValueChange={(value) =>
+                    setVehiculoFormData((prev) => ({
+                      ...prev,
+                      marca_id: value,
+                      modelo_id: "",
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona una marca" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {marcas.map((m) => (
+                      <SelectItem key={m.id} value={m.id.toString()}>
+                        {m.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-slate-700 block mb-2">
+                  Modelo
+                </label>
+                <Select
+                  value={vehiculoFormData.modelo_id.toString()}
+                  onValueChange={(value) =>
+                    setVehiculoFormData((prev) => ({
+                      ...prev,
+                      modelo_id: value,
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona un modelo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vehiculoFormData.marca_id && modelos
+                      .filter((m) => m.marca_id === parseInt(vehiculoFormData.marca_id))
+                      .map((m) => (
+                        <SelectItem key={m.id} value={m.id.toString()}>
+                          {m.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-slate-700 block mb-2">
+                  Año de Interés
+                </label>
+                <Input
+                  type="number"
+                  value={vehiculoFormData.anio_interes}
+                  onChange={(e) =>
+                    setVehiculoFormData((prev) => ({
+                      ...prev,
+                      anio_interes: parseInt(e.target.value),
+                    }))
+                  }
+                  placeholder="Ej: 2024"
+                  min={2000}
+                  max={new Date().getFullYear() + 1}
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-slate-700 block mb-2">
+                  Origen
+                </label>
+                <Select
+                  value={vehiculoFormData.source}
+                  onValueChange={(value) =>
+                    setVehiculoFormData((prev) => ({
+                      ...prev,
+                      source: value,
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manual">Manual</SelectItem>
+                    <SelectItem value="lead">Lead</SelectItem>
+                    <SelectItem value="oportunidad">Oportunidad</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setDialogVehiculoOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button onClick={saveVehiculo}>
+                {editingVehiculo ? "Actualizar" : "Agregar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={deleteVehiculoDialog} onOpenChange={setDeleteVehiculoDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar eliminación</AlertDialogTitle>
+              <AlertDialogDescription>
+                ¿Eliminar el interés en {deleteVehiculoTarget?.marca} {deleteVehiculoTarget?.modelo}?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="flex gap-3 justify-end">
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDeleteVehiculo}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Eliminar
+              </AlertDialogAction>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* TEST DRIVE DIALOG */}
+        <Dialog open={dialogTestDriveOpen} onOpenChange={setDialogTestDriveOpen}>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {editingTestDrive ? "Editar Test Drive" : "Programar Test Drive"}
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-slate-700 block mb-2">
+                  Fecha *
+                </label>
+                <Input
+                  type="date"
+                  value={testDriveFormData.fecha_testdrive}
+                  onChange={(e) =>
+                    setTestDriveFormData((prev) => ({
+                      ...prev,
+                      fecha_testdrive: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-slate-700 block mb-2">
+                    Hora Inicio *
+                  </label>
+                  <Input
+                    type="time"
+                    value={testDriveFormData.hora_inicio}
+                    onChange={(e) =>
+                      setTestDriveFormData((prev) => ({
+                        ...prev,
+                        hora_inicio: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-slate-700 block mb-2">
+                    Hora Fin
+                  </label>
+                  <Input
+                    type="time"
+                    value={testDriveFormData.hora_fin}
+                    onChange={(e) =>
+                      setTestDriveFormData((prev) => ({
+                        ...prev,
+                        hora_fin: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-slate-700 block mb-2">
+                  Modelo
+                </label>
+                <Select
+                  value={testDriveFormData.modelo_id.toString()}
+                  onValueChange={(value) =>
+                    setTestDriveFormData((prev) => ({
+                      ...prev,
+                      modelo_id: value,
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona un modelo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {modelos.map((m) => (
+                      <SelectItem key={m.id} value={m.id.toString()}>
+                        {m.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-slate-700 block mb-2">
+                  Placa
+                </label>
+                <Input
+                  value={testDriveFormData.placa}
+                  onChange={(e) =>
+                    setTestDriveFormData((prev) => ({
+                      ...prev,
+                      placa: e.target.value,
+                    }))
+                  }
+                  placeholder="Ej: ABC-123"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-slate-700 block mb-2">
+                  VIN
+                </label>
+                <Input
+                  value={testDriveFormData.vin}
+                  onChange={(e) =>
+                    setTestDriveFormData((prev) => ({
+                      ...prev,
+                      vin: e.target.value,
+                    }))
+                  }
+                  placeholder="Número de identificación del vehículo"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-slate-700 block mb-2">
+                  Descripción
+                </label>
+                <textarea
+                  value={testDriveFormData.descripcion}
+                  onChange={(e) =>
+                    setTestDriveFormData((prev) => ({
+                      ...prev,
+                      descripcion: e.target.value,
+                    }))
+                  }
+                  placeholder="Notas adicionales"
+                  rows="3"
+                  className="w-full p-2 border rounded-md text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-slate-700 block mb-2">
+                  Estado
+                </label>
+                <Select
+                  value={testDriveFormData.estado}
+                  onValueChange={(value) =>
+                    setTestDriveFormData((prev) => ({
+                      ...prev,
+                      estado: value,
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="programado">Programado</SelectItem>
+                    <SelectItem value="realizado">Realizado</SelectItem>
+                    <SelectItem value="cancelado">Cancelado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setDialogTestDriveOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button onClick={saveTestDrive}>
+                {editingTestDrive ? "Actualizar" : "Guardar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={deleteTestDriveDialog} onOpenChange={setDeleteTestDriveDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar eliminación</AlertDialogTitle>
+              <AlertDialogDescription>
+                ¿Eliminar el test drive del {deleteTestDriveTarget && new Date(deleteTestDriveTarget.fecha_testdrive).toLocaleDateString("es-ES")}?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="flex gap-3 justify-end">
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={deleteTestDrive}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Eliminar
+              </AlertDialogAction>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* CIERRE DIALOG */}
+        <Dialog open={dialogCierreOpen} onOpenChange={setDialogCierreOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {editingCierre ? "Editar Cierre" : "Registrar Cierre"}
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-slate-700 block mb-2">
+                  Detalle del Cierre *
+                </label>
+                <textarea
+                  value={cierreFormData.detalle}
+                  onChange={(e) =>
+                    setCierreFormData({ detalle: e.target.value })
+                  }
+                  placeholder="Describe el motivo del cierre"
+                  rows="4"
+                  className="w-full p-2 border rounded-md text-sm"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setDialogCierreOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button onClick={saveCierre} className="bg-red-600 hover:bg-red-700">
+                {editingCierre ? "Actualizar" : "Registrar"} Cierre
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={deleteCierreDialog} onOpenChange={setDeleteCierreDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar eliminación</AlertDialogTitle>
+              <AlertDialogDescription>
+                ¿Eliminar este cierre?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="flex gap-3 justify-end">
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={deleteCierre}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Eliminar
+              </AlertDialogAction>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={deleteReservaDialog} onOpenChange={setDeleteReservaDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar eliminación</AlertDialogTitle>
+              <AlertDialogDescription>
+                ¿Eliminar esta reserva?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="flex gap-3 justify-end">
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={deleteReserva}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Eliminar
+              </AlertDialogAction>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
-
-      {/* DIALOG VEHÍCULO */}
-      <Dialog open={dialogVehiculoOpen} onOpenChange={setDialogVehiculoOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingVehiculo ? "Editar Vehículo" : "Agregar Vehículo de Interés"}
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            {/* Marca */}
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-2">
-                Marca
-              </label>
-              <Select
-                value={vehiculoFormData.marca_id.toString()}
-                onValueChange={(value) =>
-                  setVehiculoFormData((prev) => ({
-                    ...prev,
-                    marca_id: value,
-                    modelo_id: "",
-                  }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona una marca" />
-                </SelectTrigger>
-                <SelectContent>
-                  {marcas.map((m) => (
-                    <SelectItem key={m.id} value={m.id.toString()}>
-                      {m.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Modelo */}
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-2">
-                Modelo
-              </label>
-              <Select
-                value={vehiculoFormData.modelo_id.toString()}
-                onValueChange={(value) =>
-                  setVehiculoFormData((prev) => ({
-                    ...prev,
-                    modelo_id: value,
-                  }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un modelo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {modelosFiltrados.map((m) => (
-                    <SelectItem key={m.id} value={m.id.toString()}>
-                      {m.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Año */}
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-2">
-                Año de Interés
-              </label>
-              <Input
-                type="number"
-                value={vehiculoFormData.anio_interes}
-                onChange={(e) =>
-                  setVehiculoFormData((prev) => ({
-                    ...prev,
-                    anio_interes: parseInt(e.target.value),
-                  }))
-                }
-                placeholder="Ej: 2024"
-                min={2000}
-                max={new Date().getFullYear() + 1}
-              />
-            </div>
-
-            {/* Origen */}
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-2">
-                Origen
-              </label>
-              <Select
-                value={vehiculoFormData.source}
-                onValueChange={(value) =>
-                  setVehiculoFormData((prev) => ({
-                    ...prev,
-                    source: value,
-                  }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="manual">Manual</SelectItem>
-                  <SelectItem value="lead">Lead</SelectItem>
-                  <SelectItem value="oportunidad">Oportunidad</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDialogVehiculoOpen(false)}
-            >
-              Cancelar
-            </Button>
-            <Button onClick={saveVehiculo}>
-              {editingVehiculo ? "Actualizar" : "Agregar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* DELETE VEHÍCULO DIALOG */}
-      <Dialog open={deleteVehiculoDialog} onOpenChange={setDeleteVehiculoDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmar eliminación</DialogTitle>
-          </DialogHeader>
-
-          <p>
-            ¿Eliminar el interés en{" "}
-            <b>
-              {deleteVehiculoTarget?.marca} {deleteVehiculoTarget?.modelo}
-            </b>
-            ?
-          </p>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteVehiculoDialog(false)}
-            >
-              Cancelar
-            </Button>
-            <Button variant="destructive" onClick={confirmDeleteVehiculo}>
-              Eliminar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <div className="bg-white rounded-lg border p-6">
-        <CotizacionAgendaSection
-          oportunidadId={oportunidadId}
-          clienteId={oportunidad.cliente_id}
-          oportunidadData={oportunidad}
-        />
-      </div>
-    </div>
-
+    </TooltipProvider>
   );
 }
