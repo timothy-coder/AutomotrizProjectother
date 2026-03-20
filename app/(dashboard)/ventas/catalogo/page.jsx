@@ -513,7 +513,7 @@ export default function VentasCatalogoPage() {
   // ─── Tab: Versiones ───────────────────────────────────────────────────────
 
   function renderVersiones() {
-    const modelosActivos = modelos.filter((m) => m.is_active);
+    const modelosActivos = modelos;
     const byModelo = {};
     for (const v of versiones) {
       if (!byModelo[v.modelo_id]) byModelo[v.modelo_id] = [];
@@ -680,7 +680,7 @@ export default function VentasCatalogoPage() {
       {versionModal !== null && (
         <VersionModal
           version={versionModal}
-          modelos={modelos.filter((m) => m.is_active)}
+          modelos={modelos}
           onClose={() => setVersionModal(null)}
           onSaved={() => { setVersionModal(null); fetchVersiones(); fetchModelos(); }}
         />
