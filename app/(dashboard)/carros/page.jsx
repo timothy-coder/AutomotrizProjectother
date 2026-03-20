@@ -1,6 +1,5 @@
 // ============================================
-// COMPONENTE DE PRECIOS CON GUARDADO AUTOMÁTICO (FINAL)
-// archivo: components/PreciosPage.jsx
+// PRECIOS DE CARROS - Precio + Stock por Versión
 // ============================================
 
 "use client";
@@ -23,18 +22,15 @@ export default function PreciosPage() {
 
   const [loading, setLoading] = useState(true);
 
-  // Estado para precios por marca-modelo-versión
-  const [preciosPorMarcaModeloVersion, setPreciosPorMarcaModeloVersion] = useState({});
+  // Estado por marca-modelo-version: { precio_base, en_stock, tiempo_entrega_dias }
+  const [datosPorMVV, setDatosPorMVV] = useState({});
 
-  // Estado para tracking de guardado
   const [isSaving, setIsSaving] = useState(false);
   const saveTimers = useRef({});
 
-  // Cargar datos
   async function loadData() {
     try {
       setLoading(true);
-
       const [m, mo, v, p] = await Promise.all([
         fetch("/api/marcas", { cache: "no-store" }).then((r) => r.json()),
         fetch("/api/modelos", { cache: "no-store" }).then((r) => r.json()),
@@ -51,8 +47,7 @@ export default function PreciosPage() {
       setModelos(modelosData);
       setVersiones(versionesData.sort((a, b) => a.id - b.id));
       setPrecios(preciosData);
-
-      initializePricesStructure(marcasData, modelosData, versionesData, preciosData);
+      initDatos(modelosData, versionesData, preciosData);
     } catch (e) {
       console.error(e);
       toast.error("Error cargando datos");
@@ -61,44 +56,33 @@ export default function PreciosPage() {
     }
   }
 
-  function initializePricesStructure(marcasData, modelosData, versionesData, preciosData) {
-    try {
-      const estructura = {};
-
-      modelosData.forEach((modelo) => {
-        const key = `${modelo.marca_id}_${modelo.id}`;
-        estructura[key] = {};
-
-        versionesData.forEach((version) => {
-          const precio = preciosData.find(
-            (p) =>
-              p.marca_id === modelo.marca_id &&
-              p.modelo_id === modelo.id &&
-              p.version_id === version.id
-          );
-
-          estructura[key][version.id] = precio?.precio_base || 0;
-        });
+  function initDatos(modelosData, versionesData, preciosData) {
+    const estructura = {};
+    modelosData.forEach((modelo) => {
+      versionesData.forEach((version) => {
+        const key = `${modelo.marca_id}_${modelo.id}_${version.id}`;
+        const precio = preciosData.find(
+          (p) =>
+            p.marca_id === modelo.marca_id &&
+            p.modelo_id === modelo.id &&
+            p.version_id === version.id
+        );
+        estructura[key] = {
+          precio_base: precio?.precio_base ?? "",
+          en_stock: precio ? Boolean(precio.en_stock) : true,
+          tiempo_entrega_dias: precio?.tiempo_entrega_dias ?? 0,
+        };
       });
-
-      setPreciosPorMarcaModeloVersion(estructura);
-    } catch (e) {
-      console.error("Error en initializePricesStructure:", e);
-    }
+    });
+    setDatosPorMVV(estructura);
   }
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
-  // Descargar plantilla
   async function handleDownloadTemplate() {
     try {
-      const response = await fetch(
-        "/api/precios-region-version/import?action=template"
-      );
+      const response = await fetch("/api/precios-region-version/import?action=template");
       const blob = await response.blob();
-
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -107,83 +91,55 @@ export default function PreciosPage() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-
       toast.success("Plantilla descargada");
     } catch (e) {
-      console.error(e);
       toast.error("Error descargando plantilla");
     }
   }
 
-  // Importar precios
   async function handleImport() {
-    if (!importFile) {
-      toast.error("Selecciona un archivo");
-      return;
-    }
-
+    if (!importFile) { toast.error("Selecciona un archivo"); return; }
     try {
       setImportLoading(true);
-
       const formDataImport = new FormData();
       formDataImport.append("file", importFile);
-
       const response = await fetch("/api/precios-region-version/import", {
         method: "POST",
         body: formDataImport,
       });
-
       const data = await response.json();
-
       if (response.ok) {
         toast.success(`${data.success} precios importados`);
-        if (data.errors > 0) {
-          toast.error(`${data.errors} errores durante la importación`);
-        }
+        if (data.errors > 0) toast.error(`${data.errors} errores durante la importación`);
         setImportFile(null);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
-        }
+        if (fileInputRef.current) fileInputRef.current.value = "";
         loadData();
       } else {
         toast.error(data.message);
       }
     } catch (e) {
-      console.error(e);
       toast.error("Error importando archivo");
     } finally {
       setImportLoading(false);
     }
   }
 
-  // Cambiar precio y guardar automáticamente
-  function handlePriceChange(marcaId, modeloId, versionId, value) {
-    const key = `${marcaId}_${modeloId}`;
-    
-    setPreciosPorMarcaModeloVersion((prev) => ({
+  function handleFieldChange(marcaId, modeloId, versionId, field, value) {
+    const key = `${marcaId}_${modeloId}_${versionId}`;
+    setDatosPorMVV((prev) => ({
       ...prev,
-      [key]: {
-        ...prev[key],
-        [versionId]: parseFloat(value) || 0,
-      },
+      [key]: { ...prev[key], [field]: value },
     }));
 
-    // Marcar como guardando
     setIsSaving(true);
-
-    // Limpiar timer anterior si existe
-    if (saveTimers.current[key]) {
-      clearTimeout(saveTimers.current[key]);
-    }
-
-    // Guardar después de 500ms de inactividad
+    if (saveTimers.current[key]) clearTimeout(saveTimers.current[key]);
     saveTimers.current[key] = setTimeout(() => {
-      savePrice(marcaId, modeloId, versionId, parseFloat(value) || 0, key);
-    }, 500);
+      const current = { ...datosPorMVV[key], [field]: value };
+      saveRow(marcaId, modeloId, versionId, current);
+    }, 600);
   }
 
-  // Guardar precio individual
-  async function savePrice(marcaId, modeloId, versionId, precio, key) {
+  async function saveRow(marcaId, modeloId, versionId, datos) {
     try {
       const res = await fetch("/api/precios-region-version", {
         method: "POST",
@@ -192,29 +148,22 @@ export default function PreciosPage() {
           marca_id: marcaId,
           modelo_id: modeloId,
           version_id: versionId,
-          precio_base: precio,
+          precio_base: parseFloat(datos.precio_base) || 0,
+          en_stock: datos.en_stock,
+          tiempo_entrega_dias: Number(datos.tiempo_entrega_dias) || 0,
         }),
       });
-
-      if (res.ok) {
-        setIsSaving(false);
-      } else {
-        setIsSaving(false);
-        toast.error("Error guardando precio");
-      }
+      if (!res.ok) toast.error("Error guardando");
     } catch (e) {
-      console.error(e);
+      toast.error("Error guardando");
+    } finally {
       setIsSaving(false);
-      toast.error("Error guardando precio");
     }
   }
 
-  // Agrupar modelos por marca
   const modelosPorMarca = {};
   modelos.forEach((modelo) => {
-    if (!modelosPorMarca[modelo.marca_id]) {
-      modelosPorMarca[modelo.marca_id] = [];
-    }
+    if (!modelosPorMarca[modelo.marca_id]) modelosPorMarca[modelo.marca_id] = [];
     modelosPorMarca[modelo.marca_id].push(modelo);
   });
 
@@ -235,12 +184,8 @@ export default function PreciosPage() {
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold">Precios por Versión</h1>
         <div className="border rounded-lg p-12 text-center bg-yellow-50 border-yellow-200">
-          <p className="text-yellow-800 font-semibold mb-2">
-            No se encontraron datos necesarios
-          </p>
-          <Button onClick={loadData} className="mt-4">
-            Reintentar carga
-          </Button>
+          <p className="text-yellow-800 font-semibold mb-2">No se encontraron datos necesarios</p>
+          <Button onClick={loadData} className="mt-4">Reintentar carga</Button>
         </div>
       </div>
     );
@@ -255,22 +200,11 @@ export default function PreciosPage() {
             <Download className="w-4 h-4 mr-2" />
             Plantilla
           </Button>
-          <Button 
-            onClick={loadData} 
-            variant="outline" 
-            size="sm"
-            className="relative"
-          >
+          <Button onClick={loadData} variant="outline" size="sm">
             {isSaving ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Guardando...
-              </>
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Guardando...</>
             ) : (
-              <>
-                <Loader2 className="w-4 h-4 mr-2" />
-                Recargar
-              </>
+              <><Loader2 className="w-4 h-4 mr-2" />Recargar</>
             )}
           </Button>
         </div>
@@ -285,106 +219,91 @@ export default function PreciosPage() {
             type="file"
             accept=".xlsx,.xls"
             onChange={(e) => setImportFile(e.target.files?.[0] || null)}
-            placeholder="Selecciona archivo Excel"
             className="flex-1"
           />
-          <Button
-            onClick={handleImport}
-            disabled={!importFile || importLoading}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            {importLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Importando...
-              </>
-            ) : (
-              <>
-                <Upload className="w-4 h-4 mr-2" />
-                Importar
-              </>
-            )}
+          <Button onClick={handleImport} disabled={!importFile || importLoading} className="bg-blue-600 hover:bg-blue-700">
+            {importLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Importando...</> : <><Upload className="w-4 h-4 mr-2" />Importar</>}
           </Button>
         </div>
       </div>
 
-      {/* Tabla Principal */}
+      {/* Tabla */}
       <div className="overflow-x-auto border rounded-lg bg-white">
         <table className="w-full text-sm border-collapse">
-          {/* Header Fijo */}
           <thead>
             <tr className="bg-gray-50 border-b-2">
-              <th className="border p-3 text-left font-bold bg-gray-100 sticky left-0 z-10">
-                Marca
-              </th>
-              <th className="border p-3 text-left font-bold bg-gray-100 sticky left-24 z-10">
-                Modelo
-              </th>
-              {/* Columnas de versiones */}
+              <th className="border p-3 text-left font-bold bg-gray-100 sticky left-0 z-10">Marca</th>
+              <th className="border p-3 text-left font-bold bg-gray-100 sticky left-24 z-10">Modelo</th>
               {versiones.map((version) => (
-                <th
-                  key={version.id}
-                  className="border p-3 text-center font-bold bg-blue-100 min-w-32"
-                >
-                  {version.nombre}
+                <th key={version.id} className="border p-2 text-center font-bold bg-blue-100 min-w-48" colSpan={1}>
+                  <div>{version.nombre}</div>
+                  <div className="flex text-xs font-normal text-gray-500 justify-center gap-4 mt-1">
+                    <span>Precio</span>
+                    <span>Stock</span>
+                    <span>Días</span>
+                  </div>
                 </th>
               ))}
             </tr>
           </thead>
-
-          {/* Body */}
           <tbody>
             {Object.entries(modelosPorMarca).map(([marcaId, modelosList]) => {
               const marca = marcas.find((m) => m.id === parseInt(marcaId));
-
               return (
                 <React.Fragment key={marcaId}>
-                  {modelosList.map((modelo, idx) => {
-                    const key = `${modelo.marca_id}_${modelo.id}`;
-                    const preciosData = preciosPorMarcaModeloVersion[key] || {};
-
-                    return (
-                      <tr
-                        key={modelo.id}
-                        className="border-b hover:bg-gray-50 transition-colors"
-                      >
-                        {/* Marca (solo en la primera fila del grupo) */}
-                        {idx === 0 && (
-                          <td
-                            rowSpan={modelosList.length}
-                            className="border p-3 font-bold bg-gray-50 sticky left-0 z-5 align-top"
-                          >
-                            {marca?.name}
-                          </td>
-                        )}
-
-                        {/* Modelo */}
-                        <td className="border p-3 font-semibold sticky left-24 z-5 bg-white">
-                          {modelo.name}
+                  {modelosList.map((modelo, idx) => (
+                    <tr key={modelo.id} className="border-b hover:bg-gray-50 transition-colors">
+                      {idx === 0 && (
+                        <td rowSpan={modelosList.length} className="border p-3 font-bold bg-gray-50 sticky left-0 z-5 align-top">
+                          {marca?.name}
                         </td>
-
-                        {/* Precios por versión */}
-                        {versiones.map((version) => (
-                          <td key={version.id} className="border p-2 text-center">
-                            <input
-                              type="number"
-                              placeholder="-"
-                              value={preciosData[version.id] || ""}
-                              onChange={(e) =>
-                                handlePriceChange(
-                                  modelo.marca_id,
-                                  modelo.id,
-                                  version.id,
-                                  e.target.value
-                                )
-                              }
-                              className="w-full h-9 border rounded px-2 py-1 text-center text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
+                      )}
+                      <td className="border p-3 font-semibold sticky left-24 z-5 bg-white">{modelo.name}</td>
+                      {versiones.map((version) => {
+                        const key = `${modelo.marca_id}_${modelo.id}_${version.id}`;
+                        const datos = datosPorMVV[key] || { precio_base: "", en_stock: true, tiempo_entrega_dias: 0 };
+                        return (
+                          <td key={version.id} className="border p-2">
+                            <div className="flex items-center gap-1">
+                              {/* Precio */}
+                              <input
+                                type="number"
+                                min={0}
+                                placeholder="-"
+                                value={datos.precio_base}
+                                onChange={(e) => handleFieldChange(modelo.marca_id, modelo.id, version.id, "precio_base", e.target.value)}
+                                className="w-24 h-8 border rounded px-2 text-right text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                              {/* Stock toggle */}
+                              <button
+                                title={datos.en_stock ? "En stock — click para cambiar a bajo pedido" : "Bajo pedido — click para marcar en stock"}
+                                onClick={() => handleFieldChange(modelo.marca_id, modelo.id, version.id, "en_stock", !datos.en_stock)}
+                                className={`h-8 px-2 rounded text-xs font-medium border transition-colors ${
+                                  datos.en_stock
+                                    ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200"
+                                    : "bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200"
+                                }`}
+                              >
+                                {datos.en_stock ? "✓" : "P"}
+                              </button>
+                              {/* Días de entrega (solo visible si no hay stock) */}
+                              {!datos.en_stock && (
+                                <input
+                                  type="number"
+                                  min={0}
+                                  placeholder="días"
+                                  value={datos.tiempo_entrega_dias}
+                                  onChange={(e) => handleFieldChange(modelo.marca_id, modelo.id, version.id, "tiempo_entrega_dias", e.target.value)}
+                                  className="w-14 h-8 border rounded px-1 text-center text-xs focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                  title="Días hábiles de entrega"
+                                />
+                              )}
+                            </div>
                           </td>
-                        ))}
-                      </tr>
-                    );
-                  })}
+                        );
+                      })}
+                    </tr>
+                  ))}
                 </React.Fragment>
               );
             })}
@@ -393,9 +312,10 @@ export default function PreciosPage() {
       </div>
 
       {/* Leyenda */}
-      <div className="text-xs text-gray-600 space-y-1">
-        <p>💡 <strong>Guardado automático:</strong> Los precios se guardan automáticamente 500ms después de dejar de escribir.</p>
-        <p>🔄 <strong>Estado de guardado:</strong> Observa el botón Recargar para ver el estado de guardado.</p>
+      <div className="text-xs text-gray-500 space-y-1 border rounded p-3 bg-gray-50">
+        <p><strong>Precio:</strong> Precio de lista del vehículo.</p>
+        <p><strong>✓ (verde):</strong> En stock. <strong>P (amarillo):</strong> Bajo pedido — aparece campo de días de entrega.</p>
+        <p><strong>Guardado automático:</strong> Los cambios se guardan 600ms después de editar.</p>
       </div>
     </div>
   );

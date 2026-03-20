@@ -14,12 +14,14 @@ export async function GET(req) {
     const version_id = searchParams.get("version_id");
 
     let query = `
-      SELECT 
+      SELECT
         prv.id,
         prv.marca_id,
         prv.modelo_id,
         prv.version_id,
         prv.precio_base,
+        prv.en_stock,
+        prv.tiempo_entrega_dias,
         m.name as marca,
         mo.name as modelo,
         v.nombre as version,
@@ -65,11 +67,13 @@ export async function POST(req) {
       modelo_id,
       version_id,
       precio_base,
+      en_stock = true,
+      tiempo_entrega_dias = 0,
     } = await req.json();
 
-    if (!marca_id || !modelo_id || !version_id || !precio_base) {
+    if (!marca_id || !modelo_id || !version_id) {
       return NextResponse.json(
-        { message: "Marca, modelo, versión y precio son requeridos" },
+        { message: "Marca, modelo y versión son requeridos" },
         { status: 400 }
       );
     }
@@ -119,27 +123,22 @@ export async function POST(req) {
     );
 
     if (existing.length > 0) {
-      // Actualizar
-      const [result] = await db.query(
-        `UPDATE precios_region_version 
-         SET precio_base = ? 
+      await db.query(
+        `UPDATE precios_region_version
+         SET precio_base = ?, en_stock = ?, tiempo_entrega_dias = ?
          WHERE marca_id = ? AND modelo_id = ? AND version_id = ?`,
-        [precio_base, marca_id, modelo_id, version_id]
+        [precio_base ?? 0, en_stock ? 1 : 0, Number(tiempo_entrega_dias) || 0,
+         marca_id, modelo_id, version_id]
       );
-
-      return NextResponse.json({ 
-        message: "Precio actualizado", 
-        id: existing[0].id 
-      });
+      return NextResponse.json({ message: "Precio actualizado", id: existing[0].id });
     } else {
-      // Crear
       const [result] = await db.query(
-        `INSERT INTO precios_region_version 
-         (marca_id, modelo_id, version_id, precio_base)
-         VALUES(?, ?, ?, ?)`,
-        [marca_id, modelo_id, version_id, precio_base]
+        `INSERT INTO precios_region_version
+         (marca_id, modelo_id, version_id, precio_base, en_stock, tiempo_entrega_dias)
+         VALUES(?, ?, ?, ?, ?, ?)`,
+        [marca_id, modelo_id, version_id, precio_base ?? 0,
+         en_stock ? 1 : 0, Number(tiempo_entrega_dias) || 0]
       );
-
       return NextResponse.json(
         { message: "Precio creado", id: result.insertId },
         { status: 201 }
