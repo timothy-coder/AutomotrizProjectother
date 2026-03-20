@@ -9,6 +9,42 @@ const MENU_TEXT =
   "Responde con el número de tu opción.";
 
 /**
+ * PATCH /api/ventas/route-dispatch
+ *
+ * Limpia la sesión ventas_ia de un teléfono para que el siguiente mensaje
+ * sea atendido por el taller (ruta default). Llamado por el flujo de ventas
+ * cuando el agente devuelve redirect_taller.
+ *
+ * Body: { phone: "51912528990" }
+ * Auth: x-ventas-webhook-secret
+ */
+export async function PATCH(req) {
+  const secret = process.env.VENTAS_WEBHOOK_SECRET;
+  const provided = req.headers.get("x-ventas-webhook-secret") || "";
+
+  if (secret && provided !== secret) {
+    return NextResponse.json({ message: "No autorizado" }, { status: 401 });
+  }
+
+  const body = await req.json().catch(() => ({}));
+  const phone = String(body?.phone || "").replace(/\D/g, "").trim();
+
+  if (!phone) {
+    return NextResponse.json({ message: "phone requerido" }, { status: 400 });
+  }
+
+  await db.query(
+    `UPDATE conversation_sessions
+     SET source = 'taller', updated_at = NOW()
+     WHERE REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') = ?
+       AND source = 'ventas_ia'`,
+    [phone]
+  );
+
+  return NextResponse.json({ ok: true, phone, cleared: true });
+}
+
+/**
  * POST /api/ventas/route-dispatch
  *
  * Usado por n8n "Bot Taller v14" para:

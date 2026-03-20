@@ -201,6 +201,12 @@ export async function POST(req) {
   let oportunidadId = null;
   if (clienteId && modelo_id) {
     try {
+      // Obtener ID del usuario bot de WhatsApp para created_by
+      const [[botUser]] = await db.query(
+        `SELECT id FROM usuarios WHERE username = 'whatsapp-bot' LIMIT 1`
+      );
+      const botUserId = botUser?.id || 1; // fallback al admin si no existe el bot user
+
       // Obtener o crear el origen "WhatsApp Bot"
       await db.query(
         `INSERT IGNORE INTO origenes_citas (name, is_active) VALUES ('WhatsApp Bot', 1)`
@@ -239,7 +245,7 @@ export async function POST(req) {
              (oportunidad_id, cliente_id, marca_id, modelo_id,
               origen_id, etapasconversion_id, detalle, created_by,
               created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, 1, ?, NULL, NOW(), NOW())`,
+           VALUES (?, ?, ?, ?, ?, 1, ?, ?, NOW(), NOW())`,
           [
             oportunidadCodigo,
             clienteId,
@@ -247,6 +253,7 @@ export async function POST(req) {
             Number(modelo_id),
             origenBot.id,
             detalleCrm,
+            botUserId,
           ]
         );
         oportunidadId = oportunidadCodigo;
