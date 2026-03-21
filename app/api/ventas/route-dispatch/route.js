@@ -1,12 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-const MENU_TEXT =
-  "¡Hola! 👋 Bienvenido/a.\n¿En qué te podemos ayudar hoy?\n\n" +
-  "1️⃣ Quiero comprar un vehículo nuevo\n" +
-  "2️⃣ Mantenimiento, citas o taller\n" +
-  "3️⃣ Hablar con un asesor\n\n" +
-  "Responde con el número de tu opción.";
 
 /**
  * PATCH /api/ventas/route-dispatch
@@ -87,13 +81,21 @@ export async function POST(req) {
     return NextResponse.json({ route: "default", reason: "channel_not_whatsapp" });
   }
 
-  // ── Cliente nuevo (sin sesión previa) ────────────────────────────────────
-  const hasSession = await checkHasSession(phone);
+  // ── Verificar sesión y datos del cliente en paralelo ─────────────────────
+  const [hasSession, clienteRow] = await Promise.all([
+    checkHasSession(phone),
+    lookupCliente(phone),
+  ]);
+
+  const clienteNombre = clienteRow
+    ? [clienteRow.nombre, clienteRow.apellido].filter(Boolean).join(" ").trim()
+    : null;
+
+  // ── Sin sesión previa en conversation_sessions ────────────────────────────
   if (!hasSession) {
     const selection = detectMenuSelection(body?.text || "");
 
     if (selection === "1") {
-      // Eligió ventas → crear sesión y despachar al agente de ventas
       await createVentasSession(phone);
       const ventasUrl =
         process.env.N8N_VENTAS_INBOUND_URL ||
@@ -104,24 +106,52 @@ export async function POST(req) {
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(5000),
       }).catch(() => {});
-      return NextResponse.json({ route: "ventas_ia", dispatched: true, is_new_client: true });
+      return NextResponse.json({ route: "ventas_ia", dispatched: true, is_new_client: !clienteRow });
     }
 
     if (selection === "taller") {
-      // Eligió taller o asesor → flujo normal del taller
       return NextResponse.json({ route: "default", reason: "new_client_taller_selected" });
     }
 
-    // Primer mensaje sin selección válida → mostrar menú de bienvenida
+    // Primer mensaje sin selección válida → mostrar menú personalizado
+    const saludo = clienteNombre
+      ? `¡Hola, ${clienteNombre}! 👋 Bienvenido/a de nuevo.`
+      : "¡Hola! 👋 Bienvenido/a.";
+    const menuText =
+      `${saludo}\n¿En qué te podemos ayudar hoy?\n\n` +
+      "1️⃣ Quiero comprar un vehículo nuevo\n" +
+      "2️⃣ Mantenimiento, citas o taller\n" +
+      "3️⃣ Hablar con un asesor\n\n" +
+      "Responde con el número de tu opción.";
+
     return NextResponse.json({
       route: "new_client_menu",
-      menu_text: MENU_TEXT,
+      menu_text: menuText,
       phone,
+      cliente_nombre: clienteNombre,
     });
   }
 
-  // ── Cliente existente → lógica normal de routing ─────────────────────────
+  // ── Cliente con sesión → lógica normal de routing ─────────────────────────
   const route = await resolveRoute(phone);
+
+  // Si la sesión existe pero está en default y el cliente elige ventas → mostrar menú
+  if (route === "default") {
+    const selection = detectMenuSelection(body?.text || "");
+    if (selection === "1") {
+      await createVentasSession(phone);
+      const ventasUrl =
+        process.env.N8N_VENTAS_INBOUND_URL ||
+        "https://n8n.app20.tech/webhook/ventas-ia-inbound";
+      fetch(ventasUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(5000),
+      }).catch(() => {});
+      return NextResponse.json({ route: "ventas_ia", dispatched: true });
+    }
+  }
 
   if (route === "ventas_ia") {
     const ventasUrl =
@@ -144,6 +174,17 @@ function detectMenuSelection(text) {
   if (clean === "1" || clean.startsWith("1.") || clean.includes("comprar") || clean.includes("vehículo nuevo") || clean.includes("vehiculo nuevo")) return "1";
   if (clean === "2" || clean === "3" || clean.startsWith("2.") || clean.startsWith("3.") || clean.includes("mantenimiento") || clean.includes("taller") || clean.includes("cita") || clean.includes("asesor")) return "taller";
   return null;
+}
+
+// ── Buscar cliente registrado por teléfono ────────────────────────────────
+async function lookupCliente(phone) {
+  const [rows] = await db.query(
+    `SELECT nombre, apellido FROM clientes
+     WHERE REPLACE(REPLACE(REPLACE(celular, '+', ''), ' ', ''), '-', '') = ?
+     LIMIT 1`,
+    [phone]
+  );
+  return rows[0] || null;
 }
 
 // ── Verificar si el teléfono tiene historial de sesión ───────────────────
