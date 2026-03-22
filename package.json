@@ -9,7 +9,8 @@
     "lint": "eslint",
     "outbox:process": "node --env-file=.env.local scripts/process-conversations-outbox.cjs",
     "mass:process": "node --env-file=.env.local scripts/process-mass-campaigns.cjs",
-    "migrate:ventas": "node --env-file=.env.local migrations/add_ventas_catalogo_and_leads.js"
+    "migrate:ventas": "node --env-file=.env.local migrations/add_ventas_catalogo_and_leads.js",
+    "migrate:oportunidad-crm": "node --env-file=.env.local migrations/add_oportunidad_crm_id_to_ventas_leads.js"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  ChevronDown, ChevronUp, Filter, Phone, RefreshCw, Trash2, User, X,
+  ArrowUpRight, ChevronDown, ChevronUp, Filter, RefreshCw, Trash2, User, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,26 @@ function LeadPanel({ lead, onClose, onEstadoChanged, onDeleted }) {
   const [notas, setNotas] = useState(lead.notas_agente || "");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [promoting, setPromoting] = useState(false);
+  const [oportunidadId, setOportunidadId] = useState(lead.oportunidad_crm_codigo || (lead.oportunidad_crm_id ? `LD-?` : null));
+
+  async function handlePromover() {
+    if (oportunidadId) return; // ya promovido
+    setPromoting(true);
+    try {
+      const res = await fetch(`/api/ventas/leads/${lead.id}/promover`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Error al promover");
+      if (data.already_promoted || data.ok) {
+        setOportunidadId(data.oportunidad_id);
+        toast.success(`Lead enviado a Ventas: ${data.oportunidad_id}`);
+      }
+    } catch (err) {
+      toast.error(err.message || "No se pudo promover el lead");
+    } finally {
+      setPromoting(false);
+    }
+  }
 
   async function handleDelete() {
     if (!confirm(`¿Eliminar la cotización de ${lead.nombre_cliente || "este cliente"}? Esta acción no se puede deshacer.`)) return;
@@ -108,6 +128,19 @@ function LeadPanel({ lead, onClose, onEstadoChanged, onDeleted }) {
           <p className="text-xs text-gray-500">{lead.telefono}</p>
         </div>
         <div className="flex items-center gap-1">
+          <button
+            onClick={handlePromover}
+            disabled={promoting || !!oportunidadId}
+            className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+              oportunidadId
+                ? "bg-green-100 text-green-700 cursor-default"
+                : "bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+            }`}
+            title={oportunidadId ? `Ya en Ventas: ${oportunidadId}` : "Enviar a Ventas"}
+          >
+            <ArrowUpRight className="w-3.5 h-3.5" />
+            {oportunidadId ? oportunidadId : promoting ? "Enviando…" : "Enviar a Ventas"}
+          </button>
           <button
             onClick={handleDelete}
             disabled={deleting}

@@ -73,7 +73,7 @@ export async function GET(req) {
             l.uso_vehiculo, l.personas_habituales, l.presupuesto_rango,
             l.equipamiento_requerido, l.tiene_historial_crediticio,
             l.estado, l.notas_agente, l.cotizacion_enviada_at,
-            l.created_at, l.updated_at
+            l.oportunidad_crm_id, l.created_at, l.updated_at
      FROM ventas_leads l
      ${where}
      ORDER BY l.created_at DESC
