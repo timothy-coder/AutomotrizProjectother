@@ -31,7 +31,7 @@ export default function LeadsTable({
   const router = useRouter();
   const [sorting, setSorting] = useState([]);
   const [estadosTiempo, setEstadosTiempo] = useState([]);
-  const [filtroRango, setFiltroRango] = useState("dia"); // "dia", "semana", "mes"
+  const [filtroRango, setFiltroRango] = useState("todos"); // "todos", "dia", "semana", "mes"
 
   // Cargar configuración de estados de tiempo
   useEffect(() => {
@@ -74,6 +74,8 @@ export default function LeadsTable({
 
   // Filtrar filas según el rango seleccionado
   const rowsFiltrados = useMemo(() => {
+    if (filtroRango === "todos") return rows || [];
+
     const { inicio, fin } = getRangoFechas();
 
     return (rows || []).filter((row) => {
@@ -303,6 +305,7 @@ export default function LeadsTable({
             <SelectValue placeholder="Selecciona rango" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="todos">Todos</SelectItem>
             <SelectItem value="dia">Por día</SelectItem>
             <SelectItem value="semana">Por semana</SelectItem>
             <SelectItem value="mes">Por mes</SelectItem>
