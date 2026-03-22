@@ -88,12 +88,17 @@ export async function POST(req) {
 
   const text = body?.text || "";
 
+  // ── Si el mensaje es claramente de taller, ignorar sesión de ventas ───────
+  const esMensajeTaller = detectMenuSelection(text) === "taller";
+
   // ── Verificar si hay sesión de ventas activa (últimas 24h) ────────────────
   // IMPORTANTE: solo retornamos la ruta, NO despachamos aquí.
   // El Taller v14 es quien hace el dispatch a Ventas IA para evitar doble envío.
-  const ventasRoute = await resolveVentasRoute(phone);
-  if (ventasRoute === "ventas_ia") {
-    return NextResponse.json({ route: "ventas_ia", dispatched: false });
+  if (!esMensajeTaller) {
+    const ventasRoute = await resolveVentasRoute(phone);
+    if (ventasRoute === "ventas_ia") {
+      return NextResponse.json({ route: "ventas_ia", dispatched: false });
+    }
   }
 
   // ── Verificar si hay sesión de taller activa reciente (últimas 4h) ────────
