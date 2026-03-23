@@ -43,7 +43,10 @@ export async function GET(req, { params }) {
         o.created_at,
         o.updated_at,
 
-        c.nombre AS cliente_name,
+        CONCAT(COALESCE(c.nombre,''), ' ', COALESCE(c.apellido,'')) AS cliente_name,
+        c.email AS email,
+        c.celular AS celular,
+        c.identificacion_fiscal AS dni,
         m.name AS marca_name,
         mo.name AS modelo_name,
         oc.name AS origen_name,
