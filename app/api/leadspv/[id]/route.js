@@ -42,9 +42,17 @@ export async function GET(req, { params }) {
         o.created_at,
         o.updated_at,
 
-        c.nombre AS cliente_name,
-        v.marca_name,
-        v.modelo_name,
+        CONCAT(COALESCE(c.nombre,''), ' ', COALESCE(c.apellido,'')) AS cliente_name,
+        c.email AS email,
+        c.celular AS celular,
+        c.identificacion_fiscal AS dni,
+        v.placas,
+        v.vin,
+        v.anio,
+        v.color AS color_vehiculo,
+        v.kilometraje,
+        m.name AS marca_name,
+        mo.name AS modelo_name,
         oc.name AS origen_name,
         sc.name AS suborigen_name,
         ec.nombre AS etapa_name,
@@ -54,6 +62,8 @@ export async function GET(req, { params }) {
       FROM oportunidadespv o
       LEFT JOIN clientes c ON c.id = o.cliente_id
       LEFT JOIN vehiculos v ON v.id = o.vehiculo_id
+      LEFT JOIN marcas m ON m.id = v.marca_id
+      LEFT JOIN modelos mo ON mo.id = v.modelo_id
       LEFT JOIN origenes_citas oc ON oc.id = o.origen_id
       LEFT JOIN suborigenes_citas sc ON sc.id = o.suborigen_id
       LEFT JOIN etapasconversionpv ec ON ec.id = o.etapasconversionpv_id
@@ -141,14 +151,12 @@ export async function PUT(req, { params }) {
       !vehiculo_id ||
       !origen_id ||
       !etapasconversionpv_id ||
-      !created_by ||
-      !fecha_agenda ||
-      !hora_agenda
+      !created_by
     ) {
       return NextResponse.json(
         {
           message:
-            "cliente_id, vehiculo_id, origen_id, etapasconversionpv_id, created_by, fecha_agenda y hora_agenda son obligatorios",
+            "cliente_id, vehiculo_id, origen_id, etapasconversionpv_id y created_by son obligatorios",
         },
         { status: 400 }
       );
