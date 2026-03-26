@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Save, X, Edit2, Loader2, Plus, Trash2, Pencil, MessageSquare, Check, Calendar, FileText, Lock, History } from "lucide-react";
+import { ChevronLeft, ChevronRight, Save, X, Edit2, Loader2, Plus, Trash2, Pencil, MessageSquare, Check, Calendar, FileText, Lock, History, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -39,8 +39,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useUserScope } from "@/hooks/useUserScope";
-import CotizacionAgendaSection from "@/app/components/agenda/CotizacionAgendaSection";
-
+import CotizacionDialog from "@/app/components/agenda/CotizacionDialog";
+import CotizacionesTable from "@/app/components/agenda/CotizacionesTable";
+import HistorialDialog from "@/app/components/agenda/HistorialDialog";
 export default function OportunidadDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -60,6 +61,16 @@ export default function OportunidadDetailPage() {
   const [detalleAccion, setDetalleAccion] = useState("");
   const [etapaProxima, setEtapaProxima] = useState("sin-cambio");
   const [detalles, setDetalles] = useState([]);
+// Agrega estos estados cerca de los otros estados de cotizaciones
+const [historialDialog, setHistorialDialog] = useState(false);
+const [selectedHistorial, setSelectedHistorial] = useState(null);
+const [historialLoading, setHistorialLoading] = useState(false);
+  // Cotizaciones
+  const [cotizaciones, setCotizaciones] = useState([]);
+  const [dialogCotizacionOpen, setDialogCotizacionOpen] = useState(false);
+  const [editingCotizacion, setEditingCotizacion] = useState(null);
+  const [deleteCotizacionDialog, setDeleteCotizacionDialog] = useState(false);
+  const [deleteCotizacionTarget, setDeleteCotizacionTarget] = useState(null);
 
   // Test Drives
   const [testDrives, setTestDrives] = useState([]);
@@ -97,6 +108,7 @@ export default function OportunidadDetailPage() {
   const [vehiculosInteres, setVehiculosInteres] = useState([]);
   const [marcas, setMarcas] = useState([]);
   const [modelos, setModelos] = useState([]);
+  const [versiones, setVersiones] = useState([]);
   const [dialogVehiculoOpen, setDialogVehiculoOpen] = useState(false);
   const [deleteVehiculoDialog, setDeleteVehiculoDialog] = useState(false);
   const [editingVehiculo, setEditingVehiculo] = useState(null);
@@ -108,19 +120,22 @@ export default function OportunidadDetailPage() {
     source: "manual",
   });
 
+  // Cotización desde vehículo
+  const [cotizacionVehiculoMarcaId, setCotizacionVehiculoMarcaId] = useState(null);
+  const [cotizacionVehiculoModeloId, setCotizacionVehiculoModeloId] = useState(null);
+
   // Etapas disponibles
   const etapas = [
-  { id: 1, nombre: "Nuevo", label: "Nuevo" },
-  { id: 2, nombre: "Asignado", label: "Asignado" },
-  { id: 4, nombre: "En Atención", label: "En Atención" },
-  { id: 5, nombre: "Test drive", label: "Test drive" },
-  { id: 6, nombre: "Cotización", label: "Cotización" },
-  { id: 7, nombre: "Evaluación crediticia", label: "Eval. crediticia" },
-  { id: 8, nombre: "Reserva", label: "Reserva" },
-  { id: 9, nombre: "Venta facturada", label: "Venta" },
-  { id: 10, nombre: "Cerrada", label: "Cerrada" },
-  { id: 11, nombre: "Reprogramado", label: "Reprogramado" },
-];
+    { id: 1, nombre: "Nuevo", label: "Nuevo" },
+    { id: 2, nombre: "Asignado", label: "Asignado" },
+    { id: 4, nombre: "En Atención", label: "En Atención" },
+    { id: 5, nombre: "Test drive", label: "Test drive" },
+    { id: 6, nombre: "Cotización", label: "Cotización" },
+    { id: 7, nombre: "Evaluación crediticia", label: "Eval. crediticia" },
+    { id: 8, nombre: "Reserva", label: "Reserva" },
+    { id: 9, nombre: "Venta facturada", label: "Venta" },
+    { id: 10, nombre: "Cerrada", label: "Cerrada" },
+  ];
 
   const indiceEtapaActual = etapas.findIndex((e) => e.id === etapaActual);
 
@@ -168,6 +183,21 @@ export default function OportunidadDetailPage() {
       }
     } catch (error) {
       console.error("Error cargando detalles:", error);
+    }
+  };
+
+  // Cargar cotizaciones
+  const cargarCotizaciones = async (opId) => {
+    try {
+      const response = await fetch(`/api/cotizacionesagenda?oportunidad_id=${opId}`, {
+        cache: "no-store",
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCotizaciones(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error("Error cargando cotizaciones:", error);
     }
   };
 
@@ -219,6 +249,7 @@ export default function OportunidadDetailPage() {
 
         await cargarDetalles(oportunidadId);
         await cargarActividades(oportunidadId);
+        await cargarCotizaciones(oportunidadId);
 
         const resTestDrives = await fetch(
           `/api/test-drives?oportunidad_id=${oportunidadId}`,
@@ -247,13 +278,22 @@ export default function OportunidadDetailPage() {
           setCierres(Array.isArray(dataCierres) ? dataCierres : []);
         }
 
-        const [m, mo] = await Promise.all([
+        const [m, mo, v] = await Promise.all([
           fetch("/api/marcas", { cache: "no-store" }).then((r) => r.ok ? r.json() : []),
           fetch("/api/modelos", { cache: "no-store" }).then((r) => r.ok ? r.json() : []),
+          fetch("/api/versiones?limit=1000", { cache: "no-store" }).then((r) => r.ok ? r.json() : []),
         ]);
 
         setMarcas(Array.isArray(m) ? m : []);
         setModelos(Array.isArray(mo) ? mo : []);
+
+        let versionesData = [];
+        if (v.data && Array.isArray(v.data)) {
+          versionesData = v.data;
+        } else if (Array.isArray(v)) {
+          versionesData = v;
+        }
+        setVersiones(versionesData);
       } catch (error) {
         console.error("Error cargando datos:", error);
         toast.error("Error cargando datos: " + error.message);
@@ -284,53 +324,51 @@ export default function OportunidadDetailPage() {
   };
 
   const handleGuardarActividad = async () => {
-    if (!detalleAccion.trim()) {
-      toast.warning("El detalle es requerido");
-      return;
+  if (!detalleAccion.trim()) {
+    toast.warning("El detalle es requerido");
+    return;
+  }
+
+  if (!userId) {
+    toast.error("Usuario no identificado");
+    return;
+  }
+
+  setGuardandoActividad(true);
+  try {
+    // Usa etapaProxima si fue seleccionada, sino usa la etapa actual
+    const etapaParaActividad = etapaProxima !== "sin-cambio" 
+      ? Number(etapaProxima) 
+      : etapaActual;
+
+    const resActividad = await fetch("/api/actividades-oportunidades", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        oportunidad_id: Number(oportunidadId),
+        etapasconversion_id: etapaParaActividad, // Etapa seleccionada o actual
+        detalle: detalleAccion,
+        created_by: userId,
+      }),
+    });
+
+    if (!resActividad.ok) {
+      const data = await resActividad.json();
+      throw new Error(data.message);
     }
 
-    if (!userId) {
-      toast.error("Usuario no identificado");
-      return;
-    }
+    toast.success("Actividad guardada");
+    setDetalleAccion("");
+    setEtapaProxima("sin-cambio"); // Reset al Select
 
-    setGuardandoActividad(true);
-    try {
-      const nuevaEtapa = etapaProxima !== "sin-cambio" ? Number(etapaProxima) : etapaActual;
-
-      const resActividad = await fetch("/api/actividades-oportunidades", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          oportunidad_id: Number(oportunidadId),
-          etapasconversion_id: nuevaEtapa,
-          detalle: detalleAccion,
-          created_by: userId,
-        }),
-      });
-
-      if (!resActividad.ok) {
-        const data = await resActividad.json();
-        throw new Error(data.message);
-      }
-
-      if (etapaProxima !== "sin-cambio") {
-        const cambioExitoso = await cambiarEtapa(nuevaEtapa);
-        if (!cambioExitoso) throw new Error("Error cambiando etapa");
-      }
-
-      toast.success("Actividad guardada");
-      setDetalleAccion("");
-      setEtapaProxima("sin-cambio");
-
-      await cargarActividades(oportunidadId);
-    } catch (error) {
-      console.error("Error:", error);
-      toast.error("Error: " + error.message);
-    } finally {
-      setGuardandoActividad(false);
-    }
-  };
+    await cargarActividades(oportunidadId);
+  } catch (error) {
+    console.error("Error:", error);
+    toast.error("Error: " + error.message);
+  } finally {
+    setGuardandoActividad(false);
+  }
+};
 
   const handleGuardar = async () => {
     setSaving(true);
@@ -744,6 +782,12 @@ export default function OportunidadDetailPage() {
     setDialogVehiculoOpen(true);
   }
 
+  function openCotizacionVehiculo(vehiculo) {
+    setCotizacionVehiculoMarcaId(vehiculo.marca_id);
+    setCotizacionVehiculoModeloId(vehiculo.modelo_id);
+    setDialogCotizacionOpen(true);
+  }
+
   async function saveVehiculo() {
     if (!vehiculoFormData.marca_id && !vehiculoFormData.modelo_id) {
       return toast.warning("Selecciona al menos una marca o modelo");
@@ -823,6 +867,46 @@ export default function OportunidadDetailPage() {
     } catch (error) {
       console.error(error);
       toast.error("Error eliminando vehículo");
+    }
+  }
+
+  // COTIZACIONES FUNCTIONS
+  function openCreateCotizacion() {
+    setEditingCotizacion(null);
+    setCotizacionVehiculoMarcaId(null);
+    setCotizacionVehiculoModeloId(null);
+    setDialogCotizacionOpen(true);
+  }
+
+  function openEditCotizacion(cotizacion) {
+    setEditingCotizacion(cotizacion);
+    setCotizacionVehiculoMarcaId(null);
+    setCotizacionVehiculoModeloId(null);
+    setDialogCotizacionOpen(true);
+  }
+
+  function openDeleteCotizacion(cotizacion) {
+    setDeleteCotizacionTarget(cotizacion);
+    setDeleteCotizacionDialog(true);
+  }
+
+  async function confirmDeleteCotizacion() {
+    try {
+      const response = await fetch(
+        `/api/cotizacionesagenda/${deleteCotizacionTarget.id}`,
+        { method: "DELETE" }
+      );
+
+      if (response.ok) {
+        toast.success("Cotización eliminada");
+        setDeleteCotizacionDialog(false);
+        await cargarCotizaciones(oportunidadId);
+      } else {
+        toast.error("Error eliminando cotización");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Error eliminando cotización");
     }
   }
 
@@ -1155,6 +1239,19 @@ export default function OportunidadDetailPage() {
                                 <Button
                                   size="icon"
                                   variant="outline"
+                                  onClick={() => openCotizacionVehiculo(vehiculo)}
+                                  className="h-8 w-8"
+                                >
+                                  <ShoppingCart size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Crear cotización</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
                                   onClick={() => openEditVehiculo(vehiculo)}
                                   className="h-8 w-8"
                                 >
@@ -1446,20 +1543,85 @@ export default function OportunidadDetailPage() {
                 </CardContent>
               </Card>
 
-              {/* COTIZACIÓN */}
-              <div className="bg-white rounded-lg border border-slate-200 p-6">
-                <CotizacionAgendaSection
-                  oportunidadId={oportunidadId}
-                  clienteId={oportunidad.cliente_id}
-                  oportunidadData={oportunidad}
-                  onCotizacionCreated={async () => {
-                    const cambioExitoso = await cambiarEtapa(6, "Cotización creada");
-                    if (cambioExitoso) {
-                      toast.success("Etapa cambiada a Cotización");
-                    }
-                  }}
-                />
-              </div>
+              {/* COTIZACIONES */}
+              {/* COTIZACIONES */}
+<Card>
+  <CardHeader className="flex flex-row items-center justify-between">
+    <CardTitle className="text-lg flex items-center gap-2">
+      <FileText size={18} />
+      Cotizaciones
+    </CardTitle>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button onClick={openCreateCotizacion} size="sm" className="gap-2">
+          <Plus className="h-4 w-4" /> Agregar
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="top">Crear nueva cotización</TooltipContent>
+    </Tooltip>
+  </CardHeader>
+  <CardContent>
+    <CotizacionesTable
+      cotizaciones={cotizaciones}
+      sortConfig={{ key: "id", direction: "asc" }}
+      onSort={() => {}}
+      onEdit={openEditCotizacion}
+      onDelete={openDeleteCotizacion}
+      onChangeStatus={async (cot, estado) => {
+        const res = await fetch(`/api/cotizacionesagenda/${cot.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sku: cot.sku,
+            color_externo: cot.color_externo,
+            color_interno: cot.color_interno,
+            version_id: cot.version_id,
+            anio: cot.anio,
+            marca_id: cot.marca_id,
+            modelo_id: cot.modelo_id,
+            estado,
+          }),
+        });
+        if (res.ok) {
+          toast.success(`Estado cambiado a ${estado}`);
+          if (estado === "enviada") {
+            await cambiarEtapa(6, "Cotización enviada");
+          }
+          await cargarCotizaciones(oportunidadId);
+        }
+      }}
+      onDuplicate={async (cot) => {
+        const res = await fetch("/api/cotizacionesagenda", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            oportunidad_id: cot.oportunidad_id,
+            marca_id: cot.marca_id,
+            modelo_id: cot.modelo_id,
+            version_id: cot.version_id,
+            anio: cot.anio,
+            sku: cot.sku,
+            color_externo: cot.color_externo,
+            color_interno: cot.color_interno,
+            estado: "borrador",
+            created_by: userId,
+          }),
+        });
+        if (res.ok) {
+          toast.success("Cotización duplicada");
+          await cargarCotizaciones(oportunidadId);
+        }
+      }}
+      onLoadHistorial={() => {}}
+      saving={false}
+      userId={userId}
+      onOpenHistorialDialog={(historialData) => {
+        setSelectedHistorial(historialData);
+        setHistorialDialog(true);
+      }}
+    />
+  </CardContent>
+</Card>
 
               {/* REGISTRAR ACTIVIDAD Y HISTORIAL */}
               <div className="md:col-span-2 space-y-4 pt-6 border-t-2 border-slate-200">
@@ -2175,6 +2337,53 @@ export default function OportunidadDetailPage() {
             </div>
           </AlertDialogContent>
         </AlertDialog>
+
+        <AlertDialog open={deleteCotizacionDialog} onOpenChange={setDeleteCotizacionDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar eliminación</AlertDialogTitle>
+              <AlertDialogDescription>
+                ¿Eliminar esta cotización Q-{String(deleteCotizacionTarget?.id).padStart(6, "0")}?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="flex gap-3 justify-end">
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDeleteCotizacion}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Eliminar
+              </AlertDialogAction>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* COTIZACIÓN DIALOG */}
+        <CotizacionDialog
+          open={dialogCotizacionOpen}
+          onOpenChange={setDialogCotizacionOpen}
+          editingCotizacion={editingCotizacion}
+          oportunidadId={oportunidadId}
+          marcas={marcas}
+          modelos={modelos}
+          versiones={versiones}
+          userId={userId}
+          onSave={() => cargarCotizaciones(oportunidadId)}
+          onCotizacionCreated={async () => {
+            const cambioExitoso = await cambiarEtapa(6, "Cotización creada");
+            if (cambioExitoso) {
+              toast.success("Etapa cambiada a Cotización");
+            }
+          }}
+          precargadaMarcaId={cotizacionVehiculoMarcaId}
+          precargadaModeloId={cotizacionVehiculoModeloId}
+        />
+        <HistorialDialog
+  open={historialDialog}
+  onOpenChange={setHistorialDialog}
+  selectedHistorial={selectedHistorial}
+  loading={historialLoading}
+/>
       </div>
     </TooltipProvider>
   );
