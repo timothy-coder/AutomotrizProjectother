@@ -30,6 +30,16 @@ function getUserLabel(u) {
   return u?.fullname || u?.username || u?.name || u?.nombre || `ID ${u?.id}`;
 }
 
+function getClienteLabel(cliente) {
+  return (
+    cliente?.nombre_comercial ||
+    cliente?.fullname ||
+    cliente?.nombre ||
+    cliente?.celular ||
+    `Cliente ${cliente?.id}`
+  );
+}
+
 function getHoraLabel(hora) {
   if (!hora) return "";
   return String(hora).slice(0, 5);
@@ -44,37 +54,37 @@ function renderTooltipContent(card) {
       </div>
       <div>
         <span className="font-semibold text-purple-300">Cliente:</span>{" "}
-        <span className="text-purple-100">{card?.cliente_name || "-"}</span>
+        <span className="text-purple-100">{card?.cliente_nombre || "-"}</span>
       </div>
       <div>
         <span className="font-semibold text-indigo-300">Vehículo:</span>{" "}
         <span className="text-indigo-100">
-          {card?.marca_name ? `${card.marca_name} ` : ""}
-          {card?.modelo_name || "-"}
+          {card?.marca_nombre ? `${card.marca_nombre} ` : ""}
+          {card?.modelo_nombre || "-"}
         </span>
       </div>
       <div>
         <span className="font-semibold text-amber-300">Origen:</span>{" "}
-        <span className="text-amber-100">{card?.origen_name || "-"}</span>
+        <span className="text-amber-100">{card?.origen_nombre || "-"}</span>
       </div>
-      {card?.suborigen_name && (
+      {card?.suborigen_nombre && (
         <div>
           <span className="font-semibold text-cyan-300">Suborigen:</span>{" "}
-          <span className="text-cyan-100">{card.suborigen_name}</span>
+          <span className="text-cyan-100">{card.suborigen_nombre}</span>
         </div>
       )}
       <div>
         <span className="font-semibold text-green-300">Etapa:</span>{" "}
-        <span className="text-green-100">{card?.etapa_name || "-"}</span>
+        <span className="text-green-100">{card?.etapa_nombre || "-"}</span>
       </div>
       <div>
         <span className="font-semibold text-orange-300">Hora:</span>{" "}
         <span className="text-orange-100">{getHoraLabel(card?.hora_agenda) || "-"}</span>
       </div>
-      {card?.detalle && (
+      {card?.detalle_oportunidad && (
         <div className="pt-1.5 border-t border-slate-600">
           <span className="font-semibold text-slate-300">Detalle:</span>
-          <p className="text-slate-200 mt-1">{card.detalle}</p>
+          <p className="text-slate-200 mt-1">{card.detalle_oportunidad}</p>
         </div>
       )}
     </div>
@@ -87,41 +97,87 @@ export default function VistaPorUsuarios({
   onOpenOportunidad,
   canViewAll = false,
   currentUserId = null,
+  estadosTiempo = [],
 }) {
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [openUsers, setOpenUsers] = useState(false);
-  const [estadosTiempo, setEstadosTiempo] = useState([]);
   const [filtroRango, setFiltroRango] = useState("semana");
   const [filtroCliente, setFiltroCliente] = useState("todos");
   const [clientes, setClientes] = useState([]);
+  const [detallesOportunidades, setDetallesOportunidades] = useState({});
 
-  // Cargar configuración de estados de tiempo
+  // DEBUG: Ver estructura de datos
   useEffect(() => {
-    fetch("/api/configuracion-estados-tiempo", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((data) => {
-        const lista = Array.isArray(data) ? data : [];
-        setEstadosTiempo(lista);
-      })
-      .catch(() => setEstadosTiempo([]));
-  }, []);
+    if (rows && rows.length > 0) {
+      console.log("Primer row de VistaPorUsuarios:", rows[0]);
+      console.log("Claves disponibles:", Object.keys(rows[0]));
+    }
+  }, [rows]);
+
+  // Cargar detalles de todas las oportunidades
+  useEffect(() => {
+    if (!rows || rows.length === 0) return;
+
+    async function loadAllDetalles() {
+      try {
+        const detalles = {};
+
+        const promises = rows.map(async (opp) => {
+          try {
+            const res = await fetch(
+              `/api/oportunidades-oportunidades/${opp.id}/detalles?limit=1`,
+              { cache: "no-store" }
+            );
+            const data = await res.json();
+            
+            const detalleData = Array.isArray(data)
+              ? data[0]
+              : data?.data?.[0];
+
+            if (detalleData) {
+              detalles[opp.id] = detalleData;
+            }
+          } catch (error) {
+            console.error(`Error cargando detalles para oportunidad ${opp.id}:`, error);
+          }
+        });
+
+        await Promise.all(promises);
+        setDetallesOportunidades(detalles);
+      } catch (error) {
+        console.error("Error en loadAllDetalles:", error);
+      }
+    }
+
+    loadAllDetalles();
+  }, [rows]);
 
   // Cargar clientes únicos
   useEffect(() => {
     if (rows && rows.length > 0) {
-      const clientesUnicos = Array.from(
-        new Map(
-          rows.map((row) => [
-            row.cliente_id,
-            {
-              id: row.cliente_id,
-              name: row.cliente_name,
-            },
-          ])
-        ).values()
-      ).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+      const clientesMap = new Map();
+      
+      rows.forEach((row) => {
+        if (row.cliente_id && !clientesMap.has(row.cliente_id)) {
+          const nombreCliente = 
+            row.cliente_nombre || 
+            row.nombrecliente || 
+            row.cliente_nombre_comercial ||
+            row.cliente_celular ||
+            `Cliente ${row.cliente_id}`;
 
-      setClientes(clientesUnicos);
+          clientesMap.set(row.cliente_id, {
+            id: row.cliente_id,
+            nombre: nombreCliente,
+          });
+        }
+      });
+
+      const clientesList = Array.from(clientesMap.values())
+        .filter(c => c.nombre && c.nombre !== "")
+        .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
+
+      setClientes(clientesList);
     }
   }, [rows]);
 
@@ -205,9 +261,7 @@ export default function VistaPorUsuarios({
   }, [rows, canViewAll, currentUserId]);
 
   const oportunidadesAsignadas = useMemo(() => {
-    let filtered = visibleRows.filter(
-      (r) => r?.asignado_a != null && r?.hora_agenda && r?.fecha_agenda
-    );
+    let filtered = visibleRows.filter((r) => r?.asignado_a != null);
 
     // Filtro de cliente
     if (filtroCliente !== "todos") {
@@ -216,14 +270,20 @@ export default function VistaPorUsuarios({
       );
     }
 
-    // Filtro de rango de fechas
+    // Filtro de rango de fechas - usar detalles cargados
     if (getRangoDias.length > 0) {
       const minFecha = startOfDay(getRangoDias[0]);
       const maxFecha = endOfDay(getRangoDias[getRangoDias.length - 1]);
 
       filtered = filtered.filter((r) => {
         try {
-          const fecha = new Date(r.fecha_agenda);
+          // Buscar detalle más reciente
+          const detalleReciente = detallesOportunidades[r.id];
+          const fechaAgenda = detalleReciente?.fecha_agenda || r.fechaagenda;
+          
+          if (!fechaAgenda) return false;
+          
+          const fecha = new Date(fechaAgenda);
           return fecha >= minFecha && fecha <= maxFecha;
         } catch {
           return false;
@@ -232,7 +292,7 @@ export default function VistaPorUsuarios({
     }
 
     return filtered;
-  }, [visibleRows, filtroCliente, getRangoDias]);
+  }, [visibleRows, filtroCliente, getRangoDias, detallesOportunidades]);
 
   // Función para calcular minutos restantes
   function getMinutosRestantes(fechaAgenda, horaAgenda) {
@@ -265,42 +325,28 @@ export default function VistaPorUsuarios({
   }
 
   // Función para obtener el estado de tiempo
-  function getEstadoTiempo(minutosRestantes, etapasconversion_id) {
-    if (etapasconversion_id !== 1 && etapasconversion_id !== 2) {
-      return "suficiente";
-    }
-
+  function getEstadoTiempo(minutosRestantes) {
     if (minutosRestantes === null) {
       return null;
     }
 
     const estadoActivo = estadosTiempo.find(
       (e) =>
-        e.activo &&
         minutosRestantes >= e.minutos_desde &&
         minutosRestantes <= e.minutos_hasta
     );
 
-    if (estadoActivo) {
-      return estadoActivo.estado;
-    }
-
-    return null;
+    return estadoActivo || null;
   }
 
   // Función para obtener color hexadecimal del estado
-  function getColorEstado(minutosRestantes, etapasconversion_id) {
-    if (etapasconversion_id !== 1 && etapasconversion_id !== 2) {
-      return "#10b981";
-    }
-
+  function getColorEstado(minutosRestantes) {
     if (minutosRestantes === null) {
       return "#6b7280";
     }
 
     const estadoActivo = estadosTiempo.find(
       (e) =>
-        e.activo &&
         minutosRestantes >= e.minutos_desde &&
         minutosRestantes <= e.minutos_hasta
     );
@@ -327,23 +373,29 @@ export default function VistaPorUsuarios({
     };
 
     oportunidadesAsignadas.forEach((card) => {
-      const minutosRestantes = getMinutosRestantes(
-        card.fecha_agenda,
-        card.hora_agenda
-      );
-      const estado = getEstadoTiempo(minutosRestantes, card.etapasconversion_id);
+      // Obtener detalle más reciente
+      const detalleReciente = detallesOportunidades[card.id];
+      const fechaAgenda = detalleReciente?.fecha_agenda || card.fechaagenda;
+      const horaAgenda = detalleReciente?.hora_agenda || card.horaagenda;
 
-      if (estado === "rojo") {
-        resumen.retrasado++;
-      } else if (estado === "amarillo") {
-        resumen.cercaHora++;
-      } else if (estado === "verde" || estado === "suficiente") {
+      const minutosRestantes = getMinutosRestantes(fechaAgenda, horaAgenda);
+      const estado = getEstadoTiempo(minutosRestantes);
+
+      if (estado) {
+        if (estado.estado === "rojo") {
+          resumen.retrasado++;
+        } else if (estado.estado === "amarillo") {
+          resumen.cercaHora++;
+        } else if (estado.estado === "verde") {
+          resumen.tiempoSuficiente++;
+        }
+      } else {
         resumen.tiempoSuficiente++;
       }
     });
 
     return resumen;
-  }, [oportunidadesAsignadas, estadosTiempo]);
+  }, [oportunidadesAsignadas, estadosTiempo, detallesOportunidades]);
 
   function toggleUser(id) {
     if (!canViewAll) return;
@@ -391,16 +443,22 @@ export default function VistaPorUsuarios({
                 <TooltipTrigger asChild>
                   <div>
                     <Select value={filtroCliente} onValueChange={setFiltroCliente}>
-                      <SelectTrigger className="w-[160px] h-9 text-sm">
+                      <SelectTrigger className="w-[200px] h-9 text-sm">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="todos">Todos los clientes</SelectItem>
-                        {clientes.map((cliente) => (
-                          <SelectItem key={cliente.id} value={String(cliente.id)}>
-                            {cliente.name || `Cliente ${cliente.id}`}
+                        {clientes.length > 0 ? (
+                          clientes.map((cliente) => (
+                            <SelectItem key={cliente.id} value={String(cliente.id)}>
+                              {cliente.nombre}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="sin-clientes" disabled>
+                            No hay clientes
                           </SelectItem>
-                        ))}
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -563,9 +621,15 @@ export default function VistaPorUsuarios({
                       const diaStr = format(dia, "yyyy-MM-dd");
 
                       const dayOportunidades = oportunidadesAsignadas.filter(
-                        (r) =>
-                          String(r?.asignado_a ?? "") === String(usuario.id) &&
-                          String(r?.fecha_agenda || "").startsWith(diaStr)
+                        (r) => {
+                          if (String(r?.asignado_a ?? "") !== String(usuario.id)) return false;
+                          
+                          // Obtener detalle más reciente
+                          const detalleReciente = detallesOportunidades[r.id];
+                          const fechaAgenda = detalleReciente?.fecha_agenda || r.fechaagenda;
+                          
+                          return String(fechaAgenda || "").startsWith(diaStr);
+                        }
                       );
 
                       return (
@@ -575,18 +639,19 @@ export default function VistaPorUsuarios({
                         >
                           <div className="space-y-1.5">
                             {dayOportunidades.map((card) => {
-                              const colorEstado = getColorEstado(
-                                getMinutosRestantes(
-                                  card.fecha_agenda,
-                                  card.hora_agenda
-                                ),
-                                card.etapasconversion_id
-                              );
+                              // Obtener detalle más reciente
+                              const detalleReciente = detallesOportunidades[card.id];
+                              const fechaAgenda = detalleReciente?.fecha_agenda || card.fechaagenda;
+                              const horaAgenda = detalleReciente?.hora_agenda || card.horaagenda;
+
+                              const minutosRestantes = getMinutosRestantes(fechaAgenda, horaAgenda);
+                              const estado = getEstadoTiempo(minutosRestantes);
+                              const colorEstado = getColorEstado(minutosRestantes);
                               const textOscuro = esColorOscuro(colorEstado);
                               const textColor = textOscuro ? "#ffffff" : "#000000";
 
                               return (
-                                <Tooltip key={card.id}>
+                                <Tooltip key={card.oportunidad_id}>
                                   <TooltipTrigger asChild>
                                     <button
                                       type="button"
@@ -602,10 +667,15 @@ export default function VistaPorUsuarios({
                                         {card.oportunidad_id}
                                       </div>
                                       <div className="truncate text-[10px] opacity-90">
-                                        {card.cliente_name || ""}
+                                        {card.cliente_nombre || card.nombrecliente || ""}
                                       </div>
-                                      <div className="text-[10px] font-semibold mt-0.5">
-                                        ⏰ {getHoraLabel(card.hora_agenda) || "-"}
+                                      <div className="text-[10px] font-semibold mt-0.5 flex items-center justify-between">
+                                        <span>⏰ {getHoraLabel(horaAgenda) || "-"}</span>
+                                        {estado && (
+                                          <span className="text-[9px] font-bold">
+                                            {estado.estado}
+                                          </span>
+                                        )}
                                       </div>
                                     </button>
                                   </TooltipTrigger>

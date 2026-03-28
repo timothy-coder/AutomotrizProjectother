@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, RefreshCw } from "lucide-react";
+import { Plus, RefreshCw, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -13,6 +13,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from "@/components/ui/select";
 
 import { useRequirePerm } from "@/hooks/useRequirePerm";
 import { useAuth } from "@/context/AuthContext";
@@ -25,6 +32,10 @@ import VistaPorEtapas from "@/app/components/oportunidades/VistaporEtapas";
 import { hasPermission } from "@/lib/permissions";
 
 const FILTER_ALL_CREATED = "__all_created__";
+const FILTER_ALL = "__all__";
+const FILTER_TODAY = "hoy";
+const FILTER_THIS_WEEK = "esta_semana";
+const FILTER_THIS_MONTH = "este_mes";
 
 export default function OportunidadesPage() {
   const canView = useRequirePerm("oportunidades", "view");
@@ -33,14 +44,27 @@ export default function OportunidadesPage() {
 
   const canCreate = hasPermission(permissions, "oportunidades", "create");
   const canEdit = hasPermission(permissions, "oportunidades", "edit");
-  const canViewAll = hasPermission(permissions, "agenda", "viewall");
+  const canViewAll = hasPermission(permissions, "oportunidades", "viewall");
   const canAssign = hasPermission(permissions, "oportunidades", "asignar");
 
   const [rows, setRows] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
+  const [etapas, setEtapas] = useState([]);
+  const [clientes, setClientes] = useState([]);
+  const [origenes, setOrigenes] = useState([]);
+  const [estadosTiempo, setEstadosTiempo] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  // Estados de filtros
+  const [filterCliente, setFilterCliente] = useState(FILTER_ALL);
+  const [filterOrigen, setFilterOrigen] = useState(FILTER_ALL);
+  const [filterEtapa, setFilterEtapa] = useState(FILTER_ALL);
+  const [filterAsignado, setFilterAsignado] = useState(FILTER_ALL);
   const [createdByFilter, setCreatedByFilter] = useState(FILTER_ALL_CREATED);
+  const [filterFecha, setFilterFecha] = useState(FILTER_ALL);
+
+  // Tab activo
+  const [activeTab, setActiveTab] = useState("general");
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedOportunidad, setSelectedOportunidad] = useState(null);
@@ -48,35 +72,121 @@ export default function OportunidadesPage() {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState(null);
 
+  // Obtener fechas para filtros
+  function getFechaFiltros() {
+    const hoy = new Date();
+    const inicioSemana = new Date(hoy);
+    inicioSemana.setDate(hoy.getDate() - hoy.getDay()); // Domingo
+    const finSemana = new Date(inicioSemana);
+    finSemana.setDate(inicioSemana.getDate() + 6); // Sábado
+
+    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    const finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+
+    return {
+      hoy: hoy.toISOString().split("T")[0],
+      inicioSemana: inicioSemana.toISOString().split("T")[0],
+      finSemana: finSemana.toISOString().split("T")[0],
+      inicioMes: inicioMes.toISOString().split("T")[0],
+      finMes: finMes.toISOString().split("T")[0],
+    };
+  }
+
+  // Enriquecer oportunidades con información de detalles
+  async function enriquecerOportunidadesConDetalles(oportunidades) {
+    try {
+      const oportunidadesEnriquecidas = await Promise.all(
+        oportunidades.map(async (opp) => {
+          try {
+            const res = await fetch(
+              `/api/oportunidades-oportunidades/${opp.id}/detalles?limit=1`,
+              { cache: "no-store" }
+            );
+            const data = await res.json();
+            const ultimoDetalle = Array.isArray(data)
+              ? data[0]
+              : Array.isArray(data?.data)
+                ? data.data[0]
+                : null;
+
+            return {
+              ...opp,
+              ultimoDetalle,
+              fecha_ultima_agenda: ultimoDetalle?.fecha_agenda,
+              hora_ultima_agenda: ultimoDetalle?.hora_agenda,
+            };
+          } catch (error) {
+            console.error(`Error enriqueciendo oportunidad ${opp.id}:`, error);
+            return opp;
+          }
+        })
+      );
+      return oportunidadesEnriquecidas;
+    } catch (error) {
+      console.error("Error enriqueciendo oportunidades:", error);
+      return oportunidades;
+    }
+  }
+
   async function loadData() {
     try {
       setLoading(true);
 
-      const [opRes, usersRes] = await Promise.all([
-        fetch("/api/oportunidades", { cache: "no-store" }),
+      const requests = [
+        fetch("/api/oportunidades-oportunidades?limit=1000", {
+          cache: "no-store",
+        }),
         fetch("/api/usuarios", { cache: "no-store" }),
-      ]);
+        fetch("/api/etapasconversion", { cache: "no-store" }),
+        fetch("/api/clientes", { cache: "no-store" }),
+        fetch("/api/origenes_citas", { cache: "no-store" }),
+        fetch("/api/configuracion-estados-tiempo", { cache: "no-store" }),
+      ];
 
-      const [opData, usersData] = await Promise.all([
-        opRes.json(),
-        usersRes.json(),
-      ]);
+      const responses = await Promise.all(requests);
+
+      const [opRes, usersRes, etapasRes, clientesRes, origenesRes, estadosRes] =
+        responses;
+
+      const [opData, usersData, etapasData, clientesData, origenesData, estadosData] =
+        await Promise.all(responses.map((r) => r.json()));
 
       if (!opRes.ok) {
         throw new Error(opData?.message || "No se pudo cargar oportunidades");
       }
 
-      if (!usersRes.ok) {
-        throw new Error(usersData?.message || "No se pudo cargar usuarios");
-      }
+      const oportunidades = Array.isArray(opData)
+        ? opData
+        : Array.isArray(opData?.data)
+          ? opData.data
+          : [];
 
-      setRows(Array.isArray(opData) ? opData : []);
+      // Enriquecer con detalles
+      const oportunidadesEnriquecidas =
+        await enriquecerOportunidadesConDetalles(oportunidades);
+
+      setRows(oportunidadesEnriquecidas);
       setUsuarios(Array.isArray(usersData) ? usersData : []);
+      setEtapas(Array.isArray(etapasData) ? etapasData : []);
+      setClientes(Array.isArray(clientesData) ? clientesData : []);
+      setOrigenes(Array.isArray(origenesData) ? origenesData : []);
+      
+      // Filtrar solo los estados activos
+      const estadosFiltrados = Array.isArray(estadosData) 
+        ? estadosData.filter(e => e.activo === 1 || e.activo === true)
+        : [];
+      setEstadosTiempo(estadosFiltrados);
+      
+      console.log("Estados de tiempo cargados:", estadosFiltrados);
     } catch (error) {
       console.error(error);
       toast.error(error.message || "No se pudo cargar información");
       setRows([]);
       setUsuarios([]);
+      setEtapas([]);
+      setClientes([]);
+      setOrigenes([]);
+      setEstadosTiempo([]);
     } finally {
       setLoading(false);
     }
@@ -87,7 +197,7 @@ export default function OportunidadesPage() {
   }, [canView]);
 
   const visibleRows = useMemo(() => {
-    if (!user?.id) return [];
+    if (!user?.id) return rows;
     if (canViewAll) return rows;
 
     return rows.filter(
@@ -96,14 +206,70 @@ export default function OportunidadesPage() {
   }, [rows, canViewAll, user]);
 
   const baseFilteredRows = useMemo(() => {
+    const fechas = getFechaFiltros();
+
     return visibleRows.filter((row) => {
       const matchesCreatedBy =
         createdByFilter === FILTER_ALL_CREATED ||
         String(row?.created_by ?? "") === createdByFilter;
 
-      return matchesCreatedBy;
+      const matchesCliente =
+        filterCliente === FILTER_ALL ||
+        String(row?.cliente_id ?? "") === filterCliente;
+
+      const matchesOrigen =
+        filterOrigen === FILTER_ALL ||
+        String(row?.origen_id ?? "") === filterOrigen;
+
+      const matchesEtapa =
+        filterEtapa === FILTER_ALL ||
+        String(row?.etapasconversion_id ?? "") === filterEtapa;
+
+      const matchesAsignado =
+        filterAsignado === FILTER_ALL ||
+        String(row?.asignado_a ?? "") === filterAsignado;
+
+      // Filtro de fecha basado en última agenda
+      let matchesFecha = filterFecha === FILTER_ALL;
+      if (!matchesFecha && row.fecha_ultima_agenda) {
+        const fechaAgenda = row.fecha_ultima_agenda;
+
+        switch (filterFecha) {
+          case FILTER_TODAY:
+            matchesFecha = fechaAgenda === fechas.hoy;
+            break;
+          case FILTER_THIS_WEEK:
+            matchesFecha =
+              fechaAgenda >= fechas.inicioSemana &&
+              fechaAgenda <= fechas.finSemana;
+            break;
+          case FILTER_THIS_MONTH:
+            matchesFecha =
+              fechaAgenda >= fechas.inicioMes && fechaAgenda <= fechas.finMes;
+            break;
+          default:
+            matchesFecha = true;
+        }
+      }
+
+      return (
+        matchesCreatedBy &&
+        matchesCliente &&
+        matchesOrigen &&
+        matchesEtapa &&
+        matchesAsignado &&
+        matchesFecha
+      );
     });
-  }, [visibleRows, createdByFilter]);
+  }, [
+    visibleRows,
+    createdByFilter,
+    filterCliente,
+    filterOrigen,
+    filterEtapa,
+    filterAsignado,
+    filterFecha,
+  ]);
 
   function handleOpenEdit(row) {
     setSelectedOportunidad(row);
@@ -120,6 +286,23 @@ export default function OportunidadesPage() {
     setDialogOpen(true);
   }
 
+  function clearFilters() {
+    setFilterCliente(FILTER_ALL);
+    setFilterOrigen(FILTER_ALL);
+    setFilterEtapa(FILTER_ALL);
+    setFilterAsignado(FILTER_ALL);
+    setCreatedByFilter(FILTER_ALL_CREATED);
+    setFilterFecha(FILTER_ALL);
+  }
+
+  const hasActiveFilters =
+    filterCliente !== FILTER_ALL ||
+    filterOrigen !== FILTER_ALL ||
+    filterEtapa !== FILTER_ALL ||
+    filterAsignado !== FILTER_ALL ||
+    createdByFilter !== FILTER_ALL_CREATED ||
+    filterFecha !== FILTER_ALL;
+
   if (!canView) return null;
 
   return (
@@ -128,67 +311,256 @@ export default function OportunidadesPage() {
         {/* ENCABEZADO */}
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Oportunidades</h1>
-            <p className="text-sm text-slate-600 mt-1">Gestiona todas tus oportunidades de negocio</p>
+            <h1 className="text-3xl font-bold text-slate-900">
+              Oportunidades
+            </h1>
+            <p className="text-sm text-slate-600 mt-1">
+              Gestiona todas tus oportunidades de negocio
+            </p>
           </div>
 
-          {canCreate && (
+          <div className="flex gap-2">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  onClick={() => {
-                    setSelectedOportunidad(null);
-                    setDialogOpen(true);
-                  }}
-                  className="gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
+                  onClick={loadData}
+                  disabled={loading}
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
                 >
-                  <Plus className="h-4 w-4" />
-                  Agregar oportunidad
+                  <RefreshCw className="h-4 w-4" />
+                  Actualizar
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="top">Crear nueva oportunidad</TooltipContent>
+              <TooltipContent side="top">Recargar datos</TooltipContent>
             </Tooltip>
-          )}
+
+            {canCreate && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={() => {
+                      setSelectedOportunidad(null);
+                      setDialogOpen(true);
+                    }}
+                    className="gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Agregar oportunidad
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  Crear nueva oportunidad
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
         </div>
 
+        {/* FILTROS - SOLO SE MUESTRAN EN LA VISTA GENERAL */}
+        {activeTab === "general" && (
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900">Filtros</h3>
+              {hasActiveFilters && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={clearFilters}
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1 text-xs"
+                    >
+                      <X className="h-3 w-3" />
+                      Limpiar filtros
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">
+                    Eliminar todos los filtros
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-2">
+                  Cliente
+                </label>
+                <Select value={filterCliente} onValueChange={setFilterCliente}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={FILTER_ALL}>Todos</SelectItem>
+                    {clientes.map((item) => (
+                      <SelectItem key={item.id} value={String(item.id)}>
+                        {item.nombre || `Cliente ${item.id}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-2">
+                  Origen
+                </label>
+                <Select value={filterOrigen} onValueChange={setFilterOrigen}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={FILTER_ALL}>Todos</SelectItem>
+                    {origenes.map((item) => (
+                      <SelectItem key={item.id} value={String(item.id)}>
+                        {item.name || `Origen ${item.id}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-2">
+                  Etapa
+                </label>
+                <Select value={filterEtapa} onValueChange={setFilterEtapa}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={FILTER_ALL}>Todos</SelectItem>
+                    {etapas.map((item) => (
+                      <SelectItem key={item.id} value={String(item.id)}>
+                        {item.nombre || `Etapa ${item.id}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-2">
+                  Asignado a
+                </label>
+                <Select value={filterAsignado} onValueChange={setFilterAsignado}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={FILTER_ALL}>Todos</SelectItem>
+                    {usuarios.map((item) => (
+                      <SelectItem key={item.id} value={String(item.id)}>
+                        {item.fullname ||
+                          item.username ||
+                          `Usuario ${item.id}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-2">
+                  Creado por
+                </label>
+                <Select
+                  value={createdByFilter}
+                  onValueChange={setCreatedByFilter}
+                >
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={FILTER_ALL_CREATED}>Todos</SelectItem>
+                    {usuarios.map((item) => (
+                      <SelectItem key={item.id} value={String(item.id)}>
+                        {item.fullname ||
+                          item.username ||
+                          `Usuario ${item.id}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-2">
+                  Fecha Agenda
+                </label>
+                <Select value={filterFecha} onValueChange={setFilterFecha}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={FILTER_ALL}>Todas</SelectItem>
+                    <SelectItem value={FILTER_TODAY}>Hoy</SelectItem>
+                    <SelectItem value={FILTER_THIS_WEEK}>
+                      Esta semana
+                    </SelectItem>
+                    <SelectItem value={FILTER_THIS_MONTH}>
+                      Este mes
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {hasActiveFilters && (
+              <div className="text-xs text-slate-600">
+                Mostrando {baseFilteredRows.length} de {visibleRows.length}{" "}
+                oportunidades
+              </div>
+            )}
+          </div>
+        )}
+
         {/* TABS */}
-        <Tabs defaultValue="general" className="space-y-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <div className="border-b border-slate-200">
             <TabsList className="bg-transparent border-b-0 gap-8 p-0">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <TabsTrigger 
+                  <TabsTrigger
                     value="general"
                     className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:bg-transparent rounded-none px-0 pb-3"
                   >
                     <span className="text-sm font-medium">General</span>
                   </TabsTrigger>
                 </TooltipTrigger>
-                <TooltipContent side="top">Vista general de todas las oportunidades</TooltipContent>
+                <TooltipContent side="top">
+                  Vista general de todas las oportunidades
+                </TooltipContent>
               </Tooltip>
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <TabsTrigger 
+                  <TabsTrigger
                     value="vista_usuarios"
                     className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:bg-transparent rounded-none px-0 pb-3"
                   >
                     <span className="text-sm font-medium">Tablero</span>
                   </TabsTrigger>
                 </TooltipTrigger>
-                <TooltipContent side="top">Tablero por usuarios asignados</TooltipContent>
+                <TooltipContent side="top">
+                  Tablero por usuarios asignados
+                </TooltipContent>
               </Tooltip>
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <TabsTrigger 
+                  <TabsTrigger
                     value="vista_etapas"
                     className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:bg-transparent rounded-none px-0 pb-3"
                   >
                     <span className="text-sm font-medium">Kanban</span>
                   </TabsTrigger>
                 </TooltipTrigger>
-                <TooltipContent side="top">Vista Kanban por etapas</TooltipContent>
+                <TooltipContent side="top">
+                  Vista Kanban por etapas
+                </TooltipContent>
               </Tooltip>
             </TabsList>
           </div>
@@ -203,6 +575,10 @@ export default function OportunidadesPage() {
               canAssign={canAssign && canViewAll}
               onRefresh={loadData}
               usuarios={usuarios}
+              etapas={etapas}
+              clientes={clientes}
+              origenes={origenes}
+              estadosTiempo={estadosTiempo}
             />
           </TabsContent>
 
@@ -213,11 +589,12 @@ export default function OportunidadesPage() {
               </CardHeader>
               <CardContent className="overflow-hidden p-0">
                 <VistaPorUsuarios
-                  rows={baseFilteredRows}
+                  rows={visibleRows}
                   usuarios={usuarios}
                   onOpenOportunidad={handleOpenFromViews}
                   canViewAll={canViewAll}
                   currentUserId={user?.id || null}
+                  estadosTiempo={estadosTiempo}
                 />
               </CardContent>
             </Card>
@@ -230,10 +607,11 @@ export default function OportunidadesPage() {
               </CardHeader>
               <CardContent className="overflow-hidden p-0">
                 <VistaPorEtapas
-                  rows={baseFilteredRows}
+                  rows={visibleRows}
                   onOpenOportunidad={handleOpenFromViews}
                   canViewAll={canViewAll}
                   currentUserId={user?.id || null}
+                  estadosTiempo={estadosTiempo}
                 />
               </CardContent>
             </Card>

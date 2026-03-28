@@ -1,8 +1,3 @@
-// ============================================
-// API PARA GENERAR PDF
-// archivo: app/api/cotizacionesagenda/[id]/pdf/route.js
-// ============================================
-
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import puppeteer from "puppeteer";
@@ -62,14 +57,14 @@ export async function GET(req, { params }) {
       ? usuario[0].fullname
       : "Usuario";
 
-    // Obtener oportunidad y cliente
+    // Obtener oportunidad y cliente (actualizado a oportunidades_oportunidades)
     const [oportunidad] = await db.query(
       `SELECT 
-        o.oportunidad_id,
+        oo.oportunidad_id,
         CONCAT(c.nombre, ' ', c.apellido) as cliente_name
-      FROM oportunidades o
-      INNER JOIN clientes c ON c.id = o.cliente_id
-      WHERE o.id = ?`,
+      FROM oportunidades_oportunidades oo
+      INNER JOIN clientes c ON c.id = oo.cliente_id
+      WHERE oo.id = ?`,
       [cot.oportunidad_id]
     );
 
@@ -273,7 +268,6 @@ export async function GET(req, { params }) {
                   <div class="spec-value">${cot.color_externo || "-"}</div>
                 </div>
               </div>
-              <div class="vehicle-image">🚗</div>
             </div>
 
             <!-- Specifications Section -->

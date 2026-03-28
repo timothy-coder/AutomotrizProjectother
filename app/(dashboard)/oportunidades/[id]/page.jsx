@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Save, X, Edit2, Loader2, Plus, Trash2, Pencil, MessageSquare, Check, Calendar, FileText, Lock, History } from "lucide-react";
+import { ChevronLeft, ChevronRight, Save, X, Edit2, Loader2, Plus, Trash2, Pencil, MessageSquare, Check, Calendar, FileText, Lock, History, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -39,8 +39,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useUserScope } from "@/hooks/useUserScope";
-import CotizacionAgendaSection from "@/app/components/agenda/CotizacionAgendaSection";
-
+import CotizacionDialog from "@/app/components/agenda/CotizacionDialog";
+import CotizacionesTable from "@/app/components/agenda/CotizacionesTable";
+import HistorialDialog from "@/app/components/agenda/HistorialDialog";
 export default function OportunidadDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -59,6 +60,17 @@ export default function OportunidadDetailPage() {
   const [guardandoActividad, setGuardandoActividad] = useState(false);
   const [detalleAccion, setDetalleAccion] = useState("");
   const [etapaProxima, setEtapaProxima] = useState("sin-cambio");
+  const [detalles, setDetalles] = useState([]);
+// Agrega estos estados cerca de los otros estados de cotizaciones
+const [historialDialog, setHistorialDialog] = useState(false);
+const [selectedHistorial, setSelectedHistorial] = useState(null);
+const [historialLoading, setHistorialLoading] = useState(false);
+  // Cotizaciones
+  const [cotizaciones, setCotizaciones] = useState([]);
+  const [dialogCotizacionOpen, setDialogCotizacionOpen] = useState(false);
+  const [editingCotizacion, setEditingCotizacion] = useState(null);
+  const [deleteCotizacionDialog, setDeleteCotizacionDialog] = useState(false);
+  const [deleteCotizacionTarget, setDeleteCotizacionTarget] = useState(null);
 
   // Test Drives
   const [testDrives, setTestDrives] = useState([]);
@@ -96,6 +108,7 @@ export default function OportunidadDetailPage() {
   const [vehiculosInteres, setVehiculosInteres] = useState([]);
   const [marcas, setMarcas] = useState([]);
   const [modelos, setModelos] = useState([]);
+  const [versiones, setVersiones] = useState([]);
   const [dialogVehiculoOpen, setDialogVehiculoOpen] = useState(false);
   const [deleteVehiculoDialog, setDeleteVehiculoDialog] = useState(false);
   const [editingVehiculo, setEditingVehiculo] = useState(null);
@@ -107,16 +120,20 @@ export default function OportunidadDetailPage() {
     source: "manual",
   });
 
+  // Cotización desde vehículo
+  const [cotizacionVehiculoMarcaId, setCotizacionVehiculoMarcaId] = useState(null);
+  const [cotizacionVehiculoModeloId, setCotizacionVehiculoModeloId] = useState(null);
+
   // Etapas disponibles
   const etapas = [
-    { id: 2, nombre: "Nuevo", label: "Nuevo" },
-    { id: 3, nombre: "Asignado", label: "Asignado" },
+    { id: 1, nombre: "Nuevo", label: "Nuevo" },
+    { id: 2, nombre: "Asignado", label: "Asignado" },
     { id: 4, nombre: "En Atención", label: "En Atención" },
-    { id: 5, nombre: "Test Drive", label: "Test Drive" },
+    { id: 5, nombre: "Test drive", label: "Test drive" },
     { id: 6, nombre: "Cotización", label: "Cotización" },
-    { id: 7, nombre: "Evaluación Crédito", label: "Eval. Crédito" },
+    { id: 7, nombre: "Evaluación crediticia", label: "Eval. crediticia" },
     { id: 8, nombre: "Reserva", label: "Reserva" },
-    { id: 9, nombre: "Venta Facturada", label: "Venta" },
+    { id: 9, nombre: "Venta facturada", label: "Venta" },
     { id: 10, nombre: "Cerrada", label: "Cerrada" },
   ];
 
@@ -129,7 +146,7 @@ export default function OportunidadDetailPage() {
     try {
       if (!userId) return false;
 
-      const response = await fetch(`/api/oportunidades/${oportunidadId}/cambiar-etapa`, {
+      const response = await fetch(`/api/oportunidades-oportunidades/${oportunidadId}/etapa`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -150,12 +167,46 @@ export default function OportunidadDetailPage() {
     }
   };
 
+  // Cargar detalles de agenda
+  const cargarDetalles = async (opId) => {
+    try {
+      const resDetalles = await fetch(
+        `/api/oportunidades-oportunidades/${opId}/detalles`,
+        { cache: "no-store" }
+      );
+      if (resDetalles.ok) {
+        const dataDetalles = await resDetalles.json();
+        const detallesList = Array.isArray(dataDetalles)
+          ? dataDetalles
+          : dataDetalles?.data || [];
+        setDetalles(detallesList);
+      }
+    } catch (error) {
+      console.error("Error cargando detalles:", error);
+    }
+  };
+
+  // Cargar cotizaciones
+  const cargarCotizaciones = async (opId) => {
+    try {
+      const response = await fetch(`/api/cotizacionesagenda?oportunidad_id=${opId}`, {
+        cache: "no-store",
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCotizaciones(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error("Error cargando cotizaciones:", error);
+    }
+  };
+
   useEffect(() => {
     if (!oportunidadId || loadingUserScope) return;
 
     const cargarDatos = async () => {
       try {
-        const resOp = await fetch(`/api/oportunidades/${oportunidadId}`, {
+        const resOp = await fetch(`/api/oportunidades-oportunidades/${oportunidadId}`, {
           cache: "no-store",
         });
         if (!resOp.ok) throw new Error("Error cargando oportunidad");
@@ -196,7 +247,9 @@ export default function OportunidadDetailPage() {
           setVehiculosInteres(Array.isArray(dataVeh) ? dataVeh : []);
         }
 
+        await cargarDetalles(oportunidadId);
         await cargarActividades(oportunidadId);
+        await cargarCotizaciones(oportunidadId);
 
         const resTestDrives = await fetch(
           `/api/test-drives?oportunidad_id=${oportunidadId}`,
@@ -225,13 +278,22 @@ export default function OportunidadDetailPage() {
           setCierres(Array.isArray(dataCierres) ? dataCierres : []);
         }
 
-        const [m, mo] = await Promise.all([
+        const [m, mo, v] = await Promise.all([
           fetch("/api/marcas", { cache: "no-store" }).then((r) => r.ok ? r.json() : []),
           fetch("/api/modelos", { cache: "no-store" }).then((r) => r.ok ? r.json() : []),
+          fetch("/api/versiones?limit=1000", { cache: "no-store" }).then((r) => r.ok ? r.json() : []),
         ]);
 
         setMarcas(Array.isArray(m) ? m : []);
         setModelos(Array.isArray(mo) ? mo : []);
+
+        let versionesData = [];
+        if (v.data && Array.isArray(v.data)) {
+          versionesData = v.data;
+        } else if (Array.isArray(v)) {
+          versionesData = v;
+        }
+        setVersiones(versionesData);
       } catch (error) {
         console.error("Error cargando datos:", error);
         toast.error("Error cargando datos: " + error.message);
@@ -262,53 +324,51 @@ export default function OportunidadDetailPage() {
   };
 
   const handleGuardarActividad = async () => {
-    if (!detalleAccion.trim()) {
-      toast.warning("El detalle es requerido");
-      return;
+  if (!detalleAccion.trim()) {
+    toast.warning("El detalle es requerido");
+    return;
+  }
+
+  if (!userId) {
+    toast.error("Usuario no identificado");
+    return;
+  }
+
+  setGuardandoActividad(true);
+  try {
+    // Usa etapaProxima si fue seleccionada, sino usa la etapa actual
+    const etapaParaActividad = etapaProxima !== "sin-cambio" 
+      ? Number(etapaProxima) 
+      : etapaActual;
+
+    const resActividad = await fetch("/api/actividades-oportunidades", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        oportunidad_id: Number(oportunidadId),
+        etapasconversion_id: etapaParaActividad, // Etapa seleccionada o actual
+        detalle: detalleAccion,
+        created_by: userId,
+      }),
+    });
+
+    if (!resActividad.ok) {
+      const data = await resActividad.json();
+      throw new Error(data.message);
     }
 
-    if (!userId) {
-      toast.error("Usuario no identificado");
-      return;
-    }
+    toast.success("Actividad guardada");
+    setDetalleAccion("");
+    setEtapaProxima("sin-cambio"); // Reset al Select
 
-    setGuardandoActividad(true);
-    try {
-      const nuevaEtapa = etapaProxima !== "sin-cambio" ? Number(etapaProxima) : etapaActual;
-
-      const resActividad = await fetch("/api/actividades-oportunidades", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          oportunidad_id: Number(oportunidadId),
-          etapasconversion_id: nuevaEtapa,
-          detalle: detalleAccion,
-          created_by: userId,
-        }),
-      });
-
-      if (!resActividad.ok) {
-        const data = await resActividad.json();
-        throw new Error(data.message);
-      }
-
-      if (etapaProxima !== "sin-cambio") {
-        const cambioExitoso = await cambiarEtapa(nuevaEtapa);
-        if (!cambioExitoso) throw new Error("Error cambiando etapa");
-      }
-
-      toast.success("Actividad guardada");
-      setDetalleAccion("");
-      setEtapaProxima("sin-cambio");
-
-      await cargarActividades(oportunidadId);
-    } catch (error) {
-      console.error("Error:", error);
-      toast.error("Error: " + error.message);
-    } finally {
-      setGuardandoActividad(false);
-    }
-  };
+    await cargarActividades(oportunidadId);
+  } catch (error) {
+    console.error("Error:", error);
+    toast.error("Error: " + error.message);
+  } finally {
+    setGuardandoActividad(false);
+  }
+};
 
   const handleGuardar = async () => {
     setSaving(true);
@@ -321,7 +381,7 @@ export default function OportunidadDetailPage() {
         return;
       }
 
-      await fetch(`/api/oportunidades/${oportunidadId}`, {
+      await fetch(`/api/oportunidades-oportunidades/${oportunidadId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -475,7 +535,6 @@ export default function OportunidadDetailPage() {
         toast.success(editingTestDrive ? "Test Drive actualizado" : "Test Drive creado");
         setDialogTestDriveOpen(false);
 
-        // Cambiar automáticamente a etapa "Test Drive" (id: 5) si es nueva creación
         if (!editingTestDrive) {
           const cambioExitoso = await cambiarEtapa(5, "Test drive programado");
           if (cambioExitoso) {
@@ -548,7 +607,6 @@ export default function OportunidadDetailPage() {
       if (response.ok) {
         toast.success("Reserva creada");
 
-        // Cambiar automáticamente a etapa "Reserva" (id: 8)
         const cambioExitoso = await cambiarEtapa(8, "Reserva creada");
         if (cambioExitoso) {
           toast.success("Etapa cambiada a Reserva");
@@ -648,7 +706,6 @@ export default function OportunidadDetailPage() {
         setDialogCierreOpen(false);
         setCierreFormData({ detalle: "" });
 
-        // Cambiar automáticamente a etapa "Cerrada" (id: 10) si es nueva creación
         if (!editingCierre) {
           const cambioExitoso = await cambiarEtapa(10, "Oportunidad cerrada: " + cierreFormData.detalle);
           if (cambioExitoso) {
@@ -723,6 +780,12 @@ export default function OportunidadDetailPage() {
       source: vehiculo.source || "manual",
     });
     setDialogVehiculoOpen(true);
+  }
+
+  function openCotizacionVehiculo(vehiculo) {
+    setCotizacionVehiculoMarcaId(vehiculo.marca_id);
+    setCotizacionVehiculoModeloId(vehiculo.modelo_id);
+    setDialogCotizacionOpen(true);
   }
 
   async function saveVehiculo() {
@@ -804,6 +867,46 @@ export default function OportunidadDetailPage() {
     } catch (error) {
       console.error(error);
       toast.error("Error eliminando vehículo");
+    }
+  }
+
+  // COTIZACIONES FUNCTIONS
+  function openCreateCotizacion() {
+    setEditingCotizacion(null);
+    setCotizacionVehiculoMarcaId(null);
+    setCotizacionVehiculoModeloId(null);
+    setDialogCotizacionOpen(true);
+  }
+
+  function openEditCotizacion(cotizacion) {
+    setEditingCotizacion(cotizacion);
+    setCotizacionVehiculoMarcaId(null);
+    setCotizacionVehiculoModeloId(null);
+    setDialogCotizacionOpen(true);
+  }
+
+  function openDeleteCotizacion(cotizacion) {
+    setDeleteCotizacionTarget(cotizacion);
+    setDeleteCotizacionDialog(true);
+  }
+
+  async function confirmDeleteCotizacion() {
+    try {
+      const response = await fetch(
+        `/api/cotizacionesagenda/${deleteCotizacionTarget.id}`,
+        { method: "DELETE" }
+      );
+
+      if (response.ok) {
+        toast.success("Cotización eliminada");
+        setDeleteCotizacionDialog(false);
+        await cargarCotizaciones(oportunidadId);
+      } else {
+        toast.error("Error eliminando cotización");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Error eliminando cotización");
     }
   }
 
@@ -946,7 +1049,7 @@ export default function OportunidadDetailPage() {
         <div className="bg-white border-b border-slate-200 p-6 sticky top-0 z-20 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-slate-900">{oportunidad.cliente_name}</h1>
+              <h1 className="text-3xl font-bold text-slate-900">{oportunidad.cliente_nombre}</h1>
               <p className="text-slate-600 text-sm mt-1">{oportunidad.oportunidad_id}</p>
             </div>
             <Tooltip>
@@ -1014,27 +1117,23 @@ export default function OportunidadDetailPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-xs text-slate-600 font-semibold uppercase">Cliente</p>
-                      <p className="text-slate-900 font-medium">{oportunidad.cliente_name}</p>
+                      <p className="text-slate-900 font-medium">{oportunidad.cliente_nombre}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-600 font-semibold uppercase">Código</p>
                       <p className="text-slate-900 font-mono font-medium">{oportunidad.oportunidad_id}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-600 font-semibold uppercase">Vehículo</p>
-                      <p className="text-slate-900">{oportunidad.marca_name} {oportunidad.modelo_name}</p>
-                    </div>
-                    <div>
                       <p className="text-xs text-slate-600 font-semibold uppercase">Origen</p>
-                      <p className="text-slate-900">{oportunidad.origen_name}</p>
+                      <p className="text-slate-900">{oportunidad.origen_nombre}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-600 font-semibold uppercase">Suborigen</p>
-                      <p className="text-slate-900">{oportunidad.suborigen_name}</p>
+                      <p className="text-slate-900">{oportunidad.suborigen_nombre}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-600 font-semibold uppercase">Asignado a</p>
-                      <p className="text-slate-900">{oportunidad.asignado_a_name}</p>
+                      <p className="text-slate-900">{oportunidad.asignado_a_nombre || "Sin asignar"}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -1049,11 +1148,11 @@ export default function OportunidadDetailPage() {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <p className="text-xs text-slate-600 font-semibold uppercase">Correo</p>
-                      <p className="text-slate-900">{oportunidad.email || "-"}</p>
+                      <p className="text-slate-900">{oportunidad.cliente_email || "-"}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-600 font-semibold uppercase">Teléfono</p>
-                      <p className="text-slate-900">{oportunidad.telefono || "-"}</p>
+                      <p className="text-slate-900">{oportunidad.cliente_telefono || "-"}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-600 font-semibold uppercase">Celular</p>
@@ -1061,9 +1160,45 @@ export default function OportunidadDetailPage() {
                     </div>
                     <div>
                       <p className="text-xs text-slate-600 font-semibold uppercase">DNI</p>
-                      <p className="text-slate-900">{oportunidad.documento || "-"}</p>
+                      <p className="text-slate-900">{oportunidad.cliente_dni || "-"}</p>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* DETALLES DE AGENDA */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Calendar size={18} />
+                    Detalles de Agenda
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {detalles.length === 0 ? (
+                    <p className="text-slate-500 text-sm py-4">Sin detalles de agenda</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {detalles.map((detalle) => (
+                        <div
+                          key={detalle.id}
+                          className="flex items-start justify-between p-3 bg-blue-50 rounded-lg border border-blue-200 hover:border-blue-300 transition-colors"
+                        >
+                          <div>
+                            <p className="font-medium text-slate-900">
+                              📅 {new Date(detalle.fecha_agenda).toLocaleDateString("es-ES")}
+                            </p>
+                            <p className="text-sm text-slate-700 mt-1">
+                              🕐 {String(detalle.hora_agenda).substring(0, 5)}
+                            </p>
+                            <p className="text-xs text-slate-600 mt-1">
+                              {new Date(detalle.created_at).toLocaleString("es-ES")}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -1099,6 +1234,19 @@ export default function OportunidadDetailPage() {
                             </p>
                           </div>
                           <div className="flex gap-2">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  onClick={() => openCotizacionVehiculo(vehiculo)}
+                                  className="h-8 w-8"
+                                >
+                                  <ShoppingCart size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Crear cotización</TooltipContent>
+                            </Tooltip>
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
@@ -1155,7 +1303,6 @@ export default function OportunidadDetailPage() {
                     />
                   </div>
 
-                  {/* PREGUNTAS */}
                   {preguntas.length > 0 && (
                     <div className="space-y-4 pt-4 border-t border-slate-200">
                       <h3 className="font-semibold text-slate-900 flex items-center gap-2">
@@ -1396,21 +1543,85 @@ export default function OportunidadDetailPage() {
                 </CardContent>
               </Card>
 
-              {/* COTIZACIÓN */}
-              <div className="bg-white rounded-lg border border-slate-200 p-6">
-                <CotizacionAgendaSection
-                  oportunidadId={oportunidadId}
-                  clienteId={oportunidad.cliente_id}
-                  oportunidadData={oportunidad}
-                  onCotizacionCreated={async () => {
-                    // Cambiar automáticamente a etapa "Cotización" (id: 6)
-                    const cambioExitoso = await cambiarEtapa(6, "Cotización creada");
-                    if (cambioExitoso) {
-                      toast.success("Etapa cambiada a Cotización");
-                    }
-                  }}
-                />
-              </div>
+              {/* COTIZACIONES */}
+              {/* COTIZACIONES */}
+<Card>
+  <CardHeader className="flex flex-row items-center justify-between">
+    <CardTitle className="text-lg flex items-center gap-2">
+      <FileText size={18} />
+      Cotizaciones
+    </CardTitle>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button onClick={openCreateCotizacion} size="sm" className="gap-2">
+          <Plus className="h-4 w-4" /> Agregar
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="top">Crear nueva cotización</TooltipContent>
+    </Tooltip>
+  </CardHeader>
+  <CardContent>
+    <CotizacionesTable
+      cotizaciones={cotizaciones}
+      sortConfig={{ key: "id", direction: "asc" }}
+      onSort={() => {}}
+      onEdit={openEditCotizacion}
+      onDelete={openDeleteCotizacion}
+      onChangeStatus={async (cot, estado) => {
+        const res = await fetch(`/api/cotizacionesagenda/${cot.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sku: cot.sku,
+            color_externo: cot.color_externo,
+            color_interno: cot.color_interno,
+            version_id: cot.version_id,
+            anio: cot.anio,
+            marca_id: cot.marca_id,
+            modelo_id: cot.modelo_id,
+            estado,
+          }),
+        });
+        if (res.ok) {
+          toast.success(`Estado cambiado a ${estado}`);
+          if (estado === "enviada") {
+            await cambiarEtapa(6, "Cotización enviada");
+          }
+          await cargarCotizaciones(oportunidadId);
+        }
+      }}
+      onDuplicate={async (cot) => {
+        const res = await fetch("/api/cotizacionesagenda", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            oportunidad_id: cot.oportunidad_id,
+            marca_id: cot.marca_id,
+            modelo_id: cot.modelo_id,
+            version_id: cot.version_id,
+            anio: cot.anio,
+            sku: cot.sku,
+            color_externo: cot.color_externo,
+            color_interno: cot.color_interno,
+            estado: "borrador",
+            created_by: userId,
+          }),
+        });
+        if (res.ok) {
+          toast.success("Cotización duplicada");
+          await cargarCotizaciones(oportunidadId);
+        }
+      }}
+      onLoadHistorial={() => {}}
+      saving={false}
+      userId={userId}
+      onOpenHistorialDialog={(historialData) => {
+        setSelectedHistorial(historialData);
+        setHistorialDialog(true);
+      }}
+    />
+  </CardContent>
+</Card>
 
               {/* REGISTRAR ACTIVIDAD Y HISTORIAL */}
               <div className="md:col-span-2 space-y-4 pt-6 border-t-2 border-slate-200">
@@ -2126,6 +2337,53 @@ export default function OportunidadDetailPage() {
             </div>
           </AlertDialogContent>
         </AlertDialog>
+
+        <AlertDialog open={deleteCotizacionDialog} onOpenChange={setDeleteCotizacionDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar eliminación</AlertDialogTitle>
+              <AlertDialogDescription>
+                ¿Eliminar esta cotización Q-{String(deleteCotizacionTarget?.id).padStart(6, "0")}?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="flex gap-3 justify-end">
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDeleteCotizacion}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Eliminar
+              </AlertDialogAction>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* COTIZACIÓN DIALOG */}
+        <CotizacionDialog
+          open={dialogCotizacionOpen}
+          onOpenChange={setDialogCotizacionOpen}
+          editingCotizacion={editingCotizacion}
+          oportunidadId={oportunidadId}
+          marcas={marcas}
+          modelos={modelos}
+          versiones={versiones}
+          userId={userId}
+          onSave={() => cargarCotizaciones(oportunidadId)}
+          onCotizacionCreated={async () => {
+            const cambioExitoso = await cambiarEtapa(6, "Cotización creada");
+            if (cambioExitoso) {
+              toast.success("Etapa cambiada a Cotización");
+            }
+          }}
+          precargadaMarcaId={cotizacionVehiculoMarcaId}
+          precargadaModeloId={cotizacionVehiculoModeloId}
+        />
+        <HistorialDialog
+  open={historialDialog}
+  onOpenChange={setHistorialDialog}
+  selectedHistorial={selectedHistorial}
+  loading={historialLoading}
+/>
       </div>
     </TooltipProvider>
   );

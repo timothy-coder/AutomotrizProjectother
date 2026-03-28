@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 function getHoraLabel(hora) {
@@ -8,7 +8,33 @@ function getHoraLabel(hora) {
   return String(hora).slice(0, 5);
 }
 
-function renderTooltipContent(item) {
+function obtenerEstadoTiempo(fechaAgenda, horaAgenda, estadosTiempo) {
+  if (!fechaAgenda || !horaAgenda || !estadosTiempo.length) {
+    return null;
+  }
+
+  try {
+    const fechaLimpia = fechaAgenda.split("T")[0];
+    const horaLimpia = horaAgenda.substring(0, 5);
+    const agendaDateTime = new Date(`${fechaLimpia}T${horaLimpia}:00`);
+    const ahora = new Date();
+    const diferenciaMilisegundos = agendaDateTime - ahora;
+    const minutosParaAgenda = Math.floor(diferenciaMilisegundos / (1000 * 60));
+
+    const estado = estadosTiempo.find(
+      (e) =>
+        minutosParaAgenda >= e.minutos_desde &&
+        minutosParaAgenda <= e.minutos_hasta
+    );
+
+    return estado || null;
+  } catch (error) {
+    console.error("Error calculando estado de tiempo:", error);
+    return null;
+  }
+}
+
+function renderTooltipContent(item, estadoTiempo) {
   return (
     <div className="space-y-1.5 text-xs max-w-xs">
       <div>
@@ -17,28 +43,28 @@ function renderTooltipContent(item) {
       </div>
       <div>
         <span className="font-semibold text-purple-300">Cliente:</span>{" "}
-        <span className="text-purple-100">{item?.cliente_name || "-"}</span>
+        <span className="text-purple-100">{item?.cliente_nombre || item?.cliente_name || "-"}</span>
       </div>
       <div>
         <span className="font-semibold text-indigo-300">Vehículo:</span>{" "}
         <span className="text-indigo-100">
-          {item?.marca_name ? `${item.marca_name} ` : ""}
-          {item?.modelo_name || "-"}
+          {item?.marca_nombre || item?.marca_name ? `${item.marca_nombre || item.marca_name} ` : ""}
+          {item?.modelo_nombre || item?.modelo_name || "-"}
         </span>
       </div>
       <div>
         <span className="font-semibold text-amber-300">Origen:</span>{" "}
-        <span className="text-amber-100">{item?.origen_name || "-"}</span>
+        <span className="text-amber-100">{item?.origen_nombre || item?.origen_name || "-"}</span>
       </div>
-      {item?.suborigen_name && (
+      {item?.suborigen_nombre && (
         <div>
           <span className="font-semibold text-cyan-300">Suborigen:</span>{" "}
-          <span className="text-cyan-100">{item.suborigen_name}</span>
+          <span className="text-cyan-100">{item.suborigen_nombre}</span>
         </div>
       )}
       <div>
         <span className="font-semibold text-green-300">Etapa:</span>{" "}
-        <span className="text-green-100">{item?.etapa_name || "-"}</span>
+        <span className="text-green-100">{item?.etapa_nombre || item?.etapa_name || "-"}</span>
       </div>
       <div>
         <span className="font-semibold text-orange-300">Asignado:</span>{" "}
@@ -50,6 +76,16 @@ function renderTooltipContent(item) {
           {item?.fecha_agenda || "-"} {getHoraLabel(item?.hora_agenda) ? `@${getHoraLabel(item.hora_agenda)}` : ""}
         </span>
       </div>
+      
+      {estadoTiempo && (
+        <div className="pt-1.5 border-t border-slate-600 mt-1.5">
+          <span className="font-semibold" style={{ color: estadoTiempo.color_hexadecimal }}>
+            ⏱️ Estado: {estadoTiempo.nombre}
+          </span>
+          <p className="text-slate-200 mt-0.5 text-xs">{estadoTiempo.descripcion}</p>
+        </div>
+      )}
+
       {item?.detalle && (
         <div className="pt-1.5 border-t border-slate-600 mt-1.5">
           <span className="font-semibold text-slate-300">Detalle:</span>
@@ -65,7 +101,56 @@ export default function VistaPorEtapas({
   onOpenOportunidad,
   canViewAll = false,
   currentUserId = null,
+  estadosTiempo = [],
 }) {
+  const [detallesOportunidades, setDetallesOportunidades] = useState({});
+
+  // DEBUG: Ver estructura de datos
+  useEffect(() => {
+    if (rows && rows.length > 0) {
+      console.log("Primer row de VistaPorEtapas:", rows[0]);
+      console.log("Claves disponibles:", Object.keys(rows[0]));
+    }
+  }, [rows]);
+
+  // Cargar detalles de todas las oportunidades
+  useEffect(() => {
+    if (!rows || rows.length === 0) return;
+
+    async function loadAllDetalles() {
+      try {
+        const detalles = {};
+
+        const promises = rows.map(async (opp) => {
+          try {
+            const res = await fetch(
+              `/api/oportunidades-oportunidades/${opp.id}/detalles?limit=1`,
+              { cache: "no-store" }
+            );
+            const data = await res.json();
+            
+            const detalleData = Array.isArray(data)
+              ? data[0]
+              : data?.data?.[0];
+
+            if (detalleData) {
+              detalles[opp.id] = detalleData;
+            }
+          } catch (error) {
+            console.error(`Error cargando detalles para oportunidad ${opp.id}:`, error);
+          }
+        });
+
+        await Promise.all(promises);
+        setDetallesOportunidades(detalles);
+      } catch (error) {
+        console.error("Error en loadAllDetalles:", error);
+      }
+    }
+
+    loadAllDetalles();
+  }, [rows]);
+
   const visibleRows = useMemo(() => {
     if (canViewAll) return rows || [];
     if (!currentUserId) return [];
@@ -86,7 +171,7 @@ export default function VistaPorEtapas({
       if (!map.has(key)) {
         map.set(key, {
           id: key,
-          nombre: r.etapa_name || "Sin etapa",
+          nombre: r.etapa_nombre || r.etapa_name || "Sin etapa",
           sort_order: Number(r.etapa_sort_order || 0),
           color: r.etapa_color || "#2563eb",
         });
@@ -100,7 +185,6 @@ export default function VistaPorEtapas({
     return visibleRows.filter((r) => r?.etapasconversion_id);
   }, [visibleRows]);
 
-  // Calcular resumen por etapa
   const resumenEtapas = useMemo(() => {
     const resumen = {};
     etapas.forEach((etapa) => {
@@ -149,7 +233,6 @@ export default function VistaPorEtapas({
             )}
           </div>
 
-          {/* Total de oportunidades */}
           <div className="mt-3 pt-3 border-t border-slate-200 text-center">
             <Tooltip>
               <TooltipTrigger asChild>
@@ -183,12 +266,9 @@ export default function VistaPorEtapas({
                     key={etapa.id}
                     className="flex-1 min-w-[280px] max-w-[400px] border-r border-slate-300 bg-white flex flex-col"
                   >
-                    {/* ENCABEZADO DE COLUMNA */}
                     <div
                       className="sticky top-0 z-10 border-b-2 px-4 py-3 text-center text-sm font-bold text-white"
-                      style={{
-                        backgroundColor: etapa.color,
-                      }}
+                      style={{ backgroundColor: etapa.color }}
                     >
                       <div>{etapa.nombre}</div>
                       <div className="text-xs font-semibold opacity-80 mt-1">
@@ -196,7 +276,6 @@ export default function VistaPorEtapas({
                       </div>
                     </div>
 
-                    {/* CONTENIDO DE COLUMNA */}
                     <div className="flex-1 overflow-y-auto p-3 space-y-2">
                       {items.length === 0 ? (
                         <div className="flex items-center justify-center h-32">
@@ -206,7 +285,28 @@ export default function VistaPorEtapas({
                         </div>
                       ) : (
                         items.map((item) => {
-                          const isColorDark = parseInt(etapa.color.slice(1), 16) < 0x888888;
+                          const detalleReciente = detallesOportunidades[item.id];
+                          const fechaAgenda = detalleReciente?.fecha_agenda || item.fecha_agenda;
+                          const horaAgenda = detalleReciente?.hora_agenda || item.hora_agenda;
+
+                          const estadoTiempo = obtenerEstadoTiempo(
+                            fechaAgenda,
+                            horaAgenda,
+                            estadosTiempo
+                          );
+
+                          let cardColor = etapa.color;
+                          let textColor = "#ffffff";
+                          
+                          if (estadoTiempo) {
+                            cardColor = estadoTiempo.color_hexadecimal;
+                            const isColorDark = 
+                              parseInt(estadoTiempo.color_hexadecimal.slice(1), 16) < 0x888888;
+                            textColor = isColorDark ? "#ffffff" : "#000000";
+                          } else {
+                            const isColorDark = parseInt(etapa.color.slice(1), 16) < 0x888888;
+                            textColor = isColorDark ? "#ffffff" : "#000000";
+                          }
 
                           return (
                             <Tooltip key={item.id}>
@@ -214,29 +314,42 @@ export default function VistaPorEtapas({
                                 <button
                                   type="button"
                                   onClick={() => onOpenOportunidad?.(item)}
-                                  className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-medium transition-all hover:shadow-lg hover:scale-105 active:scale-95 border-2"
+                                  className="w-full rounded-lg px-3 py-2.5 text-left text-xs font-medium transition-all hover:shadow-lg hover:scale-105 active:scale-95 border-2 relative overflow-hidden"
                                   style={{
-                                    backgroundColor: etapa.color,
-                                    borderColor: etapa.color,
-                                    color: isColorDark ? "#ffffff" : "#000000",
+                                    backgroundColor: cardColor,
+                                    borderColor: cardColor,
+                                    color: textColor,
                                     opacity: 0.95,
                                   }}
                                 >
+                                  {estadoTiempo && (
+                                    <div className="absolute top-1 right-1 w-2 h-2 rounded-full" 
+                                      style={{ backgroundColor: estadoTiempo.color_hexadecimal }}
+                                      title={estadoTiempo.nombre}
+                                    />
+                                  )}
+
                                   <div className="font-bold truncate text-sm">
                                     {String(item.oportunidad_id || "")}
                                   </div>
                                   <div className="text-[11px] opacity-80 truncate mt-0.5">
-                                    {item.cliente_name || "Sin cliente"}
+                                    {item.cliente_nombre || item.cliente_name || "Sin cliente"}
                                   </div>
-                                  {item.hora_agenda && (
-                                    <div className="text-[10px] opacity-70 mt-1">
-                                      🕐 {getHoraLabel(item.hora_agenda)}
+                                  {horaAgenda && (
+                                    <div className="text-[10px] opacity-70 mt-1 flex items-center gap-1">
+                                      <span>🕐</span>
+                                      <span>{getHoraLabel(horaAgenda)}</span>
+                                      {estadoTiempo && (
+                                        <span className="ml-auto text-xs font-semibold">
+                                          {estadoTiempo.estado}
+                                        </span>
+                                      )}
                                     </div>
                                   )}
                                 </button>
                               </TooltipTrigger>
                               <TooltipContent side="top" className="max-w-sm">
-                                {renderTooltipContent(item)}
+                                {renderTooltipContent(item, estadoTiempo)}
                               </TooltipContent>
                             </Tooltip>
                           );
