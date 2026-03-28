@@ -138,14 +138,17 @@ export async function POST(req) {
 
   // ── Sin selección válida → mostrar menú de bienvenida ────────────────────
   const saludo = clienteNombre
-    ? `¡Hola, ${clienteNombre}! 👋 Bienvenido/a de nuevo.`
-    : "¡Hola! 👋 Bienvenido/a.";
+    ? `¡Hola, ${clienteNombre}! 😊 ¡Qué gusto saludarte de nuevo!`
+    : "¡Hola! 😊 ¡Bienvenido/a!";
   const menuText =
-    `${saludo}\n¿En qué te podemos ayudar hoy?\n\n` +
-    "1️⃣ Quiero comprar un vehículo nuevo\n" +
-    "2️⃣ Mantenimiento, citas o taller\n" +
-    "3️⃣ Hablar con un asesor\n\n" +
-    "Responde con el número de tu opción.";
+    `${saludo}\n\n` +
+    `Soy *Carlos* 🤖, tu asesor virtual del *Taller Automotriz* 🔧🚗\n` +
+    `Estoy aquí para ayudarte con todo lo que necesites. ¿En qué te puedo ayudar hoy?\n\n` +
+    `Por favor, elige una opción:\n\n` +
+    `1️⃣ *Comprar un vehículo nuevo* 🚘\n` +
+    `2️⃣ *Mantenimiento, citas o taller* 🔩\n` +
+    `3️⃣ *Hablar con un asesor humano* 👨‍💼\n\n` +
+    `Responde con el *número* de tu opción. ¡Estamos para servirte! ✅`;
 
   return NextResponse.json({
     route: "new_client_menu",
