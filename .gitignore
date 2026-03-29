@@ -52,3 +52,7 @@ bd.sql
 
 # embedded repo that must stay outside this project
 /engram/
+
+# local tooling and external repos not part of this project
+/.atl/
+/gentle-ai-repo/
