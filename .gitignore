@@ -56,3 +56,6 @@ bd.sql
 # local tooling and external repos not part of this project
 /.atl/
 /gentle-ai-repo/
+
+# operational docs (local use only, no tracking en repo)
+PENDIENTES.md
