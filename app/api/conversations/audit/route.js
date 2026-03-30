@@ -42,11 +42,13 @@ export async function GET(req) {
         [sessionId, limit]
       );
 
-      const parsed = (Array.isArray(rows) ? rows : []).map((r) => ({
-        ...r,
-        changes: r.changes_json ? JSON.parse(r.changes_json) : null,
-        metadata: r.metadata_json ? JSON.parse(r.metadata_json) : null,
-      }));
+      const parsed = (Array.isArray(rows) ? rows : []).map((r) => {
+        let changes = null;
+        let metadata = null;
+        try { changes = r.changes_json ? JSON.parse(r.changes_json) : null; } catch { changes = r.changes_json; }
+        try { metadata = r.metadata_json ? JSON.parse(r.metadata_json) : null; } catch { metadata = r.metadata_json; }
+        return { ...r, changes, metadata };
+      });
 
       return NextResponse.json(parsed);
     } catch (error) {

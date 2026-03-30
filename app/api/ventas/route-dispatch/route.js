@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { normalizePhone } from "@/lib/phoneUtils";
 
 /**
  * PATCH /api/ventas/route-dispatch
@@ -15,12 +16,13 @@ export async function PATCH(req) {
   const secret = process.env.VENTAS_WEBHOOK_SECRET;
   const provided = req.headers.get("x-ventas-webhook-secret") || "";
 
-  if (secret && provided !== secret) {
+  if (!secret || provided !== secret) {
+    console.warn("[route-dispatch PATCH] Intento no autorizado — VENTAS_WEBHOOK_SECRET inválido o no seteado");
     return NextResponse.json({ message: "No autorizado" }, { status: 401 });
   }
 
   const body = await req.json().catch(() => ({}));
-  const phone = String(body?.phone || "").replace(/\D/g, "").trim();
+  const phone = normalizePhone(body?.phone);
 
   if (!phone) {
     return NextResponse.json({ message: "phone requerido" }, { status: 400 });
@@ -36,7 +38,7 @@ export async function PATCH(req) {
     );
   } catch (e) {
     console.error("[route-dispatch PATCH] DB error:", e.message);
-    return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+    return NextResponse.json({ ok: false, message: "Error actualizando sesión" }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true, phone, cleared: true });
@@ -61,20 +63,21 @@ export async function POST(req) {
   const secret = process.env.CONVERSATIONS_WEBHOOK_SECRET;
   const provided = req.headers.get("x-conversations-webhook-secret") || "";
 
-  if (secret && provided !== secret) {
+  if (!secret || provided !== secret) {
+    console.warn("[route-dispatch POST] Intento no autorizado — CONVERSATIONS_WEBHOOK_SECRET inválido o no seteado");
     return NextResponse.json({ message: "No autorizado" }, { status: 401 });
   }
 
-  const body = await req.json();
+  const body = await req.json().catch(() => ({}));
   const channel = body?.channel || "whatsapp";
 
-  const rawPhone = body?.phone || "";
-  const phone = rawPhone.replace(/\D/g, "").trim();
+  const phone = normalizePhone(body?.phone);
 
   if (!phone) {
-    return NextResponse.json({ route: "default", reason: "no_phone" });
+    return NextResponse.json({ message: "phone requerido", route: "default" }, { status: 400 });
   }
 
+  try {
   // ── Forzar sesión ventas_ia (llamado desde bot taller tras redirect_ventas) ──
   if (body?.force_ventas === true) {
     await createVentasSession(phone);
@@ -137,11 +140,13 @@ export async function POST(req) {
   }
 
   // ── Sin selección válida → mostrar menú de bienvenida ────────────────────
+  // El texto del menú es configurable via env var VENTAS_MENU_TEXT.
+  // Usar {nombre} como placeholder para el nombre del cliente.
   const saludo = clienteNombre
     ? `¡Hola, ${clienteNombre}! 😊 ¡Qué gusto saludarte de nuevo!`
     : "¡Hola! 😊 ¡Bienvenido/a!";
-  const menuText =
-    `${saludo}\n\n` +
+
+  const defaultMenuBody =
     `Soy *Carlos* 🤖, tu asesor virtual del *Taller Automotriz* 🔧🚗\n` +
     `Estoy aquí para ayudarte con todo lo que necesites. ¿En qué te puedo ayudar hoy?\n\n` +
     `Por favor, elige una opción:\n\n` +
@@ -150,12 +155,22 @@ export async function POST(req) {
     `3️⃣ *Hablar con un asesor humano* 👨‍💼\n\n` +
     `Responde con el *número* de tu opción. ¡Estamos para servirte! ✅`;
 
+  const menuBody = process.env.VENTAS_MENU_TEXT
+    ? process.env.VENTAS_MENU_TEXT.replace(/\{nombre\}/g, clienteNombre || "")
+    : defaultMenuBody;
+
+  const menuText = `${saludo}\n\n${menuBody}`;
+
   return NextResponse.json({
     route: "new_client_menu",
     menu_text: menuText,
     phone,
     cliente_nombre: clienteNombre,
   });
+  } catch (error) {
+    console.error("ERROR POST /api/ventas/route-dispatch:", error);
+    return NextResponse.json({ route: "default", reason: "server_error" }, { status: 500 });
+  }
 }
 
 // ── Detectar selección del menú ───────────────────────────────────────────
@@ -280,7 +295,8 @@ async function checkTallerActivo(phone) {
           [phone]
         );
         return rows.length > 0;
-      } catch (_) {
+      } catch (fallbackErr) {
+        console.error("[checkTallerActivo] fallback query failed:", fallbackErr);
         return false;
       }
     }

@@ -4,6 +4,27 @@ import { authorizeConversation } from "@/lib/conversationsAuth";
 
 const AGENT_KEYS_VALIDOS = ["taller", "ventas", "presales"];
 
+const MAX_CONSIDERACIONES_LENGTH = 4000;
+
+// Patrones que indican intento de prompt injection
+const INJECTION_PATTERNS = [
+  /ignore\s+(all\s+)?previous\s+instructions?/i,
+  /forget\s+(all\s+)?(previous\s+)?instructions?/i,
+  /you\s+are\s+now\s+(a\s+)?/i,
+  /act\s+as\s+(a\s+|if\s+)/i,
+  /\bsystem\s*:\s*/i,
+  /\bDAN\b/,
+  /jailbreak/i,
+];
+
+function detectInjection(text) {
+  if (!text) return null;
+  for (const pattern of INJECTION_PATTERNS) {
+    if (pattern.test(text)) return pattern.toString();
+  }
+  return null;
+}
+
 // Columnas que el agente de IA puede leer (devueltas a n8n)
 const AGENT_CONFIG_COLUMNS = "agent_key, agent_name, taller_name, dealer_name, consideraciones, is_active";
 
@@ -76,6 +97,24 @@ export async function PUT(req) {
 
   if (!agent_key || !AGENT_KEYS_VALIDOS.includes(agent_key)) {
     return NextResponse.json({ message: "agent_key inválido" }, { status: 400 });
+  }
+
+  // Validar longitud máxima de consideraciones
+  if (typeof consideraciones === "string" && consideraciones.length > MAX_CONSIDERACIONES_LENGTH) {
+    return NextResponse.json(
+      { message: `Las consideraciones no pueden superar ${MAX_CONSIDERACIONES_LENGTH} caracteres` },
+      { status: 400 }
+    );
+  }
+
+  // Detectar patrones de prompt injection
+  const injectionMatch = detectInjection(consideraciones);
+  if (injectionMatch) {
+    console.warn(`[prompt-config PUT] Posible prompt injection detectado por ${auth.user?.email} en agent_key=${agent_key}`);
+    return NextResponse.json(
+      { message: "El contenido de las consideraciones contiene patrones no permitidos" },
+      { status: 400 }
+    );
   }
 
   const updatedBy = auth.user?.email || auth.user?.username || "crm_user";
