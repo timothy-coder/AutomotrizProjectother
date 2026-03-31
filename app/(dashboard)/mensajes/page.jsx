@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Bell, Eye, Hourglass, TrendingUp, UserCheck } from "lucide-react";
+import { Bell, Eye, Hourglass, TrendingUp, UserCheck, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,77 @@ import ConversationWorkspace from "@/app/components/conversations/ConversationWo
 import NotificationPanel from "@/app/components/conversations/NotificationPanel";
 import { useAuth } from "@/context/AuthContext";
 
+
+// ── Helpers globales ─────────────────────────────────────────────────────────
+
+function getInitials(name) {
+  if (!name) return "?";
+  return name
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+}
+
+function formatRelativeTime(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffDays = Math.floor((now - d) / 86400000);
+  if (diffDays === 0)
+    return d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+  if (diffDays === 1) return "ayer";
+  if (diffDays < 7) return d.toLocaleDateString("es-AR", { weekday: "short" });
+  return d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" });
+}
+
+function assignmentColorClass(status) {
+  if (status === "open") return "bg-green-500";
+  if (status === "pending") return "bg-amber-400";
+  if (status === "closed") return "bg-gray-400";
+  return "bg-gray-300";
+}
+
+function ChannelPill({ channel }) {
+  const cfg = {
+    whatsapp: { abbr: "W", bg: "bg-green-500", label: "WhatsApp" },
+    instagram: { abbr: "IG", bg: "bg-gradient-to-br from-purple-500 to-pink-500", label: "Instagram" },
+    facebook: { abbr: "f", bg: "bg-blue-600", label: "Facebook" },
+  };
+  const c =
+    cfg[String(channel || "").toLowerCase()] || {
+      abbr: "?",
+      bg: "bg-gray-400",
+      label: channel || "canal",
+    };
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${c.bg} text-white font-bold text-[8px] flex-shrink-0`}
+        >
+          {c.abbr}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{c.label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function formatDurationCompact(seconds) {
+  if (seconds == null) return "--";
+  const totalMinutes = Math.round(Math.max(0, Number(seconds) || 0) / 60);
+  if (totalMinutes < 60) return `${totalMinutes}m`;
+  const totalHours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (totalHours < 24) return minutes > 0 ? `${totalHours}h ${minutes}m` : `${totalHours}h`;
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function ConversationsPage() {
   const router = useRouter();
@@ -109,7 +180,7 @@ export default function ConversationsPage() {
     setSelectedSession(session);
   }
 
-  function toggleChannel(ch) {
+  function handleToggleChannel(ch) {
     setChannelFilter((prev) => (prev === ch ? "all" : ch));
   }
 
@@ -154,34 +225,6 @@ export default function ConversationsPage() {
     }
   }
 
-  function severityClass(level) {
-    if (level === "high") return "border-red-200 bg-red-50 text-red-900";
-    if (level === "medium") return "border-amber-200 bg-amber-50 text-amber-900";
-    if (level === "low") return "border-emerald-200 bg-emerald-50 text-emerald-900";
-    return "border bg-white text-gray-700";
-  }
-
-  function formatDurationCompact(seconds) {
-    if (seconds == null) return "--";
-
-    const totalSeconds = Math.max(0, Number(seconds) || 0);
-    const totalMinutes = Math.round(totalSeconds / 60);
-
-    if (totalMinutes < 60) {
-      return `${totalMinutes}m`;
-    }
-
-    const totalHours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-
-    if (totalHours < 24) {
-      return minutes > 0 ? `${totalHours}h ${minutes}m` : `${totalHours}h`;
-    }
-
-    const days = Math.floor(totalHours / 24);
-    const hours = totalHours % 24;
-    return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
-  }
 
   async function handleOpenSummaryDialog(session) {
     setSummarySession(session);
@@ -354,24 +397,8 @@ export default function ConversationsPage() {
       ? null
       : Math.round(effectiveMaxWait / 60);
 
-    // ── 1ra respuesta promedio calculada desde scopedSessions ──
-    // Aproximacion: promedio de (updated_at - created_at) para sesiones con asesor asignado
-    // Cuando hay solo 1 sesión (conversación abierta), muestra su tiempo de espera actual
-    let avgFtrSeconds = null;
-    const sessionsWithAssignment = scopedSessions.filter(
-      (s) => Number(s?.assigned_agent_id || 0) > 0
-    );
-    if (sessionsWithAssignment.length > 0) {
-      const totalWait = sessionsWithAssignment.reduce((acc, s) => {
-        const updatedAt = s?.updated_at ? new Date(s.updated_at).getTime() : 0;
-        const lastAt = s?.last_message_at ? new Date(s.last_message_at).getTime() : updatedAt;
-        return acc + Math.max(0, (nowMs - lastAt) / 1000);
-      }, 0);
-      avgFtrSeconds = Math.round(totalWait / sessionsWithAssignment.length);
-    } else if (scopedSessions.length === 0) {
-      // Caer al valor global del API si no hay sesiones en el scope
-      avgFtrSeconds = metrics.avg_first_response_seconds;
-    }
+    // ── 1ra respuesta promedio — valor real del API ────────────
+    const avgFtrSeconds = metrics?.avg_first_response_seconds ?? null;
 
     return [
       {
@@ -455,7 +482,21 @@ export default function ConversationsPage() {
     [metricsCards]
   );
 
-  function toggleSessionSelection(sessionId) {
+  const avgInteractionMin = useMemo(() => {
+    const nowMs = Date.now();
+    const active = scopedSessions.filter(
+      (s) =>
+        s?.assignment_status === "open" || s?.assignment_status === "pending"
+    );
+    if (active.length === 0) return null;
+    const totalMs = active.reduce((acc, s) => {
+      const created = s?.created_at ? new Date(s.created_at).getTime() : 0;
+      return acc + Math.max(0, nowMs - created);
+    }, 0);
+    return Math.round(totalMs / active.length / 60000);
+  }, [scopedSessions]);
+
+  function handleToggleSessionSelection(sessionId) {
     const normalized = Number(sessionId);
     setSelectedSessionIds((prev) => {
       if (prev.includes(normalized)) {
@@ -555,23 +596,23 @@ export default function ConversationsPage() {
             className="h-10"
           />
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   type="button"
                   onClick={() => applyMetricFilter("mine")}
-                  className={`rounded-2xl border p-4 text-left transition-all shadow-sm hover:shadow-md ${
+                  className={`rounded-2xl border p-3 text-left transition-all shadow-sm hover:shadow-md ${
                     ownerFilter === "mine"
                       ? "bg-green-100 border-green-300 ring-2 ring-green-400"
                       : "bg-green-50 border-green-200 hover:border-green-300"
                   }`}
                 >
                   <div className="flex items-center gap-1.5 mb-2">
-                    <UserCheck className="w-4 h-4 text-green-600" />
-                    <span className="text-[10px] text-green-600 uppercase tracking-wide font-semibold">Asignados</span>
+                    <UserCheck className="w-3.5 h-3.5 text-green-600" />
+                    <span className="text-[9px] text-green-600 uppercase tracking-wide font-semibold">Asignados</span>
                   </div>
-                  <p className="text-2xl font-semibold text-green-700 leading-none">{kpiByKey["mine"]?.value ?? 0}</p>
+                  <p className="text-xl font-semibold text-green-700 leading-none">{kpiByKey["mine"]?.value ?? 0}</p>
                 </button>
               </TooltipTrigger>
               <TooltipContent>Mis conversaciones activas asignadas. Clic para filtrar.</TooltipContent>
@@ -582,17 +623,17 @@ export default function ConversationsPage() {
                 <button
                   type="button"
                   onClick={() => applyMetricFilter("overdue")}
-                  className={`rounded-2xl border p-4 text-left transition-all shadow-sm hover:shadow-md ${
+                  className={`rounded-2xl border p-3 text-left transition-all shadow-sm hover:shadow-md ${
                     priorityFilter === "overdue"
                       ? "bg-red-100 border-red-300 ring-2 ring-red-400"
                       : "bg-red-50 border-red-200 hover:border-red-300"
                   }`}
                 >
                   <div className="flex items-center gap-1.5 mb-2">
-                    <Hourglass className="w-4 h-4 text-red-500 animate-pulse" />
-                    <span className="text-[10px] text-red-500 uppercase tracking-wide font-semibold">At. Urgente</span>
+                    <Hourglass className="w-3.5 h-3.5 text-red-500 animate-pulse" />
+                    <span className="text-[9px] text-red-500 uppercase tracking-wide font-semibold">At. Urgente</span>
                   </div>
-                  <p className="text-2xl font-semibold text-red-700 leading-none">{kpiByKey["overdue"]?.value ?? 0}</p>
+                  <p className="text-xl font-semibold text-red-700 leading-none">{kpiByKey["overdue"]?.value ?? 0}</p>
                 </button>
               </TooltipTrigger>
               <TooltipContent>Conversaciones con SLA vencido. Clic para filtrar.</TooltipContent>
@@ -600,15 +641,30 @@ export default function ConversationsPage() {
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="rounded-2xl border p-4 text-left shadow-sm bg-blue-50 border-blue-200 cursor-default">
+                <div className="rounded-2xl border p-3 text-left shadow-sm bg-blue-50 border-blue-200 cursor-default">
                   <div className="flex items-center gap-1.5 mb-2">
-                    <TrendingUp className="w-4 h-4 text-blue-500" />
-                    <span className="text-[10px] text-blue-500 uppercase tracking-wide font-semibold">Ritmo resp.</span>
+                    <TrendingUp className="w-3.5 h-3.5 text-blue-500" />
+                    <span className="text-[9px] text-blue-500 uppercase tracking-wide font-semibold">Ritmo resp.</span>
                   </div>
-                  <p className="text-2xl font-semibold text-blue-700 leading-none">{kpiByKey["ftr"]?.value ?? "--"}</p>
+                  <p className="text-xl font-semibold text-blue-700 leading-none">{kpiByKey["ftr"]?.value ?? "--"}</p>
                 </div>
               </TooltipTrigger>
-              <TooltipContent>Tiempo promedio de primera respuesta en la vista actual.</TooltipContent>
+              <TooltipContent>Tiempo promedio de primera respuesta (dato real del servidor).</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="rounded-2xl border p-3 text-left shadow-sm bg-slate-50 border-slate-200 cursor-default">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Users className="w-3.5 h-3.5 text-slate-500" />
+                    <span className="text-[9px] text-slate-500 uppercase tracking-wide font-semibold">Interacción</span>
+                  </div>
+                  <p className="text-xl font-semibold text-slate-700 leading-none">
+                    {avgInteractionMin != null ? `${avgInteractionMin} min` : "--"}
+                  </p>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>Duración promedio de conversaciones activas/pendientes.</TooltipContent>
             </Tooltip>
           </div>
 
@@ -618,7 +674,7 @@ export default function ConversationsPage() {
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    onClick={() => toggleChannel("whatsapp")}
+                    onClick={() => handleToggleChannel("whatsapp")}
                     className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all text-[11px] font-bold ${
                       channelFilter === "whatsapp"
                         ? "border-green-500 bg-green-50 shadow-md scale-110 text-green-700"
@@ -635,7 +691,7 @@ export default function ConversationsPage() {
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    onClick={() => toggleChannel("instagram")}
+                    onClick={() => handleToggleChannel("instagram")}
                     className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all text-[11px] font-bold ${
                       channelFilter === "instagram"
                         ? "border-pink-500 bg-pink-50 shadow-md scale-110 text-pink-700"
@@ -681,97 +737,89 @@ export default function ConversationsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-[330px_minmax(0,1fr)] gap-2 flex-1 min-h-0">
           <div className={`${selectedSession ? "hidden lg:flex" : "flex"} border rounded-xl overflow-hidden bg-white shadow min-h-0 h-full flex-col`}>
             <div className="overflow-y-auto flex-1 min-h-0">
-              {filteredSessions.map((s) => (
-                <div
-                  key={s.session_id}
-                  onClick={() => handleOpenTimeline(s)}
-                  onDoubleClick={() => {
-                    handleOpenTimeline(s);
-                    setFocusComposerSignal((prev) => prev + 1);
-                  }}
-                  className={`flex items-center justify-between p-4 border-b hover:bg-gray-50 cursor-pointer ${selectedSession?.session_id === s.session_id ? "bg-gray-50" : ""}`}
-                >
-                  <div>
-                    <div className="mb-1">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4"
-                        checked={selectedSessionIds.includes(Number(s.session_id))}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={() => toggleSessionSelection(s.session_id)}
-                        aria-label={`Seleccionar conversacion ${s.session_id}`}
-                      />
+              {filteredSessions.map((s) => {
+                const unread = Number(s?.unread_count || 0);
+                const isOverdue = Number(s?.is_overdue || 0) === 1;
+                const isSelected = selectedSession?.session_id === s.session_id;
+                return (
+                  <div
+                    key={s.session_id}
+                    onClick={() => handleOpenTimeline(s)}
+                    onDoubleClick={() => {
+                      handleOpenTimeline(s);
+                      setFocusComposerSignal((prev) => prev + 1);
+                    }}
+                    className={`flex items-start gap-3 px-4 py-3 border-b cursor-pointer transition-colors hover:bg-gray-50/80 group border-l-2 ${
+                      isSelected ? "bg-blue-50/50 border-l-blue-500" : "border-l-transparent"
+                    }`}
+                  >
+                    {/* Checkbox */}
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-3.5 w-3.5 rounded flex-shrink-0"
+                      checked={selectedSessionIds.includes(Number(s.session_id))}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={() => handleToggleSessionSelection(s.session_id)}
+                      aria-label={`Seleccionar conversacion ${s.session_id}`}
+                    />
+
+                    {/* Avatar con iniciales */}
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 text-white ${assignmentColorClass(s.assignment_status)}`}>
+                      {getInitials(s.cliente_nombre)}
                     </div>
 
-                    <div className="font-semibold">
-                      {s.cliente_nombre || "Cliente"}
-                    </div>
+                    {/* Contenido principal */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1">
+                        <p className="font-semibold text-sm text-gray-900 truncate">
+                          {s.cliente_nombre || "Cliente"}
+                        </p>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <span className="text-[10px] text-gray-400">{formatRelativeTime(s.last_message_at)}</span>
+                          {unread > 0 && (
+                            <span className="bg-blue-600 text-white text-[10px] rounded-full px-1.5 py-0.5 font-semibold">
+                              {unread}
+                            </span>
+                          )}
+                          {isOverdue && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="bg-red-500 text-white text-[10px] rounded-full px-1.5 py-0.5 font-semibold">
+                                  SLA
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>SLA vencido — requiere atención urgente</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                      </div>
 
-                    <div className="text-sm text-gray-500 truncate max-w-55">
-                      {s.ultimomensaje || "Sin mensajes"}
-                    </div>
+                      <p className="text-xs text-gray-500 truncate mt-0.5 leading-snug">
+                        {s.ultimomensaje || "Sin mensajes"}
+                      </p>
 
-                    <div className="text-xs text-gray-400">
-                      {s.celular || s.phone}
-                      {s.source_channel ? ` · ${s.source_channel}` : ""}
-                      {s.message_status ? ` · ${s.message_status}` : ""}
-                    </div>
-
-                    <div className="text-xs mt-1 text-gray-500">
-                      {s.assigned_agent_name
-                        ? `Asignado a: ${s.assigned_agent_name}`
-                        : "Sin asignar"}
-                      {s.assignment_status ? ` · ${s.assignment_status}` : ""}
-                    </div>
-
-                    <div className="text-xs mt-1 text-gray-500">
-                      Prioridad: {s.priority_level || "normal"}
-                      {s.sla_due_at ? ` · SLA: ${new Date(s.sla_due_at).toLocaleString()}` : ""}
-                      {Number(s?.is_overdue || 0) === 1 ? " · Vencida" : ""}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {Number(s?.is_overdue || 0) === 1 && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="h-6 px-2 rounded-full bg-amber-600 text-white text-xs inline-flex items-center justify-center">
-                            SLA
+                      <div className="flex items-center justify-between mt-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <ChannelPill channel={s.source_channel} />
+                          <span className="text-[10px] text-gray-400 capitalize">
+                            {s.assignment_status || "sin asignar"}
                           </span>
-                        </TooltipTrigger>
-                        <TooltipContent>SLA vencido — requiere atención urgente</TooltipContent>
-                      </Tooltip>
-                    )}
-
-                    {Number(s?.unread_count || 0) > 0 && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="min-w-6 h-6 px-2 rounded-full bg-red-600 text-white text-xs inline-flex items-center justify-center">
-                            {s.unread_count}
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent>{s.unread_count} mensaje{s.unread_count !== 1 ? "s" : ""} sin leer</TooltipContent>
-                      </Tooltip>
-                    )}
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="icon"
+                        </div>
+                        <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleOpenSummaryDialog(s);
                           }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100"
                         >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Ver resumen de la conversación</TooltipContent>
-                    </Tooltip>
+                          <Eye className="w-3.5 h-3.5 text-gray-400" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               {isLoading && (
                 <div className="p-6 text-sm text-gray-400 text-center italic">

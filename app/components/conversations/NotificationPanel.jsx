@@ -212,9 +212,9 @@ export default function NotificationPanel({ conversations = [], onOpenConversati
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Tooltip>
-          <TooltipTrigger asChild>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <SheetTrigger asChild>
             <button
               type="button"
               className="relative flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors"
@@ -228,14 +228,14 @@ export default function NotificationPanel({ conversations = [], onOpenConversati
                 </span>
               )}
             </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            {totalCount === 0
-              ? "Sin alertas activas"
-              : `${totalCount} alerta${totalCount !== 1 ? "s" : ""} — ${urgentCount} urgente${urgentCount !== 1 ? "s" : ""}`}
-          </TooltipContent>
-        </Tooltip>
-      </SheetTrigger>
+          </SheetTrigger>
+        </TooltipTrigger>
+        <TooltipContent>
+          {totalCount === 0
+            ? "Sin alertas activas"
+            : `${totalCount} alerta${totalCount !== 1 ? "s" : ""} — ${urgentCount} urgente${urgentCount !== 1 ? "s" : ""}`}
+        </TooltipContent>
+      </Tooltip>
 
       <SheetContent side="right" className="w-80 sm:w-96 flex flex-col p-0">
         <SheetHeader className="px-4 py-3 border-b">
