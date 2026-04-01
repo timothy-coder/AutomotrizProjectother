@@ -19,7 +19,7 @@ export async function GET(req) {
         pa.tipo_respuesta,
         pa.opciones,
         pa.es_obligatoria,
-        COALESCE(u.fullname, u.nombre, u.name) as creado_por_nombre,
+        COALESCE(u.fullname) as creado_por_nombre,
         o.oportunidad_id,
         c.nombre as cliente_nombre,
         m.name as marca,

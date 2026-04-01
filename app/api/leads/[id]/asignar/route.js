@@ -1,126 +1,100 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-const REGEX_LD = "^LD-[0-9]+$";
-
-async function getEtapaIdByNombre(nombre) {
-  const [rows] = await db.query(
-    `
-    SELECT id
-    FROM etapasconversion
-    WHERE LOWER(nombre) = LOWER(?)
-    LIMIT 1
-    `,
-    [nombre]
-  );
-
-  return rows.length ? rows[0].id : null;
-}
-
 export async function PATCH(req, { params }) {
   try {
     const { id } = await params;
-    const body = await req.json();
+    const { asignado_a } = await req.json();
 
-    const asignado_a =
-      body.asignado_a === null ||
-      body.asignado_a === undefined ||
-      body.asignado_a === ""
-        ? null
-        : Number(body.asignado_a);
-
-    const [exists] = await db.query(
-      `
-      SELECT id, oportunidad_id
-      FROM oportunidades
-      WHERE id = ?
-        AND oportunidad_id REGEXP ?
-      LIMIT 1
-      `,
-      [id, REGEX_LD]
-    );
-
-    if (!exists.length) {
+    if (!asignado_a && asignado_a !== null) {
       return NextResponse.json(
-        { message: "Lead LD no encontrado" },
-        { status: 404 }
-      );
-    }
-
-    if (asignado_a !== null) {
-      const [usuario] = await db.query(
-        `SELECT id FROM usuarios WHERE id = ? LIMIT 1`,
-        [asignado_a]
-      );
-
-      if (!usuario.length) {
-        return NextResponse.json(
-          { message: "El usuario asignado no existe" },
-          { status: 404 }
-        );
-      }
-
-      const etapaAsignadoId = await getEtapaIdByNombre("Asignado");
-
-      if (!etapaAsignadoId) {
-        return NextResponse.json(
-          { message: "No existe la etapa 'Asignado' en etapasconversion" },
-          { status: 400 }
-        );
-      }
-
-      await db.query(
-        `
-        UPDATE oportunidades
-        SET
-          asignado_a = ?,
-          etapasconversion_id = ?,
-          updated_at = NOW()
-        WHERE id = ?
-          AND oportunidad_id REGEXP ?
-        `,
-        [asignado_a, etapaAsignadoId, id, REGEX_LD]
-      );
-
-      return NextResponse.json({
-        message: "Lead LD asignado correctamente",
-      });
-    }
-
-    const etapaNuevoId = await getEtapaIdByNombre("Nuevo");
-
-    if (!etapaNuevoId) {
-      return NextResponse.json(
-        { message: "No existe la etapa 'Nuevo' en etapasconversion" },
+        { message: "asignado_a es requerido" },
         { status: 400 }
       );
     }
 
+    // ✅ Verificar que existe el lead
+    const [exists] = await db.query(
+      "SELECT id FROM oportunidades_oportunidades WHERE id = ? AND oportunidad_id LIKE 'LD-%'",
+      [id]
+    );
+
+    if (!exists.length) {
+      return NextResponse.json(
+        { message: "Lead no encontrado" },
+        { status: 404 }
+      );
+    }
+
+    // ✅ Si asignado_a es null, desasignar
+    if (asignado_a === null) {
+      // Obtener la etapa "Nuevo"
+      const [etapaNuevo] = await db.query(
+        `SELECT id FROM etapasconversion WHERE LOWER(TRIM(nombre)) = 'nuevo' LIMIT 1`
+      );
+
+      if (!etapaNuevo.length) {
+        return NextResponse.json(
+          { message: "Etapa 'Nuevo' no encontrada" },
+          { status: 404 }
+        );
+      }
+
+      const etapaId = etapaNuevo[0].id;
+
+      // Desasignar: quitar usuario y cambiar etapa a "Nuevo"
+      await db.query(
+        "UPDATE oportunidades_oportunidades SET asignado_a = NULL, etapasconversion_id = ? WHERE id = ? AND oportunidad_id LIKE 'LD-%'",
+        [etapaId, id]
+      );
+
+      return NextResponse.json({
+        message: "Lead desasignado y etapa actualizada a 'Nuevo'",
+        etapa_id: etapaId,
+      });
+    }
+
+    // Verificar que el usuario existe
+    const [usuario] = await db.query(
+      "SELECT id FROM usuarios WHERE id = ?",
+      [asignado_a]
+    );
+
+    if (!usuario.length) {
+      return NextResponse.json(
+        { message: "Usuario no encontrado" },
+        { status: 404 }
+      );
+    }
+
+    // Obtener la etapa "Asignado"
+    const [etapaAsignado] = await db.query(
+      `SELECT id FROM etapasconversion WHERE LOWER(TRIM(nombre)) = 'asignado' LIMIT 1`
+    );
+
+    if (!etapaAsignado.length) {
+      return NextResponse.json(
+        { message: "Etapa 'Asignado' no encontrada" },
+        { status: 404 }
+      );
+    }
+
+    const etapaId = etapaAsignado[0].id;
+
+    // ✅ Actualizar lead: asignar usuario y cambiar etapa a "Asignado"
     await db.query(
-      `
-      UPDATE oportunidades
-      SET
-        asignado_a = NULL,
-        etapasconversion_id = ?,
-        updated_at = NOW()
-      WHERE id = ?
-        AND oportunidad_id REGEXP ?
-      `,
-      [etapaNuevoId, id, REGEX_LD]
+      "UPDATE oportunidades_oportunidades SET asignado_a = ?, etapasconversion_id = ? WHERE id = ? AND oportunidad_id LIKE 'LD-%'",
+      [asignado_a, etapaId, id]
     );
 
     return NextResponse.json({
-      message: "Asignación removida correctamente del lead LD",
+      message: "Lead asignado y etapa actualizada",
+      etapa_id: etapaId,
     });
-  } catch (error) {
-    console.error("PATCH /api/leads/[id]/asignar error:", error);
+  } catch (e) {
+    console.log(e);
     return NextResponse.json(
-      {
-        message: "Error al asignar lead LD",
-        error: error.message,
-        sqlMessage: error.sqlMessage || null,
-        code: error.code || null,
-      },
+      { message: "Error: " + e.message },
       { status: 500 }
     );
   }

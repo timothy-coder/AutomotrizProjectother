@@ -85,6 +85,7 @@ export default function AgendaPage() {
     const [createdByFilter, setCreatedByFilter] = useState("all");
     const [assignedToFilter, setAssignedToFilter] = useState("all");
     const [clienteFilter, setClienteFilter] = useState("all");
+    const [clienteFilterValue, setClienteFilterValue] = useState("");
     const [tipoFilter, setTipoFilter] = useState("all");
     const [vistaFiltro, setVistaFiltro] = useState("semana");
 
@@ -233,8 +234,8 @@ export default function AgendaPage() {
 
     function getTipoCodigo(codigo) {
         const value = String(codigo || "").trim().toUpperCase();
-        if (/^OP-\d+$/.test(value)) return "op";
-        if (/^LD-\d+$/.test(value)) return "ld";
+        if (/^OPO-\d+-\d+$/.test(value)) return "op";
+        if (/^LD-\d+-\d+$/.test(value)) return "ld";
         return "other";
     }
 
@@ -302,7 +303,7 @@ export default function AgendaPage() {
     }
 
     function isNuevoStage(oportunidad) {
-        const etapa = String(oportunidad?.etapa_name || "").trim().toLowerCase();
+        const etapa = String(oportunidad?.etapa_nombre || "").trim().toLowerCase();
         return etapa === "nuevo";
     }
 
@@ -337,7 +338,7 @@ export default function AgendaPage() {
 
     function getEtapaVisualText(oportunidad) {
         if (shouldPaintAsReprogramado(oportunidad)) return "Reprogramado";
-        return oportunidad?.etapa_name || oportunidad?.origen_name || "-";
+        return oportunidad?.etapa_nombre || oportunidad?.origen_nombre || "-";
     }
 
     function getMinutosRestantes(fechaAgenda, horaAgenda) {
@@ -387,38 +388,103 @@ export default function AgendaPage() {
             const fecha_desde = format(days[0], "yyyy-MM-dd");
             const fecha_hasta = format(days[days.length - 1], "yyyy-MM-dd");
 
-            const [resOp, resLd] = await Promise.all([
-                fetch(
-                    `/api/oportunidades?fecha_desde=${fecha_desde}&fecha_hasta=${fecha_hasta}`,
-                    { cache: "no-store" }
-                ),
-                fetch(
-                    `/api/leads?fecha_desde=${fecha_desde}&fecha_hasta=${fecha_hasta}`,
-                    { cache: "no-store" }
-                ),
-            ]);
+            // ✅ LLAMAR SOLO A /api/oportunidades-oportunidades
+            const resOp = await fetch(
+                `/api/oportunidades-oportunidades?limit=1000`,
+                { cache: "no-store" }
+            );
 
-            const [dataOp, dataLd] = await Promise.all([resOp.json(), resLd.json()]);
+            const dataOp = await resOp.json();
+            let listaOp = Array.isArray(dataOp?.data) ? dataOp.data : [];
 
-            const listaOp = Array.isArray(dataOp) ? dataOp : [];
-            const listaLd = Array.isArray(dataLd) ? dataLd : [];
+            // ✅ ENRIQUECER CADA OPORTUNIDAD CON SUS DETALLES Y ÚLTIMA ACTIVIDAD
+            listaOp = await Promise.all(
+                listaOp.map(async (opp) => {
+                    try {
+                        // Cargar detalles
+                        const resDetalles = await fetch(
+                            `/api/oportunidades-oportunidades/${opp.id}/detalles?limit=1`,
+                            { cache: "no-store" }
+                        );
 
-            let lista = [...listaOp, ...listaLd];
+                        const dataDetalles = await resDetalles.json();
+                        const detalle = Array.isArray(dataDetalles?.data)
+                            ? dataDetalles.data[0]
+                            : null;
 
+                        // ✅ Cargar última actividad
+                        const resActividades = await fetch(
+                            `/api/actividades-oportunidades?oportunidad_id=${opp.id}`,
+                            { cache: "no-store" }
+                        );
+
+                        const dataActividades = await resActividades.json();
+                        const actividades = Array.isArray(dataActividades)
+                            ? dataActividades
+                            : [];
+
+                        // ✅ Obtener la última actividad (el último registro)
+                        const ultimaActividad = actividades.length > 0
+                            ? actividades[actividades.length - 1]
+                            : null;
+
+                        return {
+                            ...opp,
+                            // Usar datos del detalle si existen
+                            fecha_agenda: detalle?.fecha_agenda || null,
+                            hora_agenda: detalle?.hora_agenda || null,
+                            oportunidad_padre_id: detalle?.oportunidad_padre_id || null,
+                            // ✅ Actividad más reciente
+                            ultima_actividad_detalle: ultimaActividad?.detalle || null,
+                            ultima_actividad_usuario: ultimaActividad?.created_by_name || null,
+                            // Renombrar campos para compatibilidad
+                            cliente_name: opp.cliente_nombre,
+                            etapa_name: opp.etapa_nombre,
+                            created_by_name: opp.creado_por_nombre,
+                            asignado_a_name: opp.asignado_a_nombre,
+                        };
+                    } catch (error) {
+                        console.error(`Error cargando detalles de oportunidad ${opp.id}:`, error);
+                        return {
+                            ...opp,
+                            fecha_agenda: null,
+                            hora_agenda: null,
+                            oportunidad_padre_id: null,
+                            ultima_actividad_detalle: null,
+                            ultima_actividad_usuario: null,
+                            cliente_name: opp.cliente_nombre,
+                            etapa_name: opp.etapa_nombre,
+                            created_by_name: opp.creado_por_nombre,
+                            asignado_a_name: opp.asignado_a_nombre,
+                        };
+                    }
+                })
+            );
+
+            // ✅ FILTRAR POR TIPO (OP/LD)
             if (tipoFilter === "op") {
-                lista = lista.filter((o) => getTipoCodigo(o.oportunidad_id) === "op");
+                listaOp = listaOp.filter((o) => getTipoCodigo(o.oportunidad_id) === "op");
             } else if (tipoFilter === "ld") {
-                lista = lista.filter((o) => getTipoCodigo(o.oportunidad_id) === "ld");
+                listaOp = listaOp.filter((o) => getTipoCodigo(o.oportunidad_id) === "ld");
             }
 
+            // ✅ FILTRAR POR TALLERES DEL USUARIO
             if (userTalleres.length > 0) {
-                lista = lista.filter((o) => {
+                listaOp = listaOp.filter((o) => {
                     if (o.taller_id == null) return true;
                     return userTalleres.includes(Number(o.taller_id));
                 });
             }
 
-            lista.sort((a, b) => {
+            // ✅ FILTRAR POR RANGO DE FECHAS SI TIENE AGENDA
+            listaOp = listaOp.filter((o) => {
+                if (!o.fecha_agenda) return false;
+                const fechaOpp = normalizeDate(o.fecha_agenda);
+                return fechaOpp >= fecha_desde && fechaOpp <= fecha_hasta;
+            });
+
+            // ✅ ORDENAR POR FECHA Y HORA
+            listaOp.sort((a, b) => {
                 const fa = `${normalizeDate(a.fecha_agenda)} ${String(
                     a.hora_agenda || ""
                 ).slice(0, 8)}`;
@@ -431,9 +497,10 @@ export default function AgendaPage() {
                 return Number(a.id || 0) - Number(b.id || 0);
             });
 
-            setOportunidades(lista);
+            setOportunidades(listaOp);
+            console.log(`✅ Oportunidades cargadas: ${listaOp.length}`);
         } catch (error) {
-            console.error(error);
+            console.error("❌ Error cargando oportunidades:", error);
             setOportunidades([]);
         }
     }
@@ -469,12 +536,13 @@ export default function AgendaPage() {
         );
     }, [oportunidades]);
 
+    // ✅ CORREGIDO: Usar cliente_name en lugar de id
     const clienteOptions = useMemo(() => {
         const map = new Map();
         oportunidades.forEach((o) => {
-            if (o.cliente_name && o.id) {
-                map.set(String(o.id), {
-                    id: String(o.id),
+            if (o.cliente_name) {
+                map.set(o.cliente_name, {
+                    id: o.cliente_name,
                     name: o.cliente_name,
                 });
             }
@@ -483,7 +551,7 @@ export default function AgendaPage() {
             .sort((a, b) =>
                 a.name.localeCompare(b.name, "es", { sensitivity: "base" })
             )
-            .slice(0, 5);
+            .slice(0, 100);
     }, [oportunidades]);
 
     const filteredClienteOptions = useMemo(() => {
@@ -493,6 +561,7 @@ export default function AgendaPage() {
         );
     }, [clienteOptions, clienteSearch]);
 
+    // ✅ CORREGIDO: Filtrar por cliente_name
     const filteredOportunidades = useMemo(() => {
         return oportunidades.filter((o) => {
             const matchesCreatedBy =
@@ -505,7 +574,7 @@ export default function AgendaPage() {
 
             const matchesCliente =
                 clienteFilter === "all" ||
-                String(o.id) === String(clienteFilter);
+                String(o.cliente_name) === String(clienteFilter);
 
             return matchesCreatedBy && matchesAssignedTo && matchesCliente;
         });
@@ -597,7 +666,7 @@ export default function AgendaPage() {
                                                 return (
                                                     <div
                                                         key={`${tipo}-${o.id}-${idx}`}
-                                                        className="rounded p-0.5 truncate cursor-pointer hover:shadow-md transition-shadow line-clamp-1"
+                                                        className="rounded p-0.5 truncate cursor-pointer hover:shadow-md transition-shadow line-clamp-3"
                                                         style={{
                                                             ...getCardStyle(o),
                                                             borderLeft: `2px solid ${colorTiempo}`,
@@ -610,13 +679,28 @@ export default function AgendaPage() {
                                                             setDialogDefaults({
                                                                 fecha: o.fecha_agenda || "",
                                                                 hora: o.hora_agenda || "",
-                                                                oportunidadPadreId: "",
+                                                                oportunidadPadreId: o.oportunidad_padre_id || "",
                                                             });
                                                             setOpenOportunidadDialog(true);
                                                         }}
-                                                        title={o.oportunidad_id}
+                                                        title={`${o.oportunidad_id}\n${o.detalle}\n${o.asignado_a_name || "Sin asignar"}\n${o.ultima_actividad_detalle || ""}`}
                                                     >
-                                                        {o.oportunidad_id}
+                                                        <div className="font-semibold">{o.oportunidad_id}</div>
+                                                        {o.detalle && (
+                                                            <div className="text-[7px] text-slate-600 line-clamp-1">
+                                                                {o.detalle}
+                                                            </div>
+                                                        )}
+                                                        {o.asignado_a_name && (
+                                                            <div className="text-[7px] font-semibold text-blue-700 line-clamp-1">
+                                                                👤 {o.asignado_a_name}
+                                                            </div>
+                                                        )}
+                                                        {o.ultima_actividad_detalle && (
+                                                            <div className="text-[7px] text-slate-500 italic line-clamp-1">
+                                                                📝 {o.ultima_actividad_detalle}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 );
                                             })}
@@ -720,7 +804,7 @@ export default function AgendaPage() {
                                                 return (
                                                     <div
                                                         key={`${tipo}-${o.id}-${idx}`}
-                                                        className="rounded shadow-sm border p-0.5 overflow-hidden cursor-pointer hover:shadow-md transition-shadow line-clamp-2"
+                                                        className="rounded shadow-sm border p-0.5 overflow-hidden cursor-pointer hover:shadow-md transition-shadow line-clamp-4"
                                                         style={getCardStyle(o)}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
@@ -730,7 +814,7 @@ export default function AgendaPage() {
                                                             setDialogDefaults({
                                                                 fecha: o.fecha_agenda || "",
                                                                 hora: o.hora_agenda || "",
-                                                                oportunidadPadreId: "",
+                                                                oportunidadPadreId: o.oportunidad_padre_id || "",
                                                             });
                                                             setOpenOportunidadDialog(true);
                                                         }}
@@ -746,6 +830,21 @@ export default function AgendaPage() {
                                                         <div className="truncate text-slate-700">
                                                             {o.cliente_name || ""}
                                                         </div>
+                                                        {o.detalle && (
+                                                            <div className="text-[7px] text-slate-600 line-clamp-1">
+                                                                {o.detalle}
+                                                            </div>
+                                                        )}
+                                                        {o.asignado_a_name && (
+                                                            <div className="text-[7px] font-semibold text-blue-700 line-clamp-1">
+                                                                👤 {o.asignado_a_name}
+                                                            </div>
+                                                        )}
+                                                        {o.ultima_actividad_detalle && (
+                                                            <div className="text-[7px] text-slate-500 italic line-clamp-1">
+                                                                📝 {o.ultima_actividad_detalle}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 );
                                             })}
@@ -989,6 +1088,7 @@ export default function AgendaPage() {
                         </SelectContent>
                     </Select>
 
+                    {/* ✅ CORREGIDO: Cliente Popover con búsqueda */}
                     <Popover open={clienteSearchOpen} onOpenChange={setClienteSearchOpen}>
                         <PopoverTrigger asChild>
                             <Button
@@ -999,48 +1099,52 @@ export default function AgendaPage() {
                                 <span className="truncate">
                                     {clienteFilter === "all"
                                         ? "Cliente"
-                                        : clienteOptions.find((c) => String(c.id) === clienteFilter)
-                                            ?.name || "Cliente"}
+                                        : clienteFilter}
                                 </span>
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-[160px] p-0" side="bottom">
+                        <PopoverContent className="w-[200px] p-0" side="bottom">
                             <Command>
                                 <CommandInput
-                                    placeholder="Buscar..."
+                                    placeholder="Buscar cliente..."
                                     value={clienteSearch}
                                     onValueChange={setClienteSearch}
                                     className="text-xs"
                                 />
                                 <CommandList>
-                                    <CommandEmpty>No encontrado</CommandEmpty>
-                                    <CommandGroup>
-                                        <CommandItem
-                                            value="all"
-                                            onSelect={() => {
-                                                setClienteFilter("all");
-                                                setClienteSearch("");
-                                                setClienteSearchOpen(false);
-                                            }}
-                                            className="cursor-pointer text-xs"
-                                        >
-                                            Todos
-                                        </CommandItem>
-                                        {filteredClienteOptions.map((cliente) => (
+                                    {filteredClienteOptions.length === 0 ? (
+                                        <CommandEmpty>No encontrado</CommandEmpty>
+                                    ) : (
+                                        <CommandGroup>
                                             <CommandItem
-                                                key={cliente.id}
-                                                value={cliente.id}
+                                                value="all"
                                                 onSelect={() => {
-                                                    setClienteFilter(cliente.id);
+                                                    setClienteFilter("all");
+                                                    setClienteFilterValue("");
                                                     setClienteSearch("");
                                                     setClienteSearchOpen(false);
                                                 }}
                                                 className="cursor-pointer text-xs"
                                             >
-                                                {cliente.name}
+                                                Todos
                                             </CommandItem>
-                                        ))}
-                                    </CommandGroup>
+                                            {filteredClienteOptions.map((cliente) => (
+                                                <CommandItem
+                                                    key={cliente.id}
+                                                    value={cliente.id}
+                                                    onSelect={() => {
+                                                        setClienteFilter(cliente.id);
+                                                        setClienteFilterValue(cliente.name);
+                                                        setClienteSearch("");
+                                                        setClienteSearchOpen(false);
+                                                    }}
+                                                    className="cursor-pointer text-xs"
+                                                >
+                                                    {cliente.name}
+                                                </CommandItem>
+                                            ))}
+                                        </CommandGroup>
+                                    )}
                                 </CommandList>
                             </Command>
                         </PopoverContent>
@@ -1082,6 +1186,7 @@ export default function AgendaPage() {
                             variant="outline"
                             onClick={() => {
                                 setClienteFilter("all");
+                                setClienteFilterValue("");
                                 setCreatedByFilter("all");
                                 setAssignedToFilter("all");
                                 setTipoFilter("all");

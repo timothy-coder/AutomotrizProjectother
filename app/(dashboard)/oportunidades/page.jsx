@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, RefreshCw, X } from "lucide-react";
+import { Plus, RefreshCw, X, Check, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Tooltip,
   TooltipContent,
@@ -14,12 +15,19 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  Select,
-  SelectTrigger,
-  SelectContent,
-  SelectItem,
-  SelectValue,
-} from "@/components/ui/select";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 import { useRequirePerm } from "@/hooks/useRequirePerm";
 import { useAuth } from "@/context/AuthContext";
@@ -37,9 +45,110 @@ const FILTER_TODAY = "hoy";
 const FILTER_THIS_WEEK = "esta_semana";
 const FILTER_THIS_MONTH = "este_mes";
 
+// Componente FilterCombobox mejorado
+function FilterCombobox({
+  value,
+  onChange,
+  items = [],
+  placeholder = "Buscar...",
+  emptyText = "No hay resultados",
+  getLabel = (item) => item.nombre || item.name || item.fullname || item.username || `Item ${item.id}`,
+}) {
+  const [open, setOpen] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
+
+  // Filtrar items según búsqueda
+  const filteredItems = useMemo(() => {
+    if (!searchValue.trim()) return items;
+    
+    const search = searchValue.toLowerCase();
+    return items.filter((item) =>
+      getLabel(item).toLowerCase().includes(search)
+    );
+  }, [items, searchValue, getLabel]);
+
+  const selectedLabel = useMemo(() => {
+    if (value === FILTER_ALL || value === FILTER_ALL_CREATED) {
+      return "Todos";
+    }
+    const selectedItem = items.find((item) => String(item.id) === value);
+    return selectedItem ? getLabel(selectedItem) : placeholder;
+  }, [value, items, getLabel, placeholder]);
+
+  const handleSelect = (itemId) => {
+    onChange(itemId);
+    setOpen(false);
+    setSearchValue("");
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between h-9 text-sm"
+        >
+          {selectedLabel}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[200px] p-0" align="start">
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder={placeholder}
+            value={searchValue}
+            onValueChange={setSearchValue}
+            className="h-9"
+          />
+          <CommandList>
+            {filteredItems.length === 0 ? (
+              <CommandEmpty>{emptyText}</CommandEmpty>
+            ) : (
+              <CommandGroup>
+                <CommandItem
+                  value="__all__"
+                  onSelect={() => handleSelect(FILTER_ALL)}
+                  className="cursor-pointer"
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      value === FILTER_ALL || value === FILTER_ALL_CREATED
+                        ? "opacity-100"
+                        : "opacity-0"
+                    )}
+                  />
+                  Todos
+                </CommandItem>
+                {filteredItems.map((item) => (
+                  <CommandItem
+                    key={item.id}
+                    value={String(item.id)}
+                    onSelect={() => handleSelect(String(item.id))}
+                    className="cursor-pointer"
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        value === String(item.id) ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    {getLabel(item)}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function OportunidadesPage() {
   const canView = useRequirePerm("oportunidades", "view");
-
   const { user, permissions } = useAuth();
 
   const canCreate = hasPermission(permissions, "oportunidades", "create");
@@ -63,22 +172,18 @@ export default function OportunidadesPage() {
   const [createdByFilter, setCreatedByFilter] = useState(FILTER_ALL_CREATED);
   const [filterFecha, setFilterFecha] = useState(FILTER_ALL);
 
-  // Tab activo
   const [activeTab, setActiveTab] = useState("general");
-
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedOportunidad, setSelectedOportunidad] = useState(null);
-
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState(null);
 
-  // Obtener fechas para filtros
   function getFechaFiltros() {
     const hoy = new Date();
     const inicioSemana = new Date(hoy);
-    inicioSemana.setDate(hoy.getDate() - hoy.getDay()); // Domingo
+    inicioSemana.setDate(hoy.getDate() - hoy.getDay());
     const finSemana = new Date(inicioSemana);
-    finSemana.setDate(inicioSemana.getDate() + 6); // Sábado
+    finSemana.setDate(inicioSemana.getDate() + 6);
 
     const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
     const finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
@@ -92,7 +197,14 @@ export default function OportunidadesPage() {
     };
   }
 
-  // Enriquecer oportunidades con información de detalles
+  // ✅ FILTRAR SOLO OPORTUNIDADES CON PREFIJO "OPO-"
+  function filtrarOportunidadesOPO(oportunidades) {
+    return oportunidades.filter((opp) => {
+      const prefijo = opp.oportunidad_id?.substring(0, 3);
+      return prefijo === "OPO";
+    });
+  }
+
   async function enriquecerOportunidadesConDetalles(oportunidades) {
     try {
       const oportunidadesEnriquecidas = await Promise.all(
@@ -144,10 +256,7 @@ export default function OportunidadesPage() {
       ];
 
       const responses = await Promise.all(requests);
-
-      const [opRes, usersRes, etapasRes, clientesRes, origenesRes, estadosRes] =
-        responses;
-
+      const [opRes] = responses;
       const [opData, usersData, etapasData, clientesData, origenesData, estadosData] =
         await Promise.all(responses.map((r) => r.json()));
 
@@ -155,13 +264,15 @@ export default function OportunidadesPage() {
         throw new Error(opData?.message || "No se pudo cargar oportunidades");
       }
 
-      const oportunidades = Array.isArray(opData)
+      let oportunidades = Array.isArray(opData)
         ? opData
         : Array.isArray(opData?.data)
           ? opData.data
           : [];
 
-      // Enriquecer con detalles
+      // ✅ FILTRAR SOLO OPORTUNIDADES CON PREFIJO "OPO-"
+      oportunidades = filtrarOportunidadesOPO(oportunidades);
+
       const oportunidadesEnriquecidas =
         await enriquecerOportunidadesConDetalles(oportunidades);
 
@@ -170,23 +281,16 @@ export default function OportunidadesPage() {
       setEtapas(Array.isArray(etapasData) ? etapasData : []);
       setClientes(Array.isArray(clientesData) ? clientesData : []);
       setOrigenes(Array.isArray(origenesData) ? origenesData : []);
-      
-      // Filtrar solo los estados activos
-      const estadosFiltrados = Array.isArray(estadosData) 
-        ? estadosData.filter(e => e.activo === 1 || e.activo === true)
+
+      const estadosFiltrados = Array.isArray(estadosData)
+        ? estadosData.filter((e) => e.activo === 1 || e.activo === true)
         : [];
       setEstadosTiempo(estadosFiltrados);
-      
-      console.log("Estados de tiempo cargados:", estadosFiltrados);
+
+      console.log("✅ Oportunidades OPO cargadas:", oportunidadesEnriquecidas.length);
     } catch (error) {
-      console.error(error);
+      console.error("❌ Error cargando datos:", error);
       toast.error(error.message || "No se pudo cargar información");
-      setRows([]);
-      setUsuarios([]);
-      setEtapas([]);
-      setClientes([]);
-      setOrigenes([]);
-      setEstadosTiempo([]);
     } finally {
       setLoading(false);
     }
@@ -199,7 +303,6 @@ export default function OportunidadesPage() {
   const visibleRows = useMemo(() => {
     if (!user?.id) return rows;
     if (canViewAll) return rows;
-
     return rows.filter(
       (row) => String(row?.asignado_a ?? "") === String(user.id)
     );
@@ -229,7 +332,6 @@ export default function OportunidadesPage() {
         filterAsignado === FILTER_ALL ||
         String(row?.asignado_a ?? "") === filterAsignado;
 
-      // Filtro de fecha basado en última agenda
       let matchesFecha = filterFecha === FILTER_ALL;
       if (!matchesFecha && row.fecha_ultima_agenda) {
         const fechaAgenda = row.fecha_ultima_agenda;
@@ -315,7 +417,7 @@ export default function OportunidadesPage() {
               Oportunidades
             </h1>
             <p className="text-sm text-slate-600 mt-1">
-              Gestiona todas tus oportunidades de negocio
+              Gestiona todas tus oportunidades de negocio (OPO)
             </p>
           </div>
 
@@ -358,7 +460,7 @@ export default function OportunidadesPage() {
           </div>
         </div>
 
-        {/* FILTROS - SOLO SE MUESTRAN EN LA VISTA GENERAL */}
+        {/* FILTROS */}
         {activeTab === "general" && (
           <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-4">
             <div className="flex items-center justify-between">
@@ -388,123 +490,165 @@ export default function OportunidadesPage() {
                 <label className="text-xs font-medium text-slate-600 block mb-2">
                   Cliente
                 </label>
-                <Select value={filterCliente} onValueChange={setFilterCliente}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={FILTER_ALL}>Todos</SelectItem>
-                    {clientes.map((item) => (
-                      <SelectItem key={item.id} value={String(item.id)}>
-                        {item.nombre || `Cliente ${item.id}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <FilterCombobox
+                  value={filterCliente}
+                  onChange={setFilterCliente}
+                  items={clientes}
+                  placeholder="Buscar cliente..."
+                  emptyText="No hay clientes"
+                  getLabel={(item) => item.nombre || `Cliente ${item.id}`}
+                />
               </div>
 
               <div>
                 <label className="text-xs font-medium text-slate-600 block mb-2">
                   Origen
                 </label>
-                <Select value={filterOrigen} onValueChange={setFilterOrigen}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={FILTER_ALL}>Todos</SelectItem>
-                    {origenes.map((item) => (
-                      <SelectItem key={item.id} value={String(item.id)}>
-                        {item.name || `Origen ${item.id}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <FilterCombobox
+                  value={filterOrigen}
+                  onChange={setFilterOrigen}
+                  items={origenes}
+                  placeholder="Buscar origen..."
+                  emptyText="No hay orígenes"
+                  getLabel={(item) => item.name || `Origen ${item.id}`}
+                />
               </div>
 
               <div>
                 <label className="text-xs font-medium text-slate-600 block mb-2">
                   Etapa
                 </label>
-                <Select value={filterEtapa} onValueChange={setFilterEtapa}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={FILTER_ALL}>Todos</SelectItem>
-                    {etapas.map((item) => (
-                      <SelectItem key={item.id} value={String(item.id)}>
-                        {item.nombre || `Etapa ${item.id}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <FilterCombobox
+                  value={filterEtapa}
+                  onChange={setFilterEtapa}
+                  items={etapas}
+                  placeholder="Buscar etapa..."
+                  emptyText="No hay etapas"
+                  getLabel={(item) => item.nombre || `Etapa ${item.id}`}
+                />
               </div>
 
               <div>
                 <label className="text-xs font-medium text-slate-600 block mb-2">
                   Asignado a
                 </label>
-                <Select value={filterAsignado} onValueChange={setFilterAsignado}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={FILTER_ALL}>Todos</SelectItem>
-                    {usuarios.map((item) => (
-                      <SelectItem key={item.id} value={String(item.id)}>
-                        {item.fullname ||
-                          item.username ||
-                          `Usuario ${item.id}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <FilterCombobox
+                  value={filterAsignado}
+                  onChange={setFilterAsignado}
+                  items={usuarios}
+                  placeholder="Buscar usuario..."
+                  emptyText="No hay usuarios"
+                  getLabel={(item) =>
+                    item.fullname || item.username || `Usuario ${item.id}`
+                  }
+                />
               </div>
 
               <div>
                 <label className="text-xs font-medium text-slate-600 block mb-2">
                   Creado por
                 </label>
-                <Select
+                <FilterCombobox
                   value={createdByFilter}
-                  onValueChange={setCreatedByFilter}
-                >
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={FILTER_ALL_CREATED}>Todos</SelectItem>
-                    {usuarios.map((item) => (
-                      <SelectItem key={item.id} value={String(item.id)}>
-                        {item.fullname ||
-                          item.username ||
-                          `Usuario ${item.id}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={setCreatedByFilter}
+                  items={usuarios}
+                  placeholder="Buscar usuario..."
+                  emptyText="No hay usuarios"
+                  getLabel={(item) =>
+                    item.fullname || item.username || `Usuario ${item.id}`
+                  }
+                />
               </div>
 
               <div>
                 <label className="text-xs font-medium text-slate-600 block mb-2">
                   Fecha Agenda
                 </label>
-                <Select value={filterFecha} onValueChange={setFilterFecha}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="Todas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={FILTER_ALL}>Todas</SelectItem>
-                    <SelectItem value={FILTER_TODAY}>Hoy</SelectItem>
-                    <SelectItem value={FILTER_THIS_WEEK}>
-                      Esta semana
-                    </SelectItem>
-                    <SelectItem value={FILTER_THIS_MONTH}>
-                      Este mes
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-between h-9 text-sm"
+                    >
+                      {filterFecha === FILTER_ALL
+                        ? "Todas"
+                        : filterFecha === FILTER_TODAY
+                          ? "Hoy"
+                          : filterFecha === FILTER_THIS_WEEK
+                            ? "Esta semana"
+                            : "Este mes"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[200px] p-0" align="start">
+                    <Command>
+                      <CommandList>
+                        <CommandGroup>
+                          <CommandItem
+                            value={FILTER_ALL}
+                            onSelect={() => setFilterFecha(FILTER_ALL)}
+                            className="cursor-pointer"
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                filterFecha === FILTER_ALL
+                                  ? "opacity-100"
+                                  : "opacity-0"
+                              )}
+                            />
+                            Todas
+                          </CommandItem>
+                          <CommandItem
+                            value={FILTER_TODAY}
+                            onSelect={() => setFilterFecha(FILTER_TODAY)}
+                            className="cursor-pointer"
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                filterFecha === FILTER_TODAY
+                                  ? "opacity-100"
+                                  : "opacity-0"
+                              )}
+                            />
+                            Hoy
+                          </CommandItem>
+                          <CommandItem
+                            value={FILTER_THIS_WEEK}
+                            onSelect={() => setFilterFecha(FILTER_THIS_WEEK)}
+                            className="cursor-pointer"
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                filterFecha === FILTER_THIS_WEEK
+                                  ? "opacity-100"
+                                  : "opacity-0"
+                              )}
+                            />
+                            Esta semana
+                          </CommandItem>
+                          <CommandItem
+                            value={FILTER_THIS_MONTH}
+                            onSelect={() => setFilterFecha(FILTER_THIS_MONTH)}
+                            className="cursor-pointer"
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                filterFecha === FILTER_THIS_MONTH
+                                  ? "opacity-100"
+                                  : "opacity-0"
+                              )}
+                            />
+                            Este mes
+                          </CommandItem>
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 

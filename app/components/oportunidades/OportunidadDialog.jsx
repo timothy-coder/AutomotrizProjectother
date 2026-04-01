@@ -135,7 +135,7 @@ const EMPTY_ACTIVIDAD = {
   detalle: "",
 };
 
-// ==================== COMBOBOX COMPONENT ====================
+// ==================== COMBOBOX COMPONENT MEJORADO ====================
 function Combobox({
   items = [],
   value = "",
@@ -160,6 +160,12 @@ function Combobox({
     });
   }, [items, searchValue]);
 
+  const handleSelect = (itemId) => {
+    onChange(itemId === value ? "" : itemId);
+    setSearchValue("");
+    setOpen(false);
+  };
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -168,7 +174,7 @@ function Combobox({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          className={cn("w-full justify-between", className)}
+          className={cn("w-full justify-between h-10", className)}
         >
           <span className="truncate">
             {value && selectedItem ? getLabel(selectedItem) : placeholder}
@@ -176,29 +182,24 @@ function Combobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-full p-0">
-        <Command>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command shouldFilter={false}>
           <CommandInput
             placeholder={`Buscar ${placeholder.toLowerCase()}...`}
             value={searchValue}
             onValueChange={setSearchValue}
           />
-          {filteredItems.length === 0 ? (
-            <CommandEmpty>No encontrado.</CommandEmpty>
-          ) : (
-            <CommandList>
+          <CommandList>
+            {filteredItems.length === 0 ? (
+              <CommandEmpty>No encontrado.</CommandEmpty>
+            ) : (
               <CommandGroup>
                 {filteredItems.map((item) => (
                   <CommandItem
                     key={item.id}
                     value={String(item.id)}
-                    onSelect={(currentValue) => {
-                      onChange(
-                        currentValue === value ? "" : currentValue
-                      );
-                      setSearchValue("");
-                      setOpen(false);
-                    }}
+                    onSelect={() => handleSelect(String(item.id))}
+                    className="cursor-pointer"
                   >
                     <Check
                       className={cn(
@@ -212,8 +213,8 @@ function Combobox({
                   </CommandItem>
                 ))}
               </CommandGroup>
-            </CommandList>
-          )}
+            )}
+          </CommandList>
         </Command>
       </PopoverContent>
     </Popover>

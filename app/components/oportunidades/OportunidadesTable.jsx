@@ -18,7 +18,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-import { Edit2, Send, Clock, Eye, Loader2 } from "lucide-react";
+import { Edit2, Send, Clock, Eye, Loader2, Flame } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -51,8 +51,6 @@ function obtenerEstadoTiempo(fechaAgenda, horaAgenda, estadosTiempo) {
     const ahora = new Date();
 
     // Calcular diferencia: agenda - ahora (minutos que faltan o han pasado)
-    // Si es positivo: faltan minutos
-    // Si es negativo: ya pasó
     const diferenciaMilisegundos = agendaDateTime - ahora;
     const minutosParaAgenda = Math.floor(
       diferenciaMilisegundos / (1000 * 60)
@@ -95,12 +93,88 @@ function debeColorearse(etapaId, etapas) {
   return nombreEtapa.includes("nuevo") || nombreEtapa.includes("asignado");
 }
 
+// ✅ FUNCIÓN PARA VERIFICAR SI ETAPA ES "CERRADA"
+function esEtapaCerrada(etapaId, etapas) {
+  const etapa = etapas.find((e) => String(e.id) === String(etapaId));
+  if (!etapa) return false;
+
+  const nombreEtapa = (getLabel(etapa) || "").toLowerCase();
+  return nombreEtapa.includes("cerrada");
+}
+
+// ✅ FUNCIÓN PARA CALCULAR TEMPERATURA
+function calcularTemperatura(etapaActualId, etapas) {
+  if (!etapaActualId || !etapas || etapas.length === 0) {
+    return 0;
+  }
+
+  try {
+    // Encontrar la etapa actual
+    const etapaActual = etapas.find((e) => String(e.id) === String(etapaActualId));
+    if (!etapaActual) return 0;
+
+    const sortOrderActual = etapaActual.sort_order;
+
+    // Sumar SOLO las descripciones de etapas anteriores + actual
+    let temperaturaCalculada = 0;
+    etapas.forEach((etapa) => {
+      if (etapa.sort_order <= sortOrderActual && etapa.is_active === 1) {
+        temperaturaCalculada += etapa.descripcion || 0;
+      }
+    });
+
+    console.log("🔥 Temperatura calculada:", {
+      etapaActual: etapaActual.nombre,
+      sortOrder: sortOrderActual,
+      temperatura: temperaturaCalculada,
+    });
+
+    return temperaturaCalculada;
+  } catch (error) {
+    console.error("Error calculando temperatura:", error);
+    return 0;
+  }
+}
+
 // Función para convertir hex a rgba
 function hexToRgba(hex, alpha) {
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// Función para obtener color de temperatura
+function getTemperaturaColor(temperatura) {
+  if (temperatura === undefined || temperatura === null || temperatura === 0) {
+    return { bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-300" };
+  }
+
+  const temp = parseInt(temperatura);
+
+  if (temp >= 75) {
+    return { bg: "bg-red-100", text: "text-red-700", border: "border-red-300", icon: "🔴" };
+  } else if (temp >= 50) {
+    return { bg: "bg-orange-100", text: "text-orange-700", border: "border-orange-300", icon: "🟠" };
+  } else if (temp >= 25) {
+    return { bg: "bg-yellow-100", text: "text-yellow-700", border: "border-yellow-300", icon: "🟡" };
+  } else {
+    return { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-300", icon: "🔵" };
+  }
+}
+
+// Función para obtener etiqueta de temperatura
+function getTemperaturaLabel(temperatura) {
+  if (temperatura === undefined || temperatura === null || temperatura === 0) {
+    return "Sin temp.";
+  }
+
+  const temp = parseInt(temperatura);
+
+  if (temp >= 75) return "Muy caliente";
+  if (temp >= 50) return "Caliente";
+  if (temp >= 25) return "Templada";
+  return "Fría";
 }
 
 export default function OportunidadesTable({
@@ -154,6 +228,11 @@ export default function OportunidadesTable({
   const getOrigenNombre = (id) => {
     const origen = origenes.find((o) => String(o.id) === String(id));
     return origen ? getLabel(origen) : `Origen ${id}`;
+  };
+
+  // ✅ NUEVA FUNCIÓN: Abrir oportunidad
+  const handleAbrirOportunidad = async (row) => {
+    router.push(`/oportunidades/${row.id}`);
   };
 
   const handleVerDetalle = async (row) => {
@@ -224,7 +303,7 @@ export default function OportunidadesTable({
                 Próxima Agenda
               </TableHead>
               <TableHead className="text-xs font-semibold text-slate-700">
-                Estado
+                Temperatura
               </TableHead>
               <TableHead className="text-xs font-semibold text-slate-700">
                 Detalle
@@ -257,19 +336,37 @@ export default function OportunidadesTable({
                     }
                   : {};
 
+              // ✅ CALCULAR TEMPERATURA
+              const temperaturaCalculada = calcularTemperatura(
+                row.etapasconversion_id,
+                etapas
+              );
+              const temperaturaColor = getTemperaturaColor(temperaturaCalculada);
+              const temperaturaLabel = getTemperaturaLabel(temperaturaCalculada);
+
+              // ✅ VERIFICAR SI ETAPA ES CERRADA
+              const etapaEsCerrada = esEtapaCerrada(row.etapasconversion_id, etapas);
+
               return (
                 <TableRow
                   key={row.id}
                   className="border-b border-slate-200 hover:bg-slate-50 transition-colors"
                   style={estiloFila}
                 >
+                  {/* ✅ CÓDIGO CLICKEABLE */}
                   <TableCell className="text-sm font-medium text-slate-900">
                     <Tooltip>
-                      <TooltipTrigger className="cursor-help underline underline-offset-2 text-blue-600">
-                        {row.oportunidad_id || `OPO-${row.id}`}
+                      <TooltipTrigger asChild>
+                        <Button
+                          onClick={() => handleAbrirOportunidad(row)}
+                          variant="ghost"
+                          className="p-0 h-auto text-blue-600 hover:text-blue-700 underline underline-offset-2 cursor-pointer"
+                        >
+                          {row.oportunidad_id || `OPO-${row.id}`}
+                        </Button>
                       </TooltipTrigger>
                       <TooltipContent side="right">
-                        ID: {row.id}
+                        ID: {row.id} (Haz clic para abrir)
                       </TooltipContent>
                     </Tooltip>
                   </TableCell>
@@ -308,19 +405,50 @@ export default function OportunidadesTable({
                     )}
                   </TableCell>
 
+                  {/* ✅ COLUMNA TEMPERATURA - NO SE MUESTRA SI ETAPA ES CERRADA */}
                   <TableCell className="text-sm">
-                    {estadoTiempo ? (
-                      <span
-                        className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium text-white"
-                        style={{
-                          backgroundColor: estadoTiempo.color_hexadecimal,
-                        }}
-                        title={estadoTiempo.descripcion}
-                      >
-                        {estadoTiempo.nombre}
-                      </span>
+                    {etapaEsCerrada ? (
+                      <span className="text-slate-400 text-xs">-</span>
                     ) : (
-                      <span className="text-slate-400 text-xs">—</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${temperaturaColor.bg} ${temperaturaColor.text} ${temperaturaColor.border} border cursor-help`}
+                          >
+                            <Flame size={14} />
+                            {temperaturaCalculada}%
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          <div className="space-y-1">
+                            <p className="font-semibold">
+                              {temperaturaLabel}
+                            </p>
+                            <p className="text-xs">
+                              Temperatura: {temperaturaCalculada}%
+                            </p>
+                            <div className="text-xs mt-2 pt-2 border-t border-slate-400">
+                              <p className="font-semibold mb-1">Etapas incluidas:</p>
+                              {etapas
+                                .filter(
+                                  (e) =>
+                                    e.sort_order <=
+                                      etapas.find(
+                                        (et) =>
+                                          String(et.id) ===
+                                          String(row.etapasconversion_id)
+                                      )?.sort_order &&
+                                    e.is_active === 1
+                                )
+                                .map((e) => (
+                                  <p key={e.id}>
+                                    • {e.nombre}: +{e.descripcion}%
+                                  </p>
+                                ))}
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
                     )}
                   </TableCell>
 
