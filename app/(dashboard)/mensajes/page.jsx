@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Bell, Eye, Hourglass, TrendingUp, UserCheck, Users } from "lucide-react";
+import { AlertTriangle, Bell, Eye, Hourglass, Search, TrendingUp, UserCheck, Users, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -184,7 +184,7 @@ export default function ConversationsPage() {
     setChannelFilter((prev) => (prev === ch ? "all" : ch));
   }
 
-  function openConversationById(sessionId) {
+  function handleOpenConversationById(sessionId) {
     const found = sessions.find((s) => Number(s.session_id) === Number(sessionId));
     if (found) setSelectedSession(found);
   }
@@ -196,7 +196,7 @@ export default function ConversationsPage() {
     setPriorityFilter("all");
   }
 
-  function applyMetricFilter(filterKey) {
+  function handleApplyMetricFilter(filterKey) {
     resetQuickFilters();
 
     if (filterKey === "active") {
@@ -585,23 +585,35 @@ export default function ConversationsPage() {
             <h1 className="text-base font-semibold text-gray-800">Mensajes</h1>
             <NotificationPanel
               conversations={sessions}
-              onOpenConversation={openConversationById}
+              onOpenConversation={handleOpenConversationById}
             />
           </div>
 
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por cliente, celular o mensaje..."
-            className="h-10"
-          />
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por cliente, celular o mensaje..."
+              className={`h-10 pl-9 pr-8 transition-colors ${search.trim() ? "border-blue-400 ring-1 ring-blue-300" : ""}`}
+            />
+            {search.trim() && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  onClick={() => applyMetricFilter("mine")}
+                  onClick={() => handleApplyMetricFilter("mine")}
                   className={`rounded-2xl border p-3 text-left transition-all shadow-sm hover:shadow-md ${
                     ownerFilter === "mine"
                       ? "bg-green-100 border-green-300 ring-2 ring-green-400"
@@ -622,7 +634,7 @@ export default function ConversationsPage() {
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  onClick={() => applyMetricFilter("overdue")}
+                  onClick={() => handleApplyMetricFilter("overdue")}
                   className={`rounded-2xl border p-3 text-left transition-all shadow-sm hover:shadow-md ${
                     priorityFilter === "overdue"
                       ? "bg-red-100 border-red-300 ring-2 ring-red-400"
@@ -736,6 +748,20 @@ export default function ConversationsPage() {
         {/* Layout conversaciones */}
         <div className="grid grid-cols-1 lg:grid-cols-[330px_minmax(0,1fr)] gap-2 flex-1 min-h-0">
           <div className={`${selectedSession ? "hidden lg:flex" : "flex"} border rounded-xl overflow-hidden bg-white shadow min-h-0 h-full flex-col`}>
+            {search.trim() && (
+              <div className="px-4 py-2 border-b bg-blue-50/60 flex items-center justify-between">
+                <span className="text-xs text-blue-700 font-medium">
+                  {filteredSessions.length} resultado{filteredSessions.length !== 1 ? "s" : ""} para &ldquo;{search.trim()}&rdquo;
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="text-xs text-blue-500 hover:text-blue-700 transition-colors"
+                >
+                  Limpiar
+                </button>
+              </div>
+            )}
             <div className="overflow-y-auto flex-1 min-h-0">
               {filteredSessions.map((s) => {
                 const unread = Number(s?.unread_count || 0);
