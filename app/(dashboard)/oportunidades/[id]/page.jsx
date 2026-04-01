@@ -428,8 +428,8 @@ export default function OportunidadDetailPage() {
 
     setGuardandoActividad(true);
     try {
-      const etapaParaActividad = etapaProxima !== "sin-cambio" 
-        ? Number(etapaProxima) 
+      const etapaParaActividad = etapaProxima !== "sin-cambio"
+        ? Number(etapaProxima)
         : etapaActual;
 
       const resActividad = await fetch("/api/actividades-oportunidades", {
@@ -1105,7 +1105,7 @@ export default function OportunidadDetailPage() {
 
   const temperaturaNum = calcularTemperatura();
   const temperaturaNumericValue = parseInt(temperaturaNum.replace("%", ""));
-  
+
   let temperaturaColor = "bg-slate-400";
   let temperaturaLabel = "Fría";
 
@@ -1156,13 +1156,12 @@ export default function OportunidadDetailPage() {
                       <TooltipTrigger asChild>
                         <button
                           onClick={() => setEtapaActual(etapa.id)}
-                          className={`px-3 py-2 rounded-lg font-medium text-xs whitespace-nowrap transition-all flex items-center gap-1.5 ${
-                            isActive
-                              ? "bg-blue-600 text-white shadow-lg"
-                              : isCompleted
+                          className={`px-3 py-2 rounded-lg font-medium text-xs whitespace-nowrap transition-all flex items-center gap-1.5 ${isActive
+                            ? "bg-blue-600 text-white shadow-lg"
+                            : isCompleted
                               ? "bg-green-100 text-green-700 hover:bg-green-200"
                               : "bg-slate-200 text-slate-700 hover:bg-slate-300"
-                          }`}
+                            }`}
                         >
                           {isCompleted && <Check size={14} />}
                           {etapa.label}
@@ -1367,19 +1366,7 @@ export default function OportunidadDetailPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div>
-                    <label className="text-sm font-semibold text-slate-700 block mb-2">
-                      Notas de la Etapa
-                    </label>
-                    <textarea
-                      name="detalle"
-                      value={formData.detalle || ""}
-                      onChange={handleInputChange}
-                      placeholder="Añade notas sobre esta etapa"
-                      className="w-full p-3 border border-slate-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
-                      rows="3"
-                    />
-                  </div>
+                  
 
                   {preguntas.length > 0 && (
                     <div className="space-y-4 pt-4 border-t border-slate-200">
@@ -1426,311 +1413,6 @@ export default function OportunidadDetailPage() {
                       ))}
                     </div>
                   )}
-                </CardContent>
-              </Card>
-
-              {/* TEST DRIVES */}
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Calendar size={18} />
-                    Test Drives
-                  </CardTitle>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button onClick={openCreateTestDrive} size="sm" className="gap-2">
-                        <Plus className="h-4 w-4" /> Agregar
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">Programar nuevo test drive</TooltipContent>
-                  </Tooltip>
-                </CardHeader>
-                <CardContent>
-                  {testDrives.length === 0 ? (
-                    <p className="text-slate-500 text-sm py-4">Sin test drives registrados</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {testDrives.map((testDrive) => (
-                        <div
-                          key={testDrive.id}
-                          className="flex items-start justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"
-                        >
-                          <div className="flex-1">
-                            <p className="font-medium text-slate-900">
-                              {new Date(testDrive.fecha_testdrive).toLocaleDateString("es-ES")} a las {testDrive.hora_inicio}
-                            </p>
-                            <p className="text-xs text-slate-600 mt-1">
-                              {testDrive.placa && `Placa: ${testDrive.placa}`}
-                              {testDrive.vin && ` • VIN: ${testDrive.vin}`}
-                            </p>
-                            {testDrive.descripcion && (
-                              <p className="text-xs text-slate-700 mt-1">{testDrive.descripcion}</p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className={`text-xs px-2 py-1 rounded-full font-semibold ${
-                              testDrive.estado === 'realizado' ? 'bg-green-100 text-green-700' :
-                              testDrive.estado === 'cancelado' ? 'bg-red-100 text-red-700' :
-                              'bg-blue-100 text-blue-700'
-                            }`}>
-                              {testDrive.estado}
-                            </span>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="outline"
-                                  onClick={() => openEditTestDrive(testDrive)}
-                                  className="h-8 w-8"
-                                >
-                                  <Pencil size={14} />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">Editar</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="destructive"
-                                  onClick={() => {
-                                    setDeleteTestDriveTarget(testDrive);
-                                    setDeleteTestDriveDialog(true);
-                                  }}
-                                  className="h-8 w-8"
-                                >
-                                  <Trash2 size={14} />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">Eliminar</TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* RESERVAS */}
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <FileText size={18} />
-                    Reservas
-                  </CardTitle>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button 
-                        onClick={createReserva} 
-                        size="sm" 
-                        className="gap-2"
-                        disabled={reservas.length > 0}
-                      >
-                        <Plus className="h-4 w-4" /> Agregar
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      {reservas.length > 0 ? "Ya existe una reserva" : "Crear nueva reserva"}
-                    </TooltipContent>
-                  </Tooltip>
-                </CardHeader>
-                <CardContent>
-                  {reservas.length === 0 ? (
-                    <p className="text-slate-500 text-sm py-4">Sin reservas registradas</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {reservas.map((reserva) => (
-                        <div
-                          key={reserva.id}
-                          className="flex items-start justify-between p-3 bg-green-50 rounded-lg border border-green-200"
-                        >
-                          <div>
-                            <p className="font-medium text-green-900">
-                              Reserva creada el {new Date(reserva.created_at).toLocaleDateString("es-ES")}
-                            </p>
-                            <p className="text-xs text-green-700 mt-1">
-                              ID: {reserva.id}
-                            </p>
-                          </div>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="icon"
-                                variant="destructive"
-                                onClick={() => {
-                                  setDeleteReservaTarget(reserva);
-                                  setDeleteReservaDialog(true);
-                                }}
-                                className="h-8 w-8"
-                              >
-                                <Trash2 size={14} />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">Eliminar</TooltipContent>
-                          </Tooltip>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* CIERRES */}
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Lock size={18} />
-                    Cierres
-                  </CardTitle>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button onClick={openCreateCierre} size="sm" className="gap-2">
-                        <Plus className="h-4 w-4" /> Agregar
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">Registrar cierre de oportunidad</TooltipContent>
-                  </Tooltip>
-                </CardHeader>
-                <CardContent>
-                  {cierres.length === 0 ? (
-                    <p className="text-slate-500 text-sm py-4">Sin cierres registrados</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {cierres.map((cierre) => (
-                        <div
-                          key={cierre.id}
-                          className="flex items-start justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"
-                        >
-                          <div className="flex-1">
-                            <p className="text-xs font-semibold text-slate-600 uppercase mb-1">
-                              {new Date(cierre.created_at).toLocaleString("es-ES")}
-                            </p>
-                            <p className="text-sm text-slate-900">{cierre.detalle}</p>
-                          </div>
-                          <div className="flex gap-2">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="outline"
-                                  onClick={() => openEditCierre(cierre)}
-                                  className="h-8 w-8"
-                                >
-                                  <Pencil size={14} />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">Editar</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="destructive"
-                                  onClick={() => {
-                                    setDeleteCierreTarget(cierre);
-                                    setDeleteCierreDialog(true);
-                                  }}
-                                  className="h-8 w-8"
-                                >
-                                  <Trash2 size={14} />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">Eliminar</TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* COTIZACIONES */}
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <FileText size={18} />
-                    Cotizaciones
-                  </CardTitle>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button onClick={openCreateCotizacion} size="sm" className="gap-2">
-                        <Plus className="h-4 w-4" /> Agregar
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">Crear nueva cotización</TooltipContent>
-                  </Tooltip>
-                </CardHeader>
-                <CardContent>
-                  <CotizacionesTable
-                    cotizaciones={cotizaciones}
-                    sortConfig={{ key: "id", direction: "asc" }}
-                    onSort={() => {}}
-                    onEdit={openEditCotizacion}
-                    onDelete={openDeleteCotizacion}
-                    onChangeStatus={async (cot, estado) => {
-                      const res = await fetch(`/api/cotizacionesagenda/${cot.id}`, {
-                        method: "PUT",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          sku: cot.sku,
-                          color_externo: cot.color_externo,
-                          color_interno: cot.color_interno,
-                          version_id: cot.version_id,
-                          anio: cot.anio,
-                          marca_id: cot.marca_id,
-                          modelo_id: cot.modelo_id,
-                          estado,
-                        }),
-                      });
-                      if (res.ok) {
-                        toast.success(`Estado cambiado a ${estado}`);
-                        if (estado === "enviada") {
-                          await cambiarEtapa(6, "Cotización enviada");
-                        }
-                        await cargarCotizaciones(oportunidadId);
-                      }
-                    }}
-                    onDuplicate={async (cot) => {
-                      const res = await fetch("/api/cotizacionesagenda", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          oportunidad_id: cot.oportunidad_id,
-                          marca_id: cot.marca_id,
-                          modelo_id: cot.modelo_id,
-                          version_id: cot.version_id,
-                          anio: cot.anio,
-                          sku: cot.sku,
-                          color_externo: cot.color_externo,
-                          color_interno: cot.color_interno,
-                          estado: "borrador",
-                          created_by: userId,
-                        }),
-                      });
-                      if (res.ok) {
-                        toast.success("Cotización duplicada");
-                        await cargarCotizaciones(oportunidadId);
-                      }
-                    }}
-                    onLoadHistorial={() => {}}
-                    saving={false}
-                    userId={userId}
-                    onOpenHistorialDialog={(historialData) => {
-                      setSelectedHistorial(historialData);
-                      setHistorialDialog(true);
-                    }}
-                    // ✅ NUEVOS PROPS PARA ACCESORIOS Y PREVIEW
-                    onAddAccesorios={(cot) => {
-                      setSelectedCotizacionForAccesorios(cot);
-                      setDialogAccesoriosOpen(true);
-                    }}
-                    onPreview={(cot) => {
-                      setSelectedCotizacionPreview(cot);
-                      setPreviewCotizacionOpen(true);
-                    }}
-                  />
                 </CardContent>
               </Card>
 
@@ -1863,6 +1545,312 @@ export default function OportunidadDetailPage() {
                   )}
                 </div>
               </div>
+
+              {/* COTIZACIONES */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <FileText size={18} />
+                    Cotizaciones
+                  </CardTitle>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button onClick={openCreateCotizacion} size="sm" className="gap-2">
+                        <Plus className="h-4 w-4" /> Agregar
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Crear nueva cotización</TooltipContent>
+                  </Tooltip>
+                </CardHeader>
+                <CardContent>
+                  <CotizacionesTable
+                    cotizaciones={cotizaciones}
+                    sortConfig={{ key: "id", direction: "asc" }}
+                    onSort={() => { }}
+                    onEdit={openEditCotizacion}
+                    onDelete={openDeleteCotizacion}
+                    onChangeStatus={async (cot, estado) => {
+                      const res = await fetch(`/api/cotizacionesagenda/${cot.id}`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          sku: cot.sku,
+                          color_externo: cot.color_externo,
+                          color_interno: cot.color_interno,
+                          version_id: cot.version_id,
+                          anio: cot.anio,
+                          marca_id: cot.marca_id,
+                          modelo_id: cot.modelo_id,
+                          estado,
+                        }),
+                      });
+                      if (res.ok) {
+                        toast.success(`Estado cambiado a ${estado}`);
+                        if (estado === "enviada") {
+                          await cambiarEtapa(6, "Cotización enviada");
+                        }
+                        await cargarCotizaciones(oportunidadId);
+                      }
+                    }}
+                    onDuplicate={async (cot) => {
+                      const res = await fetch("/api/cotizacionesagenda", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          oportunidad_id: cot.oportunidad_id,
+                          marca_id: cot.marca_id,
+                          modelo_id: cot.modelo_id,
+                          version_id: cot.version_id,
+                          anio: cot.anio,
+                          sku: cot.sku,
+                          color_externo: cot.color_externo,
+                          color_interno: cot.color_interno,
+                          estado: "borrador",
+                          created_by: userId,
+                        }),
+                      });
+                      if (res.ok) {
+                        toast.success("Cotización duplicada");
+                        await cargarCotizaciones(oportunidadId);
+                      }
+                    }}
+                    onLoadHistorial={() => { }}
+                    saving={false}
+                    userId={userId}
+                    onOpenHistorialDialog={(historialData) => {
+                      setSelectedHistorial(historialData);
+                      setHistorialDialog(true);
+                    }}
+                    // ✅ NUEVOS PROPS PARA ACCESORIOS Y PREVIEW
+                    onAddAccesorios={(cot) => {
+                      setSelectedCotizacionForAccesorios(cot);
+                      setDialogAccesoriosOpen(true);
+                    }}
+                    onPreview={(cot) => {
+                      setSelectedCotizacionPreview(cot);
+                      setPreviewCotizacionOpen(true);
+                    }}
+                  />
+                </CardContent>
+              </Card>
+
+              {/* TEST DRIVES */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Calendar size={18} />
+                    Test Drive
+                  </CardTitle>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button onClick={openCreateTestDrive} size="sm" className="gap-2">
+                        <Plus className="h-4 w-4" /> Agregar
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Programar nuevo test drive</TooltipContent>
+                  </Tooltip>
+                </CardHeader>
+                <CardContent>
+                  {testDrives.length === 0 ? (
+                    <p className="text-slate-500 text-sm py-4">Sin test drives registrados</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {testDrives.map((testDrive) => (
+                        <div
+                          key={testDrive.id}
+                          className="flex items-start justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"
+                        >
+                          <div className="flex-1">
+                            <p className="font-medium text-slate-900">
+                              {new Date(testDrive.fecha_testdrive).toLocaleDateString("es-ES")} a las {testDrive.hora_inicio}
+                            </p>
+                            <p className="text-xs text-slate-600 mt-1">
+                              {testDrive.placa && `Placa: ${testDrive.placa}`}
+                              {testDrive.vin && ` • VIN: ${testDrive.vin}`}
+                            </p>
+                            {testDrive.descripcion && (
+                              <p className="text-xs text-slate-700 mt-1">{testDrive.descripcion}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs px-2 py-1 rounded-full font-semibold ${testDrive.estado === 'realizado' ? 'bg-green-100 text-green-700' :
+                              testDrive.estado === 'cancelado' ? 'bg-red-100 text-red-700' :
+                                'bg-blue-100 text-blue-700'
+                              }`}>
+                              {testDrive.estado}
+                            </span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  onClick={() => openEditTestDrive(testDrive)}
+                                  className="h-8 w-8"
+                                >
+                                  <Pencil size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Editar</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="destructive"
+                                  onClick={() => {
+                                    setDeleteTestDriveTarget(testDrive);
+                                    setDeleteTestDriveDialog(true);
+                                  }}
+                                  className="h-8 w-8"
+                                >
+                                  <Trash2 size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Eliminar</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* RESERVAS */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <FileText size={18} />
+                    Reservas
+                  </CardTitle>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        onClick={createReserva}
+                        size="sm"
+                        className="gap-2"
+                        disabled={reservas.length > 0}
+                      >
+                        <Plus className="h-4 w-4" /> Agregar
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      {reservas.length > 0 ? "Ya existe una reserva" : "Crear nueva reserva"}
+                    </TooltipContent>
+                  </Tooltip>
+                </CardHeader>
+                <CardContent>
+                  {reservas.length === 0 ? (
+                    <p className="text-slate-500 text-sm py-4">Sin reservas registradas</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {reservas.map((reserva) => (
+                        <div
+                          key={reserva.id}
+                          className="flex items-start justify-between p-3 bg-green-50 rounded-lg border border-green-200"
+                        >
+                          <div>
+                            <p className="font-medium text-green-900">
+                              Reserva creada el {new Date(reserva.created_at).toLocaleDateString("es-ES")}
+                            </p>
+                            <p className="text-xs text-green-700 mt-1">
+                              ID: {reserva.id}
+                            </p>
+                          </div>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="destructive"
+                                onClick={() => {
+                                  setDeleteReservaTarget(reserva);
+                                  setDeleteReservaDialog(true);
+                                }}
+                                className="h-8 w-8"
+                              >
+                                <Trash2 size={14} />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Eliminar</TooltipContent>
+                          </Tooltip>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* CIERRES */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Lock size={18} />
+                    Cierres
+                  </CardTitle>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button onClick={openCreateCierre} size="sm" className="gap-2">
+                        <Plus className="h-4 w-4" /> Agregar
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Registrar cierre de oportunidad</TooltipContent>
+                  </Tooltip>
+                </CardHeader>
+                <CardContent>
+                  {cierres.length === 0 ? (
+                    <p className="text-slate-500 text-sm py-4">Sin cierres registrados</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {cierres.map((cierre) => (
+                        <div
+                          key={cierre.id}
+                          className="flex items-start justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"
+                        >
+                          <div className="flex-1">
+                            <p className="text-xs font-semibold text-slate-600 uppercase mb-1">
+                              {new Date(cierre.created_at).toLocaleString("es-ES")}
+                            </p>
+                            <p className="text-sm text-slate-900">{cierre.detalle}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  onClick={() => openEditCierre(cierre)}
+                                  className="h-8 w-8"
+                                >
+                                  <Pencil size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Editar</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="destructive"
+                                  onClick={() => {
+                                    setDeleteCierreTarget(cierre);
+                                    setDeleteCierreDialog(true);
+                                  }}
+                                  className="h-8 w-8"
+                                >
+                                  <Trash2 size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Eliminar</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+
             </div>
 
             {/* RIGHT COLUMN */}
@@ -1896,9 +1884,8 @@ export default function OportunidadDetailPage() {
                         <div className="text-4xl font-bold text-slate-900 mb-2">
                           {temperaturaNum}
                         </div>
-                        <div className={`text-sm font-semibold text-white p-2 rounded-lg text-center ${
-                          temperaturaColor
-                        }`}>
+                        <div className={`text-sm font-semibold text-white p-2 rounded-lg text-center ${temperaturaColor
+                          }`}>
                           {temperaturaLabel}
                         </div>
                         <div className="mt-3 w-full h-3 bg-slate-200 rounded-full overflow-hidden">
@@ -2024,7 +2011,7 @@ export default function OportunidadDetailPage() {
         </div>
 
         {/* DIALOGS */}
-        
+
         {/* VEHÍCULO DIALOG */}
         <Dialog open={dialogVehiculoOpen} onOpenChange={setDialogVehiculoOpen}>
           <DialogContent>

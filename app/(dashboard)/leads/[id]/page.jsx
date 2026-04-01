@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Save, X, Edit2, Loader2, Plus, Trash2, Pencil, MessageSquare, Check, Calendar, FileText, Lock, History } from "lucide-react";
+import { ChevronLeft, ChevronRight, Save, X, Edit2, Loader2, Plus, Trash2, Pencil, MessageSquare, Check, Calendar, FileText, Lock, History, ShoppingCart, Package, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -39,15 +39,19 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useUserScope } from "@/hooks/useUserScope";
-import CotizacionAgendaSection from "@/app/components/agenda/CotizacionAgendaSection";
+import CotizacionDialog from "@/app/components/agenda/CotizacionDialog";
+import CotizacionesTable from "@/app/components/agenda/CotizacionesTable";
+import HistorialDialog from "@/app/components/agenda/HistorialDialog";
+import AgregarAccesoriosDialog from "@/app/components/agenda/AgregarAccesoriosDialog";
+import PreviewCotizacionDialog from "@/app/components/agenda/PreviewCotizacionDialog";
 
 export default function LeadDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const oportunidadId = params?.id;
+  const leadId = params?.id;
   const { userId, loading: loadingUserScope } = useUserScope();
 
-  const [oportunidad, setOportunidad] = useState(null);
+  const [lead, setLead] = useState(null);
   const [etapaActual, setEtapaActual] = useState(null);
   const [preguntas, setPreguntas] = useState([]);
   const [respuestas, setRespuestas] = useState({});
@@ -59,6 +63,26 @@ export default function LeadDetailPage() {
   const [guardandoActividad, setGuardandoActividad] = useState(false);
   const [detalleAccion, setDetalleAccion] = useState("");
   const [etapaProxima, setEtapaProxima] = useState("sin-cambio");
+  const [detalles, setDetalles] = useState([]);
+  const [guardandoPregunta, setGuardandoPregunta] = useState(null);
+
+  // Historial Dialog
+  const [historialDialog, setHistorialDialog] = useState(false);
+  const [selectedHistorial, setSelectedHistorial] = useState(null);
+  const [historialLoading, setHistorialLoading] = useState(false);
+
+  // Cotizaciones
+  const [cotizaciones, setCotizaciones] = useState([]);
+  const [dialogCotizacionOpen, setDialogCotizacionOpen] = useState(false);
+  const [editingCotizacion, setEditingCotizacion] = useState(null);
+  const [deleteCotizacionDialog, setDeleteCotizacionDialog] = useState(false);
+  const [deleteCotizacionTarget, setDeleteCotizacionTarget] = useState(null);
+
+  // ✅ ACCESORIOS Y PREVIEW
+  const [dialogAccesoriosOpen, setDialogAccesoriosOpen] = useState(false);
+  const [previewCotizacionOpen, setPreviewCotizacionOpen] = useState(false);
+  const [selectedCotizacionForAccesorios, setSelectedCotizacionForAccesorios] = useState(null);
+  const [selectedCotizacionPreview, setSelectedCotizacionPreview] = useState(null);
 
   // Test Drives
   const [testDrives, setTestDrives] = useState([]);
@@ -96,6 +120,7 @@ export default function LeadDetailPage() {
   const [vehiculosInteres, setVehiculosInteres] = useState([]);
   const [marcas, setMarcas] = useState([]);
   const [modelos, setModelos] = useState([]);
+  const [versiones, setVersiones] = useState([]);
   const [dialogVehiculoOpen, setDialogVehiculoOpen] = useState(false);
   const [deleteVehiculoDialog, setDeleteVehiculoDialog] = useState(false);
   const [editingVehiculo, setEditingVehiculo] = useState(null);
@@ -107,16 +132,23 @@ export default function LeadDetailPage() {
     source: "manual",
   });
 
-  // Etapas disponibles
+  // Cotización desde vehículo
+  const [cotizacionVehiculoMarcaId, setCotizacionVehiculoMarcaId] = useState(null);
+  const [cotizacionVehiculoModeloId, setCotizacionVehiculoModeloId] = useState(null);
+
+  // Etapas
+  const [etapasData, setEtapasData] = useState([]);
+
+  // Etapas locales para mapeo
   const etapas = [
-    { id: 2, nombre: "Nuevo", label: "Nuevo" },
-    { id: 3, nombre: "Asignado", label: "Asignado" },
+    { id: 1, nombre: "Nuevo", label: "Nuevo" },
+    { id: 2, nombre: "Asignado", label: "Asignado" },
     { id: 4, nombre: "En Atención", label: "En Atención" },
-    { id: 5, nombre: "Test Drive", label: "Test Drive" },
+    { id: 5, nombre: "Test drive", label: "Test drive" },
     { id: 6, nombre: "Cotización", label: "Cotización" },
-    { id: 7, nombre: "Evaluación Crédito", label: "Eval. Crédito" },
+    { id: 7, nombre: "Evaluación crediticia", label: "Eval. crediticia" },
     { id: 8, nombre: "Reserva", label: "Reserva" },
-    { id: 9, nombre: "Venta Facturada", label: "Venta" },
+    { id: 9, nombre: "Venta facturada", label: "Venta" },
     { id: 10, nombre: "Cerrada", label: "Cerrada" },
   ];
 
@@ -124,12 +156,12 @@ export default function LeadDetailPage() {
 
   const getLabel = (etapa) => etapa.label || etapa.nombre;
 
-  // Función para cambiar etapa
+  // ✅ CAMBIAR API A /api/leads
   const cambiarEtapa = async (nuevoEtapaId, detalle) => {
     try {
       if (!userId) return false;
 
-      const response = await fetch(`/api/leads//${oportunidadId}/cambiar-etapa`, {
+      const response = await fetch(`/api/leads/${leadId}/etapa`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -140,7 +172,7 @@ export default function LeadDetailPage() {
 
       if (response.ok) {
         setEtapaActual(nuevoEtapaId);
-        await cargarActividades(oportunidadId);
+        await cargarActividades(leadId);
         return true;
       }
       return false;
@@ -150,19 +182,131 @@ export default function LeadDetailPage() {
     }
   };
 
+  // ✅ CAMBIAR API A /api/leads
+  const cargarDetalles = async (lId) => {
+    try {
+      const resDetalles = await fetch(
+        `/api/leads/${lId}/detalles`,
+        { cache: "no-store" }
+      );
+      if (resDetalles.ok) {
+        const dataDetalles = await resDetalles.json();
+        const detallesList = Array.isArray(dataDetalles)
+          ? dataDetalles
+          : dataDetalles?.data || [];
+        setDetalles(detallesList);
+      }
+    } catch (error) {
+      console.error("Error cargando detalles:", error);
+    }
+  };
+
+  // ✅ Cargar cotizaciones - CAMBIAR A oportunidad_id
+  const cargarCotizaciones = async (lId) => {
+    try {
+      const response = await fetch(`/api/cotizacionesagenda?oportunidad_id=${lId}`, {
+        cache: "no-store",
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCotizaciones(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error("Error cargando cotizaciones:", error);
+    }
+  };
+
+  // Cargar etapas desde API
+  const cargarEtapas = async () => {
+    try {
+      const response = await fetch("/api/etapasconversion", {
+        cache: "no-store",
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setEtapasData(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error("Error cargando etapas:", error);
+    }
+  };
+
+  // ✅ CALCULAR TEMPERATURA
+  const calcularTemperatura = () => {
+    if (!etapaActual || etapasData.length === 0) return "0%";
+
+    const etapaActualData = etapasData.find((e) => e.id === etapaActual);
+    if (!etapaActualData) return "0%";
+
+    const sortOrderActual = etapaActualData.sort_order;
+
+    let temperaturaCalculada = 0;
+    etapasData.forEach((etapa) => {
+      if (etapa.sort_order <= sortOrderActual && etapa.is_active === 1) {
+        temperaturaCalculada += etapa.descripcion;
+      }
+    });
+
+    return `${temperaturaCalculada}%`;
+  };
+
+  // ✅ GUARDAR RESPUESTA DE PREGUNTA INDIVIDUAL - CAMBIAR A oportunidad_id
+  const handleGuardarRespuestaPregunta = async (preguntaId) => {
+    if (!userId) {
+      toast.error("Usuario no identificado");
+      return;
+    }
+
+    if (respuestas[preguntaId] === undefined) {
+      toast.warning("Completa la respuesta primero");
+      return;
+    }
+
+    setGuardandoPregunta(preguntaId);
+    try {
+      const response = await fetch("/api/respuestas-atencion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          oportunidad_id: Number(leadId),
+          pregunta_id: preguntaId,
+          respuesta: respuestas[preguntaId],
+          created_by: userId,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Error al guardar");
+      }
+
+      toast.success("Respuesta guardada");
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error(error.message || "Error al guardar la respuesta");
+    } finally {
+      setGuardandoPregunta(null);
+    }
+  };
+
   useEffect(() => {
-    if (!oportunidadId || loadingUserScope) return;
+    cargarEtapas();
+  }, []);
+
+  useEffect(() => {
+    if (!leadId || loadingUserScope) return;
 
     const cargarDatos = async () => {
       try {
-        const resOp = await fetch(`/api/leads//${oportunidadId}`, {
+        // ✅ CAMBIAR API A /api/leads
+        const resLead = await fetch(`/api/leads/${leadId}`, {
           cache: "no-store",
         });
-        if (!resOp.ok) throw new Error("Error cargando oportunidad");
-        const dataOp = await resOp.json();
-        setOportunidad(dataOp);
-        setFormData(dataOp);
-        setEtapaActual(dataOp.etapasconversion_id);
+        if (!resLead.ok) throw new Error("Error cargando lead");
+        const dataLead = await resLead.json();
+        setLead(dataLead);
+        setFormData(dataLead);
+        setEtapaActual(dataLead.etapasconversion_id);
 
         const resPreg = await fetch("/api/preguntas-atencion?activa=true", {
           cache: "no-store",
@@ -172,8 +316,9 @@ export default function LeadDetailPage() {
           setPreguntas(Array.isArray(dataPreg) ? dataPreg : []);
         }
 
+        // ✅ CAMBIAR API A oportunidad_id
         const resResp = await fetch(
-          `/api/respuestas-atencion?oportunidad_id=${oportunidadId}`,
+          `/api/respuestas-atencion?oportunidad_id=${leadId}`,
           { cache: "no-store" }
         );
         if (resResp.ok) {
@@ -187,8 +332,9 @@ export default function LeadDetailPage() {
           }
         }
 
+        // ✅ CAMBIAR API A lead
         const resVeh = await fetch(
-          `/api/client-interest-vehicles?client_id=${dataOp.cliente_id}`,
+          `/api/client-interest-vehicles?client_id=${dataLead.cliente_id}`,
           { cache: "no-store" }
         );
         if (resVeh.ok) {
@@ -196,10 +342,13 @@ export default function LeadDetailPage() {
           setVehiculosInteres(Array.isArray(dataVeh) ? dataVeh : []);
         }
 
-        await cargarActividades(oportunidadId);
+        await cargarDetalles(leadId);
+        await cargarActividades(leadId);
+        await cargarCotizaciones(leadId);
 
+        // ✅ CAMBIAR API A oportunidad_id
         const resTestDrives = await fetch(
-          `/api/test-drives?oportunidad_id=${oportunidadId}`,
+          `/api/test-drives?oportunidad_id=${leadId}`,
           { cache: "no-store" }
         );
         if (resTestDrives.ok) {
@@ -207,8 +356,9 @@ export default function LeadDetailPage() {
           setTestDrives(Array.isArray(dataTestDrives) ? dataTestDrives : []);
         }
 
+        // ✅ CAMBIAR API A oportunidad_id
         const resReservas = await fetch(
-          `/api/reservas?oportunidad_id=${oportunidadId}`,
+          `/api/reservas?oportunidad_id=${leadId}`,
           { cache: "no-store" }
         );
         if (resReservas.ok) {
@@ -216,8 +366,9 @@ export default function LeadDetailPage() {
           setReservas(Array.isArray(dataReservas) ? dataReservas : []);
         }
 
+        // ✅ CAMBIAR API A oportunidad_id
         const resCierres = await fetch(
-          `/api/cierres?oportunidad_id=${oportunidadId}`,
+          `/api/cierres?oportunidad_id=${leadId}`,
           { cache: "no-store" }
         );
         if (resCierres.ok) {
@@ -225,13 +376,22 @@ export default function LeadDetailPage() {
           setCierres(Array.isArray(dataCierres) ? dataCierres : []);
         }
 
-        const [m, mo] = await Promise.all([
+        const [m, mo, v] = await Promise.all([
           fetch("/api/marcas", { cache: "no-store" }).then((r) => r.ok ? r.json() : []),
           fetch("/api/modelos", { cache: "no-store" }).then((r) => r.ok ? r.json() : []),
+          fetch("/api/versiones?limit=1000", { cache: "no-store" }).then((r) => r.ok ? r.json() : []),
         ]);
 
         setMarcas(Array.isArray(m) ? m : []);
         setModelos(Array.isArray(mo) ? mo : []);
+
+        let versionesData = [];
+        if (v.data && Array.isArray(v.data)) {
+          versionesData = v.data;
+        } else if (Array.isArray(v)) {
+          versionesData = v;
+        }
+        setVersiones(versionesData);
       } catch (error) {
         console.error("Error cargando datos:", error);
         toast.error("Error cargando datos: " + error.message);
@@ -241,13 +401,14 @@ export default function LeadDetailPage() {
     };
 
     cargarDatos();
-  }, [oportunidadId, loadingUserScope]);
+  }, [leadId, loadingUserScope]);
 
-  const cargarActividades = async (opId) => {
+  const cargarActividades = async (lId) => {
     try {
       setLoadingActividades(true);
+      // ✅ CAMBIAR API A lead_id
       const resActividades = await fetch(
-        `/api/actividades-oportunidades?oportunidad_id=${opId}`,
+        `/api/actividades-oportunidades?oportunidad_id=${lId}`,
         { cache: "no-store" }
       );
       if (resActividades.ok) {
@@ -274,14 +435,17 @@ export default function LeadDetailPage() {
 
     setGuardandoActividad(true);
     try {
-      const nuevaEtapa = etapaProxima !== "sin-cambio" ? Number(etapaProxima) : etapaActual;
+      const etapaParaActividad = etapaProxima !== "sin-cambio"
+        ? Number(etapaProxima)
+        : etapaActual;
 
+      // ✅ CAMBIAR API A /api/actividades-oportunidades
       const resActividad = await fetch("/api/actividades-oportunidades", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          oportunidad_id: Number(oportunidadId),
-          etapasconversion_id: nuevaEtapa,
+          oportunidad_id: Number(leadId),
+          etapasconversion_id: etapaParaActividad,
           detalle: detalleAccion,
           created_by: userId,
         }),
@@ -292,16 +456,11 @@ export default function LeadDetailPage() {
         throw new Error(data.message);
       }
 
-      if (etapaProxima !== "sin-cambio") {
-        const cambioExitoso = await cambiarEtapa(nuevaEtapa);
-        if (!cambioExitoso) throw new Error("Error cambiando etapa");
-      }
-
       toast.success("Actividad guardada");
       setDetalleAccion("");
       setEtapaProxima("sin-cambio");
 
-      await cargarActividades(oportunidadId);
+      await cargarActividades(leadId);
     } catch (error) {
       console.error("Error:", error);
       toast.error("Error: " + error.message);
@@ -321,7 +480,8 @@ export default function LeadDetailPage() {
         return;
       }
 
-      await fetch(`/api/leads//${oportunidadId}`, {
+      // ✅ CAMBIAR API A /api/leads
+      await fetch(`/api/leads/${leadId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -330,21 +490,6 @@ export default function LeadDetailPage() {
           etapa_name: etapaSeleccionada?.nombre,
         }),
       });
-
-      for (const pregunta of preguntas) {
-        if (respuestas[pregunta.id] !== undefined) {
-          await fetch("/api/respuestas-atencion", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              oportunidad_id: Number(oportunidadId),
-              pregunta_id: pregunta.id,
-              respuesta: respuestas[pregunta.id],
-              created_by: userId,
-            }),
-          });
-        }
-      }
 
       toast.success("Cambios guardados exitosamente");
     } catch (error) {
@@ -431,7 +576,7 @@ export default function LeadDetailPage() {
     if (!userId) {
       return toast.error("Usuario no identificado");
     }
-    if (!oportunidad?.cliente_id) {
+    if (!lead?.cliente_id) {
       return toast.error("Cliente no identificado");
     }
 
@@ -452,8 +597,8 @@ export default function LeadDetailPage() {
           estado: testDriveFormData.estado || "programado",
         }
         : {
-          oportunidad_id: Number(oportunidadId),
-          cliente_id: Number(oportunidad.cliente_id),
+          oportunidad_id: Number(leadId),
+          cliente_id: Number(lead.cliente_id),
           fecha_testdrive: testDriveFormData.fecha_testdrive,
           hora_inicio: testDriveFormData.hora_inicio,
           hora_fin: testDriveFormData.hora_fin || null,
@@ -475,7 +620,6 @@ export default function LeadDetailPage() {
         toast.success(editingTestDrive ? "Test Drive actualizado" : "Test Drive creado");
         setDialogTestDriveOpen(false);
 
-        // Cambiar automáticamente a etapa "Test Drive" (id: 5) si es nueva creación
         if (!editingTestDrive) {
           const cambioExitoso = await cambiarEtapa(5, "Test drive programado");
           if (cambioExitoso) {
@@ -483,8 +627,9 @@ export default function LeadDetailPage() {
           }
         }
 
+        // ✅ CAMBIAR API A oportunidad_id
         const resTestDrives = await fetch(
-          `/api/test-drives?oportunidad_id=${oportunidadId}`,
+          `/api/test-drives?oportunidad_id=${leadId}`,
           { cache: "no-store" }
         );
         if (resTestDrives.ok) {
@@ -512,8 +657,9 @@ export default function LeadDetailPage() {
         toast.success("Test Drive eliminado");
         setDeleteTestDriveDialog(false);
 
+        // ✅ CAMBIAR API A oportunidad_id
         const resTestDrives = await fetch(
-          `/api/test-drives?oportunidad_id=${oportunidadId}`,
+          `/api/test-drives?oportunidad_id=${leadId}`,
           { cache: "no-store" }
         );
         if (resTestDrives.ok) {
@@ -536,11 +682,12 @@ export default function LeadDetailPage() {
     }
 
     try {
+      // ✅ CAMBIAR API A oportunidad_id
       const response = await fetch("/api/reservas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          oportunidad_id: Number(oportunidadId),
+          oportunidad_id: Number(leadId),
           created_by: userId,
         }),
       });
@@ -548,14 +695,14 @@ export default function LeadDetailPage() {
       if (response.ok) {
         toast.success("Reserva creada");
 
-        // Cambiar automáticamente a etapa "Reserva" (id: 8)
         const cambioExitoso = await cambiarEtapa(8, "Reserva creada");
         if (cambioExitoso) {
           toast.success("Etapa cambiada a Reserva");
         }
 
+        // ✅ CAMBIAR API A oportunidad_id
         const resReservas = await fetch(
-          `/api/reservas?oportunidad_id=${oportunidadId}`,
+          `/api/reservas?oportunidad_id=${leadId}`,
           { cache: "no-store" }
         );
         if (resReservas.ok) {
@@ -583,8 +730,9 @@ export default function LeadDetailPage() {
         toast.success("Reserva eliminada");
         setDeleteReservaDialog(false);
 
+        // ✅ CAMBIAR API A oportunidad_id
         const resReservas = await fetch(
-          `/api/reservas?oportunidad_id=${oportunidadId}`,
+          `/api/reservas?oportunidad_id=${leadId}`,
           { cache: "no-store" }
         );
         if (resReservas.ok) {
@@ -632,7 +780,7 @@ export default function LeadDetailPage() {
       const body = editingCierre
         ? { detalle: cierreFormData.detalle }
         : {
-          oportunidad_id: Number(oportunidadId),
+          oportunidad_id: Number(leadId),
           detalle: cierreFormData.detalle,
           created_by: userId,
         };
@@ -648,7 +796,6 @@ export default function LeadDetailPage() {
         setDialogCierreOpen(false);
         setCierreFormData({ detalle: "" });
 
-        // Cambiar automáticamente a etapa "Cerrada" (id: 10) si es nueva creación
         if (!editingCierre) {
           const cambioExitoso = await cambiarEtapa(10, "Oportunidad cerrada: " + cierreFormData.detalle);
           if (cambioExitoso) {
@@ -656,8 +803,9 @@ export default function LeadDetailPage() {
           }
         }
 
+        // ✅ CAMBIAR API A oportunidad_id
         const resCierres = await fetch(
-          `/api/cierres?oportunidad_id=${oportunidadId}`,
+          `/api/cierres?oportunidad_id=${leadId}`,
           { cache: "no-store" }
         );
         if (resCierres.ok) {
@@ -685,8 +833,9 @@ export default function LeadDetailPage() {
         toast.success("Cierre eliminado");
         setDeleteCierreDialog(false);
 
+        // ✅ CAMBIAR API A oportunidad_id
         const resCierres = await fetch(
-          `/api/cierres?oportunidad_id=${oportunidadId}`,
+          `/api/cierres?oportunidad_id=${leadId}`,
           { cache: "no-store" }
         );
         if (resCierres.ok) {
@@ -725,6 +874,12 @@ export default function LeadDetailPage() {
     setDialogVehiculoOpen(true);
   }
 
+  function openCotizacionVehiculo(vehiculo) {
+    setCotizacionVehiculoMarcaId(vehiculo.marca_id);
+    setCotizacionVehiculoModeloId(vehiculo.modelo_id);
+    setDialogCotizacionOpen(true);
+  }
+
   async function saveVehiculo() {
     if (!vehiculoFormData.marca_id && !vehiculoFormData.modelo_id) {
       return toast.warning("Selecciona al menos una marca o modelo");
@@ -741,7 +896,7 @@ export default function LeadDetailPage() {
         ? vehiculoFormData
         : {
           ...vehiculoFormData,
-          client_id: oportunidad.cliente_id,
+          client_id: lead.cliente_id,
         };
 
       const response = await fetch(url, {
@@ -757,7 +912,7 @@ export default function LeadDetailPage() {
         setDialogVehiculoOpen(false);
 
         const resVeh = await fetch(
-          `/api/client-interest-vehicles?client_id=${oportunidad.cliente_id}`,
+          `/api/client-interest-vehicles?client_id=${lead.cliente_id}`,
           { cache: "no-store" }
         );
         if (resVeh.ok) {
@@ -791,7 +946,7 @@ export default function LeadDetailPage() {
         setDeleteVehiculoDialog(false);
 
         const resVeh = await fetch(
-          `/api/client-interest-vehicles?client_id=${oportunidad.cliente_id}`,
+          `/api/client-interest-vehicles?client_id=${lead.cliente_id}`,
           { cache: "no-store" }
         );
         if (resVeh.ok) {
@@ -804,6 +959,46 @@ export default function LeadDetailPage() {
     } catch (error) {
       console.error(error);
       toast.error("Error eliminando vehículo");
+    }
+  }
+
+  // COTIZACIONES FUNCTIONS
+  function openCreateCotizacion() {
+    setEditingCotizacion(null);
+    setCotizacionVehiculoMarcaId(null);
+    setCotizacionVehiculoModeloId(null);
+    setDialogCotizacionOpen(true);
+  }
+
+  function openEditCotizacion(cotizacion) {
+    setEditingCotizacion(cotizacion);
+    setCotizacionVehiculoMarcaId(null);
+    setCotizacionVehiculoModeloId(null);
+    setDialogCotizacionOpen(true);
+  }
+
+  function openDeleteCotizacion(cotizacion) {
+    setDeleteCotizacionTarget(cotizacion);
+    setDeleteCotizacionDialog(true);
+  }
+
+  async function confirmDeleteCotizacion() {
+    try {
+      const response = await fetch(
+        `/api/cotizacionesagenda/${deleteCotizacionTarget.id}`,
+        { method: "DELETE" }
+      );
+
+      if (response.ok) {
+        toast.success("Cotización eliminada");
+        setDeleteCotizacionDialog(false);
+        await cargarCotizaciones(leadId);
+      } else {
+        toast.error("Error eliminando cotización");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Error eliminando cotización");
     }
   }
 
@@ -911,10 +1106,10 @@ export default function LeadDetailPage() {
     );
   }
 
-  if (!oportunidad) {
+  if (!lead) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
-        <p className="text-slate-600">Oportunidad no encontrada</p>
+        <p className="text-slate-600">Lead no encontrado</p>
       </div>
     );
   }
@@ -924,17 +1119,19 @@ export default function LeadDetailPage() {
     ? modelos.filter((m) => m.marca_id === parseInt(vehiculoFormData.marca_id))
     : [];
 
-  const temperaturaNum = oportunidad.temperatura || 0;
+  const temperaturaNum = calcularTemperatura();
+  const temperaturaNumericValue = parseInt(temperaturaNum.replace("%", ""));
+
   let temperaturaColor = "bg-slate-400";
   let temperaturaLabel = "Fría";
 
-  if (temperaturaNum >= 75) {
+  if (temperaturaNumericValue >= 75) {
     temperaturaColor = "bg-red-500";
     temperaturaLabel = "Muy caliente";
-  } else if (temperaturaNum >= 50) {
+  } else if (temperaturaNumericValue >= 50) {
     temperaturaColor = "bg-orange-500";
     temperaturaLabel = "Caliente";
-  } else if (temperaturaNum >= 25) {
+  } else if (temperaturaNumericValue >= 25) {
     temperaturaColor = "bg-yellow-500";
     temperaturaLabel = "Templada";
   }
@@ -946,8 +1143,8 @@ export default function LeadDetailPage() {
         <div className="bg-white border-b border-slate-200 p-6 sticky top-0 z-20 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-slate-900">{oportunidad.cliente_name}</h1>
-              <p className="text-slate-600 text-sm mt-1">{oportunidad.oportunidad_id}</p>
+              <h1 className="text-3xl font-bold text-slate-900">{lead.cliente_nombre}</h1>
+              <p className="text-slate-600 text-sm mt-1">{lead.oportunidad_id || `LD-${lead.id}`}</p>
             </div>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -975,13 +1172,12 @@ export default function LeadDetailPage() {
                       <TooltipTrigger asChild>
                         <button
                           onClick={() => setEtapaActual(etapa.id)}
-                          className={`px-3 py-2 rounded-lg font-medium text-xs whitespace-nowrap transition-all flex items-center gap-1.5 ${
-                            isActive
-                              ? "bg-blue-600 text-white shadow-lg"
-                              : isCompleted
+                          className={`px-3 py-2 rounded-lg font-medium text-xs whitespace-nowrap transition-all flex items-center gap-1.5 ${isActive
+                            ? "bg-blue-600 text-white shadow-lg"
+                            : isCompleted
                               ? "bg-green-100 text-green-700 hover:bg-green-200"
                               : "bg-slate-200 text-slate-700 hover:bg-slate-300"
-                          }`}
+                            }`}
                         >
                           {isCompleted && <Check size={14} />}
                           {etapa.label}
@@ -1014,27 +1210,23 @@ export default function LeadDetailPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-xs text-slate-600 font-semibold uppercase">Cliente</p>
-                      <p className="text-slate-900 font-medium">{oportunidad.cliente_name}</p>
+                      <p className="text-slate-900 font-medium">{lead.cliente_nombre}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-600 font-semibold uppercase">Código</p>
-                      <p className="text-slate-900 font-mono font-medium">{oportunidad.oportunidad_id}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-600 font-semibold uppercase">Vehículo</p>
-                      <p className="text-slate-900">{oportunidad.marca_name} {oportunidad.modelo_name}</p>
+                      <p className="text-slate-900 font-mono font-medium">{lead.oportunidad_id || `LD-${lead.id}`}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-600 font-semibold uppercase">Origen</p>
-                      <p className="text-slate-900">{oportunidad.origen_name}</p>
+                      <p className="text-slate-900">{lead.origen_nombre}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-600 font-semibold uppercase">Suborigen</p>
-                      <p className="text-slate-900">{oportunidad.suborigen_name}</p>
+                      <p className="text-slate-900">{lead.suborigen_nombre}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-600 font-semibold uppercase">Asignado a</p>
-                      <p className="text-slate-900">{oportunidad.asignado_a_name}</p>
+                      <p className="text-slate-900">{lead.asignado_a_nombre || "Sin asignar"}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -1049,21 +1241,57 @@ export default function LeadDetailPage() {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <p className="text-xs text-slate-600 font-semibold uppercase">Correo</p>
-                      <p className="text-slate-900">{oportunidad.email || "-"}</p>
+                      <p className="text-slate-900">{lead.cliente_email || "-"}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-600 font-semibold uppercase">Teléfono</p>
-                      <p className="text-slate-900">{oportunidad.telefono || "-"}</p>
+                      <p className="text-slate-900">{lead.cliente_telefono || "-"}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-600 font-semibold uppercase">Celular</p>
-                      <p className="text-slate-900">{oportunidad.celular || "-"}</p>
+                      <p className="text-slate-900">{lead.celular || "-"}</p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-600 font-semibold uppercase">DNI</p>
-                      <p className="text-slate-900">{oportunidad.documento || "-"}</p>
+                      <p className="text-slate-900">{lead.cliente_dni || "-"}</p>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* DETALLES DE AGENDA */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Calendar size={18} />
+                    Detalles de Agenda
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {detalles.length === 0 ? (
+                    <p className="text-slate-500 text-sm py-4">Sin detalles de agenda</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {detalles.map((detalle) => (
+                        <div
+                          key={detalle.id}
+                          className="flex items-start justify-between p-3 bg-blue-50 rounded-lg border border-blue-200 hover:border-blue-300 transition-colors"
+                        >
+                          <div>
+                            <p className="font-medium text-slate-900">
+                              📅 {new Date(detalle.fecha_agenda).toLocaleDateString("es-ES")}
+                            </p>
+                            <p className="text-sm text-slate-700 mt-1">
+                              🕐 {String(detalle.hora_agenda).substring(0, 5)}
+                            </p>
+                            <p className="text-xs text-slate-600 mt-1">
+                              {new Date(detalle.created_at).toLocaleString("es-ES")}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -1104,6 +1332,19 @@ export default function LeadDetailPage() {
                                 <Button
                                   size="icon"
                                   variant="outline"
+                                  onClick={() => openCotizacionVehiculo(vehiculo)}
+                                  className="h-8 w-8"
+                                >
+                                  <ShoppingCart size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Crear cotización</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
                                   onClick={() => openEditVehiculo(vehiculo)}
                                   className="h-8 w-8"
                                 >
@@ -1133,7 +1374,7 @@ export default function LeadDetailPage() {
                 </CardContent>
               </Card>
 
-              {/* INFORMACIÓN DE ETAPA */}
+              {/* INFORMACIÓN DE ETAPA - CON BOTONES PARA GUARDAR PREGUNTAS */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">
@@ -1141,21 +1382,8 @@ export default function LeadDetailPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div>
-                    <label className="text-sm font-semibold text-slate-700 block mb-2">
-                      Notas de la Etapa
-                    </label>
-                    <textarea
-                      name="detalle"
-                      value={formData.detalle || ""}
-                      onChange={handleInputChange}
-                      placeholder="Añade notas sobre esta etapa"
-                      className="w-full p-3 border border-slate-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500"
-                      rows="3"
-                    />
-                  </div>
+                  
 
-                  {/* PREGUNTAS */}
                   {preguntas.length > 0 && (
                     <div className="space-y-4 pt-4 border-t border-slate-200">
                       <h3 className="font-semibold text-slate-900 flex items-center gap-2">
@@ -1164,13 +1392,38 @@ export default function LeadDetailPage() {
                       </h3>
 
                       {preguntas.map((pregunta) => (
-                        <div key={pregunta.id}>
-                          <label className="text-sm font-medium text-slate-700 flex items-center gap-1">
-                            {pregunta.pregunta}
-                            {pregunta.es_obligatoria && (
-                              <span className="text-red-500">*</span>
-                            )}
-                          </label>
+                        <div key={pregunta.id} className="border border-slate-200 rounded-lg p-3 bg-slate-50">
+                          <div className="flex items-center justify-between mb-2">
+                            <label className="text-sm font-medium text-slate-700 flex items-center gap-1 flex-1">
+                              {pregunta.pregunta}
+                              {pregunta.es_obligatoria && (
+                                <span className="text-red-500">*</span>
+                              )}
+                            </label>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  onClick={() => handleGuardarRespuestaPregunta(pregunta.id)}
+                                  disabled={guardandoPregunta === pregunta.id}
+                                  size="sm"
+                                  className="gap-2 ml-2"
+                                >
+                                  {guardandoPregunta === pregunta.id ? (
+                                    <>
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                      Guardando...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Save className="h-4 w-4" />
+                                      Guardar
+                                    </>
+                                  )}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Guardar respuesta</TooltipContent>
+                            </Tooltip>
+                          </div>
                           {renderCampoPregunta(pregunta)}
                         </div>
                       ))}
@@ -1178,239 +1431,6 @@ export default function LeadDetailPage() {
                   )}
                 </CardContent>
               </Card>
-
-              {/* TEST DRIVES */}
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Calendar size={18} />
-                    Test Drives
-                  </CardTitle>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button onClick={openCreateTestDrive} size="sm" className="gap-2">
-                        <Plus className="h-4 w-4" /> Agregar
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">Programar nuevo test drive</TooltipContent>
-                  </Tooltip>
-                </CardHeader>
-                <CardContent>
-                  {testDrives.length === 0 ? (
-                    <p className="text-slate-500 text-sm py-4">Sin test drives registrados</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {testDrives.map((testDrive) => (
-                        <div
-                          key={testDrive.id}
-                          className="flex items-start justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"
-                        >
-                          <div className="flex-1">
-                            <p className="font-medium text-slate-900">
-                              {new Date(testDrive.fecha_testdrive).toLocaleDateString("es-ES")} a las {testDrive.hora_inicio}
-                            </p>
-                            <p className="text-xs text-slate-600 mt-1">
-                              {testDrive.placa && `Placa: ${testDrive.placa}`}
-                              {testDrive.vin && ` • VIN: ${testDrive.vin}`}
-                            </p>
-                            {testDrive.descripcion && (
-                              <p className="text-xs text-slate-700 mt-1">{testDrive.descripcion}</p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className={`text-xs px-2 py-1 rounded-full font-semibold ${
-                              testDrive.estado === 'realizado' ? 'bg-green-100 text-green-700' :
-                              testDrive.estado === 'cancelado' ? 'bg-red-100 text-red-700' :
-                              'bg-blue-100 text-blue-700'
-                            }`}>
-                              {testDrive.estado}
-                            </span>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="outline"
-                                  onClick={() => openEditTestDrive(testDrive)}
-                                  className="h-8 w-8"
-                                >
-                                  <Pencil size={14} />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">Editar</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="destructive"
-                                  onClick={() => {
-                                    setDeleteTestDriveTarget(testDrive);
-                                    setDeleteTestDriveDialog(true);
-                                  }}
-                                  className="h-8 w-8"
-                                >
-                                  <Trash2 size={14} />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">Eliminar</TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* RESERVAS */}
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <FileText size={18} />
-                    Reservas
-                  </CardTitle>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button 
-                        onClick={createReserva} 
-                        size="sm" 
-                        className="gap-2"
-                        disabled={reservas.length > 0}
-                      >
-                        <Plus className="h-4 w-4" /> Agregar
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      {reservas.length > 0 ? "Ya existe una reserva" : "Crear nueva reserva"}
-                    </TooltipContent>
-                  </Tooltip>
-                </CardHeader>
-                <CardContent>
-                  {reservas.length === 0 ? (
-                    <p className="text-slate-500 text-sm py-4">Sin reservas registradas</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {reservas.map((reserva) => (
-                        <div
-                          key={reserva.id}
-                          className="flex items-start justify-between p-3 bg-green-50 rounded-lg border border-green-200"
-                        >
-                          <div>
-                            <p className="font-medium text-green-900">
-                              Reserva creada el {new Date(reserva.created_at).toLocaleDateString("es-ES")}
-                            </p>
-                            <p className="text-xs text-green-700 mt-1">
-                              ID: {reserva.id}
-                            </p>
-                          </div>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="icon"
-                                variant="destructive"
-                                onClick={() => {
-                                  setDeleteReservaTarget(reserva);
-                                  setDeleteReservaDialog(true);
-                                }}
-                                className="h-8 w-8"
-                              >
-                                <Trash2 size={14} />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">Eliminar</TooltipContent>
-                          </Tooltip>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* CIERRES */}
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Lock size={18} />
-                    Cierres
-                  </CardTitle>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button onClick={openCreateCierre} size="sm" className="gap-2">
-                        <Plus className="h-4 w-4" /> Agregar
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">Registrar cierre de oportunidad</TooltipContent>
-                  </Tooltip>
-                </CardHeader>
-                <CardContent>
-                  {cierres.length === 0 ? (
-                    <p className="text-slate-500 text-sm py-4">Sin cierres registrados</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {cierres.map((cierre) => (
-                        <div
-                          key={cierre.id}
-                          className="flex items-start justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"
-                        >
-                          <div className="flex-1">
-                            <p className="text-xs font-semibold text-slate-600 uppercase mb-1">
-                              {new Date(cierre.created_at).toLocaleString("es-ES")}
-                            </p>
-                            <p className="text-sm text-slate-900">{cierre.detalle}</p>
-                          </div>
-                          <div className="flex gap-2">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="outline"
-                                  onClick={() => openEditCierre(cierre)}
-                                  className="h-8 w-8"
-                                >
-                                  <Pencil size={14} />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">Editar</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="destructive"
-                                  onClick={() => {
-                                    setDeleteCierreTarget(cierre);
-                                    setDeleteCierreDialog(true);
-                                  }}
-                                  className="h-8 w-8"
-                                >
-                                  <Trash2 size={14} />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">Eliminar</TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* COTIZACIÓN */}
-              <div className="bg-white rounded-lg border border-slate-200 p-6">
-                <CotizacionAgendaSection
-                  oportunidadId={oportunidadId}
-                  clienteId={oportunidad.cliente_id}
-                  oportunidadData={oportunidad}
-                  onCotizacionCreated={async () => {
-                    // Cambiar automáticamente a etapa "Cotización" (id: 6)
-                    const cambioExitoso = await cambiarEtapa(6, "Cotización creada");
-                    if (cambioExitoso) {
-                      toast.success("Etapa cambiada a Cotización");
-                    }
-                  }}
-                />
-              </div>
 
               {/* REGISTRAR ACTIVIDAD Y HISTORIAL */}
               <div className="md:col-span-2 space-y-4 pt-6 border-t-2 border-slate-200">
@@ -1425,7 +1445,7 @@ export default function LeadDetailPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                       <label className="text-sm font-medium text-slate-700 block mb-2">
-                        Actividad a realizar (opcional)
+                        Etapa donde registrar (opcional)
                       </label>
                       <Select
                         value={etapaProxima}
@@ -1437,7 +1457,7 @@ export default function LeadDetailPage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="sin-cambio">
-                            Sin actividad
+                            Etapa actual
                           </SelectItem>
                           {etapas.map((item) => (
                             <SelectItem key={item.id} value={String(item.id)}>
@@ -1470,10 +1490,7 @@ export default function LeadDetailPage() {
                   >
                     {guardandoActividad
                       ? "Guardando..."
-                      : "Guardar actividad" +
-                      (etapaProxima !== "sin-cambio"
-                        ? " y cambiar etapa"
-                        : "")}
+                      : "Guardar actividad"}
                   </Button>
                 </div>
 
@@ -1544,6 +1561,312 @@ export default function LeadDetailPage() {
                   )}
                 </div>
               </div>
+
+              {/* COTIZACIONES */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <FileText size={18} />
+                    Cotizaciones
+                  </CardTitle>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button onClick={openCreateCotizacion} size="sm" className="gap-2">
+                        <Plus className="h-4 w-4" /> Agregar
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Crear nueva cotización</TooltipContent>
+                  </Tooltip>
+                </CardHeader>
+                <CardContent>
+                  <CotizacionesTable
+                    cotizaciones={cotizaciones}
+                    sortConfig={{ key: "id", direction: "asc" }}
+                    onSort={() => { }}
+                    onEdit={openEditCotizacion}
+                    onDelete={openDeleteCotizacion}
+                    onChangeStatus={async (cot, estado) => {
+                      const res = await fetch(`/api/cotizacionesagenda/${cot.id}`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          sku: cot.sku,
+                          color_externo: cot.color_externo,
+                          color_interno: cot.color_interno,
+                          version_id: cot.version_id,
+                          anio: cot.anio,
+                          marca_id: cot.marca_id,
+                          modelo_id: cot.modelo_id,
+                          estado,
+                        }),
+                      });
+                      if (res.ok) {
+                        toast.success(`Estado cambiado a ${estado}`);
+                        if (estado === "enviada") {
+                          await cambiarEtapa(6, "Cotización enviada");
+                        }
+                        await cargarCotizaciones(leadId);
+                      }
+                    }}
+                    onDuplicate={async (cot) => {
+                      const res = await fetch("/api/cotizacionesagenda", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          oportunidad_id: Number(leadId),
+                          marca_id: cot.marca_id,
+                          modelo_id: cot.modelo_id,
+                          version_id: cot.version_id,
+                          anio: cot.anio,
+                          sku: cot.sku,
+                          color_externo: cot.color_externo,
+                          color_interno: cot.color_interno,
+                          estado: "borrador",
+                          created_by: userId,
+                        }),
+                      });
+                      if (res.ok) {
+                        toast.success("Cotización duplicada");
+                        await cargarCotizaciones(leadId);
+                      }
+                    }}
+                    onLoadHistorial={() => { }}
+                    saving={false}
+                    userId={userId}
+                    onOpenHistorialDialog={(historialData) => {
+                      setSelectedHistorial(historialData);
+                      setHistorialDialog(true);
+                    }}
+                    // ✅ NUEVOS PROPS PARA ACCESORIOS Y PREVIEW
+                    onAddAccesorios={(cot) => {
+                      setSelectedCotizacionForAccesorios(cot);
+                      setDialogAccesoriosOpen(true);
+                    }}
+                    onPreview={(cot) => {
+                      setSelectedCotizacionPreview(cot);
+                      setPreviewCotizacionOpen(true);
+                    }}
+                  />
+                </CardContent>
+              </Card>
+
+              {/* TEST DRIVES */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Calendar size={18} />
+                    Test Drive
+                  </CardTitle>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button onClick={openCreateTestDrive} size="sm" className="gap-2">
+                        <Plus className="h-4 w-4" /> Agregar
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Programar nuevo test drive</TooltipContent>
+                  </Tooltip>
+                </CardHeader>
+                <CardContent>
+                  {testDrives.length === 0 ? (
+                    <p className="text-slate-500 text-sm py-4">Sin test drives registrados</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {testDrives.map((testDrive) => (
+                        <div
+                          key={testDrive.id}
+                          className="flex items-start justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"
+                        >
+                          <div className="flex-1">
+                            <p className="font-medium text-slate-900">
+                              {new Date(testDrive.fecha_testdrive).toLocaleDateString("es-ES")} a las {testDrive.hora_inicio}
+                            </p>
+                            <p className="text-xs text-slate-600 mt-1">
+                              {testDrive.placa && `Placa: ${testDrive.placa}`}
+                              {testDrive.vin && ` • VIN: ${testDrive.vin}`}
+                            </p>
+                            {testDrive.descripcion && (
+                              <p className="text-xs text-slate-700 mt-1">{testDrive.descripcion}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs px-2 py-1 rounded-full font-semibold ${testDrive.estado === 'realizado' ? 'bg-green-100 text-green-700' :
+                              testDrive.estado === 'cancelado' ? 'bg-red-100 text-red-700' :
+                                'bg-blue-100 text-blue-700'
+                              }`}>
+                              {testDrive.estado}
+                            </span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  onClick={() => openEditTestDrive(testDrive)}
+                                  className="h-8 w-8"
+                                >
+                                  <Pencil size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Editar</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="destructive"
+                                  onClick={() => {
+                                    setDeleteTestDriveTarget(testDrive);
+                                    setDeleteTestDriveDialog(true);
+                                  }}
+                                  className="h-8 w-8"
+                                >
+                                  <Trash2 size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Eliminar</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* RESERVAS */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <FileText size={18} />
+                    Reservas
+                  </CardTitle>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        onClick={createReserva}
+                        size="sm"
+                        className="gap-2"
+                        disabled={reservas.length > 0}
+                      >
+                        <Plus className="h-4 w-4" /> Agregar
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      {reservas.length > 0 ? "Ya existe una reserva" : "Crear nueva reserva"}
+                    </TooltipContent>
+                  </Tooltip>
+                </CardHeader>
+                <CardContent>
+                  {reservas.length === 0 ? (
+                    <p className="text-slate-500 text-sm py-4">Sin reservas registradas</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {reservas.map((reserva) => (
+                        <div
+                          key={reserva.id}
+                          className="flex items-start justify-between p-3 bg-green-50 rounded-lg border border-green-200"
+                        >
+                          <div>
+                            <p className="font-medium text-green-900">
+                              Reserva creada el {new Date(reserva.created_at).toLocaleDateString("es-ES")}
+                            </p>
+                            <p className="text-xs text-green-700 mt-1">
+                              ID: {reserva.id}
+                            </p>
+                          </div>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="destructive"
+                                onClick={() => {
+                                  setDeleteReservaTarget(reserva);
+                                  setDeleteReservaDialog(true);
+                                }}
+                                className="h-8 w-8"
+                              >
+                                <Trash2 size={14} />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Eliminar</TooltipContent>
+                          </Tooltip>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* CIERRES */}
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Lock size={18} />
+                    Cierres
+                  </CardTitle>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button onClick={openCreateCierre} size="sm" className="gap-2">
+                        <Plus className="h-4 w-4" /> Agregar
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Registrar cierre de lead</TooltipContent>
+                  </Tooltip>
+                </CardHeader>
+                <CardContent>
+                  {cierres.length === 0 ? (
+                    <p className="text-slate-500 text-sm py-4">Sin cierres registrados</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {cierres.map((cierre) => (
+                        <div
+                          key={cierre.id}
+                          className="flex items-start justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"
+                        >
+                          <div className="flex-1">
+                            <p className="text-xs font-semibold text-slate-600 uppercase mb-1">
+                              {new Date(cierre.created_at).toLocaleString("es-ES")}
+                            </p>
+                            <p className="text-sm text-slate-900">{cierre.detalle}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  onClick={() => openEditCierre(cierre)}
+                                  className="h-8 w-8"
+                                >
+                                  <Pencil size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Editar</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="destructive"
+                                  onClick={() => {
+                                    setDeleteCierreTarget(cierre);
+                                    setDeleteCierreDialog(true);
+                                  }}
+                                  className="h-8 w-8"
+                                >
+                                  <Trash2 size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Eliminar</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+
             </div>
 
             {/* RIGHT COLUMN */}
@@ -1575,28 +1898,24 @@ export default function LeadDetailPage() {
                     <TooltipTrigger asChild>
                       <div className="cursor-help">
                         <div className="text-4xl font-bold text-slate-900 mb-2">
-                          {temperaturaNum}%
+                          {temperaturaNum}
                         </div>
-                        <div className={`text-sm font-semibold text-white p-2 rounded-lg text-center ${
-                          temperaturaNum >= 75 ? "bg-red-500" :
-                          temperaturaNum >= 50 ? "bg-orange-500" :
-                          temperaturaNum >= 25 ? "bg-yellow-500" :
-                          "bg-slate-500"
-                        }`}>
+                        <div className={`text-sm font-semibold text-white p-2 rounded-lg text-center ${temperaturaColor
+                          }`}>
                           {temperaturaLabel}
                         </div>
                         <div className="mt-3 w-full h-3 bg-slate-200 rounded-full overflow-hidden">
                           <div
                             className={temperaturaColor}
-                            style={{ width: `${temperaturaNum}%` }}
+                            style={{ width: `${(temperaturaNumericValue / 200) * 100}%` }}
                           />
                         </div>
                       </div>
                     </TooltipTrigger>
                     <TooltipContent side="top">
                       <div className="text-xs">
-                        <div>Indicador de temperatura</div>
-                        <div className="mt-1">0-24%: Fría | 25-49%: Templada | 50-74%: Caliente | 75-100%: Muy caliente</div>
+                        <div>Temperatura = Suma de etapas anteriores + actual</div>
+                        <div className="mt-1">Ejemplo: Etapa 1 (10%) + Etapa 2 (10%) + Etapa 4 (10%) = 30%</div>
                       </div>
                     </TooltipContent>
                   </Tooltip>
@@ -1707,7 +2026,7 @@ export default function LeadDetailPage() {
           </div>
         </div>
 
-        {/* DIALOGS */}
+        {/* DIALOGS - IGUAL QUE ANTES */}
 
         {/* VEHÍCULO DIALOG */}
         <Dialog open={dialogVehiculoOpen} onOpenChange={setDialogVehiculoOpen}>
@@ -2126,6 +2445,71 @@ export default function LeadDetailPage() {
             </div>
           </AlertDialogContent>
         </AlertDialog>
+
+        <AlertDialog open={deleteCotizacionDialog} onOpenChange={setDeleteCotizacionDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar eliminación</AlertDialogTitle>
+              <AlertDialogDescription>
+                ¿Eliminar esta cotización Q-{String(deleteCotizacionTarget?.id).padStart(6, "0")}?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="flex gap-3 justify-end">
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDeleteCotizacion}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Eliminar
+              </AlertDialogAction>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* ✅ COTIZACIÓN DIALOG - CON oportunidadId EN LUGAR DE leadId */}
+        <CotizacionDialog
+          open={dialogCotizacionOpen}
+          onOpenChange={setDialogCotizacionOpen}
+          editingCotizacion={editingCotizacion}
+          oportunidadId={leadId}
+          marcas={marcas}
+          modelos={modelos}
+          versiones={versiones}
+          userId={userId}
+          onSave={() => cargarCotizaciones(leadId)}
+          onCotizacionCreated={async () => {
+            const cambioExitoso = await cambiarEtapa(6, "Cotización creada");
+            if (cambioExitoso) {
+              toast.success("Etapa cambiada a Cotización");
+            }
+          }}
+          precargadaMarcaId={cotizacionVehiculoMarcaId}
+          precargadaModeloId={cotizacionVehiculoModeloId}
+        />
+
+        {/* ✅ HISTORIAL DIALOG */}
+        <HistorialDialog
+          open={historialDialog}
+          onOpenChange={setHistorialDialog}
+          selectedHistorial={selectedHistorial}
+          loading={historialLoading}
+        />
+
+        {/* ✅ ACCESORIOS DIALOG */}
+        <AgregarAccesoriosDialog
+          open={dialogAccesoriosOpen}
+          onOpenChange={setDialogAccesoriosOpen}
+          cotizacion={selectedCotizacionForAccesorios}
+          marcaId={selectedCotizacionForAccesorios?.marca_id}
+          modeloId={selectedCotizacionForAccesorios?.modelo_id}
+        />
+
+        {/* ✅ PREVIEW DIALOG */}
+        <PreviewCotizacionDialog
+          open={previewCotizacionOpen}
+          onOpenChange={setPreviewCotizacionOpen}
+          cotizacion={selectedCotizacionPreview}
+        />
       </div>
     </TooltipProvider>
   );

@@ -93,6 +93,15 @@ function debeColorearse(etapaId, etapas) {
   return nombreEtapa.includes("nuevo") || nombreEtapa.includes("asignado");
 }
 
+// ✅ FUNCIÓN PARA VERIFICAR SI ETAPA ES "CERRADA"
+function esEtapaCerrada(etapaId, etapas) {
+  const etapa = etapas.find((e) => String(e.id) === String(etapaId));
+  if (!etapa) return false;
+
+  const nombreEtapa = (getLabel(etapa) || "").toLowerCase();
+  return nombreEtapa.includes("cerrada");
+}
+
 // ✅ FUNCIÓN PARA CALCULAR TEMPERATURA
 function calcularTemperatura(etapaActualId, etapas) {
   if (!etapaActualId || !etapas || etapas.length === 0) {
@@ -221,6 +230,11 @@ export default function OportunidadesTable({
     return origen ? getLabel(origen) : `Origen ${id}`;
   };
 
+  // ✅ NUEVA FUNCIÓN: Abrir oportunidad
+  const handleAbrirOportunidad = async (row) => {
+    router.push(`/oportunidades/${row.id}`);
+  };
+
   const handleVerDetalle = async (row) => {
     // Verificar si está en etapa "Nuevo" (id: 1) o "Asignado" (id: 2)
     const etapaActual = row.etapasconversion_id;
@@ -330,19 +344,29 @@ export default function OportunidadesTable({
               const temperaturaColor = getTemperaturaColor(temperaturaCalculada);
               const temperaturaLabel = getTemperaturaLabel(temperaturaCalculada);
 
+              // ✅ VERIFICAR SI ETAPA ES CERRADA
+              const etapaEsCerrada = esEtapaCerrada(row.etapasconversion_id, etapas);
+
               return (
                 <TableRow
                   key={row.id}
                   className="border-b border-slate-200 hover:bg-slate-50 transition-colors"
                   style={estiloFila}
                 >
+                  {/* ✅ CÓDIGO CLICKEABLE */}
                   <TableCell className="text-sm font-medium text-slate-900">
                     <Tooltip>
-                      <TooltipTrigger className="cursor-help underline underline-offset-2 text-blue-600">
-                        {row.oportunidad_id || `OPO-${row.id}`}
+                      <TooltipTrigger asChild>
+                        <Button
+                          onClick={() => handleAbrirOportunidad(row)}
+                          variant="ghost"
+                          className="p-0 h-auto text-blue-600 hover:text-blue-700 underline underline-offset-2 cursor-pointer"
+                        >
+                          {row.oportunidad_id || `OPO-${row.id}`}
+                        </Button>
                       </TooltipTrigger>
                       <TooltipContent side="right">
-                        ID: {row.id}
+                        ID: {row.id} (Haz clic para abrir)
                       </TooltipContent>
                     </Tooltip>
                   </TableCell>
@@ -381,48 +405,51 @@ export default function OportunidadesTable({
                     )}
                   </TableCell>
 
-
-                  {/* ✅ COLUMNA TEMPERATURA CALCULADA */}
+                  {/* ✅ COLUMNA TEMPERATURA - NO SE MUESTRA SI ETAPA ES CERRADA */}
                   <TableCell className="text-sm">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${temperaturaColor.bg} ${temperaturaColor.text} ${temperaturaColor.border} border cursor-help`}
-                        >
-                          <Flame size={14} />
-                          {temperaturaCalculada}%
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">
-                        <div className="space-y-1">
-                          <p className="font-semibold">
-                            {temperaturaLabel}
-                          </p>
-                          <p className="text-xs">
-                            Temperatura: {temperaturaCalculada}%
-                          </p>
-                          <div className="text-xs mt-2 pt-2 border-t border-slate-400">
-                            <p className="font-semibold mb-1">Etapas incluidas:</p>
-                            {etapas
-                              .filter(
-                                (e) =>
-                                  e.sort_order <=
-                                    etapas.find(
-                                      (et) =>
-                                        String(et.id) ===
-                                        String(row.etapasconversion_id)
-                                    )?.sort_order &&
-                                  e.is_active === 1
-                              )
-                              .map((e) => (
-                                <p key={e.id}>
-                                  • {e.nombre}: +{e.descripcion}%
-                                </p>
-                              ))}
+                    {etapaEsCerrada ? (
+                      <span className="text-slate-400 text-xs">-</span>
+                    ) : (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${temperaturaColor.bg} ${temperaturaColor.text} ${temperaturaColor.border} border cursor-help`}
+                          >
+                            <Flame size={14} />
+                            {temperaturaCalculada}%
                           </div>
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          <div className="space-y-1">
+                            <p className="font-semibold">
+                              {temperaturaLabel}
+                            </p>
+                            <p className="text-xs">
+                              Temperatura: {temperaturaCalculada}%
+                            </p>
+                            <div className="text-xs mt-2 pt-2 border-t border-slate-400">
+                              <p className="font-semibold mb-1">Etapas incluidas:</p>
+                              {etapas
+                                .filter(
+                                  (e) =>
+                                    e.sort_order <=
+                                      etapas.find(
+                                        (et) =>
+                                          String(et.id) ===
+                                          String(row.etapasconversion_id)
+                                      )?.sort_order &&
+                                    e.is_active === 1
+                                )
+                                .map((e) => (
+                                  <p key={e.id}>
+                                    • {e.nombre}: +{e.descripcion}%
+                                  </p>
+                                ))}
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
                   </TableCell>
 
                   <TableCell className="text-sm text-slate-600 max-w-xs truncate">

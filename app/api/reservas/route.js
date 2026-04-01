@@ -6,9 +6,16 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const oportunidadId = searchParams.get('oportunidad_id');
 
-    let sql = `SELECT r.*, u.fullname as created_by_name
+    let sql = `SELECT 
+                r.*, 
+                u.fullname as created_by_name,
+                oo.id as oportunidad_internal_id,
+                CONCAT(c.nombre, ' ', c.apellido) as cliente_nombre,
+                c.id as cliente_id
                FROM reservas r
                LEFT JOIN usuarios u ON r.created_by = u.id
+               INNER JOIN oportunidades_oportunidades oo ON r.oportunidad_id = oo.id
+               INNER JOIN clientes c ON oo.cliente_id = c.id
                WHERE 1=1`;
     const params = [];
 

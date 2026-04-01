@@ -1,654 +1,531 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  getPaginationRowModel,
-  flexRender,
-} from "@tanstack/react-table";
-import { ArrowUpDown, Pencil, UserPlus, Eye, Calendar, AlertCircle } from "lucide-react";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
-import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
-import { useRouter } from "next/navigation";
+import { Edit2, Send, Clock, Eye, Loader2, Flame } from "lucide-react";
 
-export default function LeadsTable({
-  rows,
-  loading,
-  onEdit,
-  onAssign,
-  canEdit,
-  canAssign,
-}) {
-  const router = useRouter();
-  const [sorting, setSorting] = useState([]);
-  const [estadosTiempo, setEstadosTiempo] = useState([]);
-  const [filtroRango, setFiltroRango] = useState("dia");
+function getLabel(item) {
+  return (
+    item?.fullname ||
+    item?.full_name ||
+    item?.nombre ||
+    item?.name ||
+    item?.razon_social ||
+    item?.description ||
+    `ID ${item?.id}`
+  );
+}
 
-  useEffect(() => {
-    fetch("/api/configuracion-estados-tiempo", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((data) => {
-        const lista = Array.isArray(data) ? data : [];
-        setEstadosTiempo(lista);
-      })
-      .catch(() => setEstadosTiempo([]));
-  }, []);
+function obtenerEstadoTiempo(fechaAgenda, horaAgenda, estadosTiempo) {
+  if (!fechaAgenda || !horaAgenda || !estadosTiempo.length) {
+    return null;
+  }
 
-  function getRangoFechas() {
+  try {
+    const fechaLimpia = fechaAgenda.split("T")[0];
+    const horaLimpia = horaAgenda.substring(0, 5);
+
+    const agendaDateTime = new Date(`${fechaLimpia}T${horaLimpia}:00`);
     const ahora = new Date();
 
-    switch (filtroRango) {
-      case "dia":
-        return {
-          inicio: startOfDay(ahora),
-          fin: endOfDay(ahora),
-        };
-      case "semana":
-        return {
-          inicio: startOfWeek(ahora, { weekStartsOn: 1 }),
-          fin: endOfWeek(ahora, { weekStartsOn: 1 }),
-        };
-      case "mes":
-        return {
-          inicio: startOfMonth(ahora),
-          fin: endOfMonth(ahora),
-        };
-      default:
-        return {
-          inicio: startOfDay(ahora),
-          fin: endOfDay(ahora),
-        };
-    }
-  }
-
-  const rowsFiltrados = useMemo(() => {
-    const { inicio, fin } = getRangoFechas();
-
-    return (rows || []).filter((row) => {
-      if (!row?.fecha_agenda) return false;
-
-      try {
-        const fechaRow = new Date(row.fecha_agenda);
-        return fechaRow >= inicio && fechaRow <= fin;
-      } catch {
-        return false;
-      }
-    });
-  }, [rows, filtroRango]);
-
-  function getMinutosRestantes(fechaAgenda, horaAgenda) {
-    if (!fechaAgenda || !horaAgenda) return null;
-
-    try {
-      const fechaStr = String(fechaAgenda).trim().split("T")[0];
-      const horaStr = String(horaAgenda)
-        .trim()
-        .split(":")
-        .slice(0, 2)
-        .join(":");
-
-      const fechaHoraString = `${fechaStr}T${horaStr}:00`;
-
-      const ahora = new Date();
-      const agendaDateTime = new Date(fechaHoraString);
-
-      if (isNaN(agendaDateTime.getTime())) {
-        return null;
-      }
-
-      const diferencia = agendaDateTime.getTime() - ahora.getTime();
-      const minutos = Math.floor(diferencia / 1000 / 60);
-
-      return minutos;
-    } catch (error) {
-      console.error("Error calculando minutos:", error);
-      return null;
-    }
-  }
-
-  function getColorEstadoTiempo(minutosRestantes, etapasconversion_id) {
-    if (etapasconversion_id !== 1 && etapasconversion_id !== 2) {
-      return {
-        bg: "#f0fdf4",
-        text: "#000000",
-        border: "border-green-200",
-      };
-    }
-
-    if (minutosRestantes === null) {
-      return {
-        bg: "transparent",
-        text: "#000000",
-        border: "border-gray-200",
-      };
-    }
-
-    const estadoActivo = estadosTiempo.find(
-      (e) =>
-        e.activo &&
-        minutosRestantes >= e.minutos_desde &&
-        minutosRestantes <= e.minutos_hasta
+    const diferenciaMilisegundos = agendaDateTime - ahora;
+    const minutosParaAgenda = Math.floor(
+      diferenciaMilisegundos / (1000 * 60)
     );
 
-    if (estadoActivo) {
-      return {
-        bg: estadoActivo.color_hexadecimal,
-        text: esColorOscuro(estadoActivo.color_hexadecimal) ? "#ffffff" : "#000000",
-        border: "border-gray-200",
-      };
+    console.log("Estado de tiempo:", {
+      agendaDateTime: agendaDateTime.toLocaleString(),
+      ahora: ahora.toLocaleString(),
+      minutosParaAgenda,
+      fechaAgenda,
+      horaAgenda,
+    });
+
+    const estado = estadosTiempo.find(
+      (e) =>
+        minutosParaAgenda >= e.minutos_desde &&
+        minutosParaAgenda <= e.minutos_hasta
+    );
+
+    if (estado) {
+      console.log("Estado encontrado:", estado.nombre);
     }
 
-    return {
-      bg: "transparent",
-      text: "#000000",
-      border: "border-gray-200",
-    };
+    return estado || null;
+  } catch (error) {
+    console.error("Error calculando estado de tiempo:", error, {
+      fechaAgenda,
+      horaAgenda,
+    });
+    return null;
+  }
+}
+
+function debeColorearse(etapaId, etapas) {
+  const etapa = etapas.find((e) => String(e.id) === String(etapaId));
+  if (!etapa) return false;
+
+  const nombreEtapa = (getLabel(etapa) || "").toLowerCase();
+  return nombreEtapa.includes("nuevo") || nombreEtapa.includes("asignado");
+}
+
+function esEtapaCerrada(etapaId, etapas) {
+  const etapa = etapas.find((e) => String(e.id) === String(etapaId));
+  if (!etapa) return false;
+
+  const nombreEtapa = (getLabel(etapa) || "").toLowerCase();
+  return nombreEtapa.includes("cerrada");
+}
+
+function calcularTemperatura(etapaActualId, etapas) {
+  if (!etapaActualId || !etapas || etapas.length === 0) {
+    return 0;
   }
 
-  function esColorOscuro(color) {
-    const hex = color.replace("#", "");
-    const r = parseInt(hex.substr(0, 2), 16);
-    const g = parseInt(hex.substr(2, 2), 16);
-    const b = parseInt(hex.substr(4, 2), 16);
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-    return brightness < 128;
+  try {
+    const etapaActual = etapas.find((e) => String(e.id) === String(etapaActualId));
+    if (!etapaActual) return 0;
+
+    const sortOrderActual = etapaActual.sort_order;
+
+    let temperaturaCalculada = 0;
+    etapas.forEach((etapa) => {
+      if (etapa.sort_order <= sortOrderActual && etapa.is_active === 1) {
+        temperaturaCalculada += etapa.descripcion || 0;
+      }
+    });
+
+    console.log("🔥 Temperatura calculada:", {
+      etapaActual: etapaActual.nombre,
+      sortOrder: sortOrderActual,
+      temperatura: temperaturaCalculada,
+    });
+
+    return temperaturaCalculada;
+  } catch (error) {
+    console.error("Error calculando temperatura:", error);
+    return 0;
+  }
+}
+
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function getTemperaturaColor(temperatura) {
+  if (temperatura === undefined || temperatura === null || temperatura === 0) {
+    return { bg: "bg-slate-100", text: "text-slate-700", border: "border-slate-300" };
   }
 
-  function getEstadoTiempoTexto(minutosRestantes) {
-    if (minutosRestantes === null) return "-";
-    if (minutosRestantes < 0) return "Vencido";
-    if (minutosRestantes === 0) return "Ahora";
-    if (minutosRestantes < 60) return `${minutosRestantes}m`;
-    if (minutosRestantes < 1440) return `${Math.floor(minutosRestantes / 60)}h`;
-    return `${Math.floor(minutosRestantes / 1440)}d`;
+  const temp = parseInt(temperatura);
+
+  if (temp >= 75) {
+    return { bg: "bg-red-100", text: "text-red-700", border: "border-red-300", icon: "🔴" };
+  } else if (temp >= 50) {
+    return { bg: "bg-orange-100", text: "text-orange-700", border: "border-orange-300", icon: "🟠" };
+  } else if (temp >= 25) {
+    return { bg: "bg-yellow-100", text: "text-yellow-700", border: "border-yellow-300", icon: "🟡" };
+  } else {
+    return { bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-300", icon: "🔵" };
+  }
+}
+
+function getTemperaturaLabel(temperatura) {
+  if (temperatura === undefined || temperatura === null || temperatura === 0) {
+    return "Sin temp.";
   }
 
-  const handleVerLead = (lead) => {
-    router.push(`/leads/${lead.id}`);
-  };
+  const temp = parseInt(temperatura);
 
-  const columns = useMemo(
-    () => [
-      {
-        accessorKey: "oportunidad_id",
-        header: "Código",
-        cell: ({ row }) => (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="font-semibold text-blue-600 cursor-help">
-                #{row.original?.oportunidad_id || "-"}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              ID de la oportunidad
-            </TooltipContent>
-          </Tooltip>
-        ),
-      },
-      {
-        accessorKey: "cliente_name",
-        header: ({ column }) => (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                className="px-0"
-                onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-              >
-                Cliente
-                <ArrowUpDown className="ml-2 h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              Haz clic para ordenar
-            </TooltipContent>
-          </Tooltip>
-        ),
-        cell: ({ row }) => (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="font-medium cursor-help">
-                {row.original?.cliente_name || "-"}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              {row.original?.cliente_name || "Sin nombre"}
-            </TooltipContent>
-          </Tooltip>
-        ),
-      },
-      {
-        accessorKey: "asignado_a_name",
-        header: "Asignado a",
-        cell: ({ row }) => (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Badge
-                variant={
-                  row.original?.asignado_a_name && row.original?.asignado_a_name !== "Sin asignar"
-                    ? "default"
-                    : "secondary"
-                }
-                className="cursor-help"
-              >
-                {row.original?.asignado_a_name || "Sin asignar"}
-              </Badge>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              Usuario responsable del lead
-            </TooltipContent>
-          </Tooltip>
-        ),
-      },
-      {
-        accessorKey: "origen_name",
-        header: "Origen",
-        cell: ({ row }) => (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="text-sm cursor-help">
-                {row.original?.origen_name || "-"}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              Origen del lead
-            </TooltipContent>
-          </Tooltip>
-        ),
-      },
-      {
-        accessorKey: "suborigen_name",
-        header: "Suborigen",
-        cell: ({ row }) => (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="text-sm text-gray-600 cursor-help">
-                {row.original?.suborigen_name || "-"}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              Suborigen del lead
-            </TooltipContent>
-          </Tooltip>
-        ),
-      },
-      {
-        id: "vehiculo",
-        header: "Vehículo",
-        cell: ({ row }) => {
-          const modelo = row.original?.modelo_name || "";
-          const marca = row.original?.marca_name || "";
-          const texto = `${marca}${modelo && marca ? " " : ""}${modelo}`;
-          return (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="text-sm font-medium cursor-help">
-                  {texto || "-"}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                {texto || "Sin vehículo"}
-              </TooltipContent>
-            </Tooltip>
-          );
-        },
-      },
-      {
-        accessorKey: "etapa_name",
-        header: "Etapa",
-        cell: ({ row }) => (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Badge variant="outline">
-                {row.original?.etapa_name || "-"}
-              </Badge>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              Etapa actual del lead
-            </TooltipContent>
-          </Tooltip>
-        ),
-      },
-      {
-        accessorKey: "fecha_agenda",
-        header: "Fecha agendada",
-        cell: ({ row }) => {
-          if (!row.original?.fecha_agenda) {
-            return (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="text-sm text-gray-400 cursor-help">-</span>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  No agendado
-                </TooltipContent>
-              </Tooltip>
-            );
-          }
+  if (temp >= 75) return "Muy caliente";
+  if (temp >= 50) return "Caliente";
+  if (temp >= 25) return "Templada";
+  return "Fría";
+}
 
-          const minutos = getMinutosRestantes(
-            row.original?.fecha_agenda,
-            row.original?.hora_agenda
-          );
+export default function LeadsTable({
+  rows = [],
+  loading = false,
+  onEdit,
+  onAssign,
+  canEdit = false,
+  canAssign = false,
+  onRefresh,
+  usuarios = [],
+  etapas = [],
+  clientes = [],
+  origenes = [],
+  estadosTiempo = [],
+}) {
+  const router = useRouter();
+  const [loadingRow, setLoadingRow] = useState(null);
 
-          const esVencido = minutos !== null && minutos < 0;
-          const esProximo = minutos !== null && minutos >= 0 && minutos <= 60;
+  // ✅ DIAGNÓSTICO
+  useEffect(() => {
+    console.log("🎯 LeadsTable MONTADO con:", {
+      rowsLength: rows?.length,
+      loading,
+      rows: rows?.slice(0, 2),
+    });
+  }, [rows, loading]);
 
-          return (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="text-sm cursor-help">
-                  <div className="font-medium">
-                    {new Date(row.original.fecha_agenda).toLocaleDateString("es-ES", {
-                      day: "numeric",
-                      month: "short",
-                    })}
-                    {" a las "}
-                    {row.original?.hora_agenda
-                      ? String(row.original.hora_agenda).slice(0, 5)
-                      : "-"}
-                  </div>
-                  {esVencido && (
-                    <div className="text-red-600 font-semibold flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" />
-                      Vencido
-                    </div>
-                  )}
-                  {esProximo && (
-                    <div className="text-orange-600 font-semibold">
-                      En {getEstadoTiempoTexto(minutos)}
-                    </div>
-                  )}
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                {esVencido
-                  ? "Esta agenda ha vencido"
-                  : `Faltan ${getEstadoTiempoTexto(minutos)}`}
-              </TooltipContent>
-            </Tooltip>
-          );
-        },
-      },
-      {
-        accessorKey: "temperatura",
-        header: "Temp.",
-        cell: ({ row }) => {
-          const temp = row.original?.temperatura ?? 0;
-          let color = "bg-blue-100 text-blue-900";
-
-          if (temp > 75) color = "bg-red-100 text-red-900";
-          else if (temp > 50) color = "bg-orange-100 text-orange-900";
-          else if (temp > 25) color = "bg-yellow-100 text-yellow-900";
-
-          return (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Badge className={`${color} cursor-help`}>
-                  {temp}%
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                Temperatura del lead: {temp}%
-              </TooltipContent>
-            </Tooltip>
-          );
-        },
-      },
-      {
-        id: "acciones",
-        header: "Acciones",
-        cell: ({ row }) => (
-          <div className="flex gap-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  className="text-white bg-blue-600 hover:bg-blue-700"
-                  size="sm"
-                  onClick={() => handleVerLead(row.original)}
-                >
-                  <Eye className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                Ver detalle completo
-              </TooltipContent>
-            </Tooltip>
-
-            {canEdit && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onEdit(row.original)}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  Editar lead
-                </TooltipContent>
-              </Tooltip>
-            )}
-
-            {canAssign && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onAssign(row.original)}
-                  >
-                    <UserPlus className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  Asignar a usuario
-                </TooltipContent>
-              </Tooltip>
-            )}
-          </div>
-        ),
-      },
-    ],
-    [canEdit, canAssign, onEdit, onAssign]
-  );
-
-  const table = useReactTable({
-    data: rowsFiltrados,
-    columns,
-    state: { sorting },
-    onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+  console.log("🔴 LeadsTable render:", {
+    rowsLength: rows?.length,
+    loading,
+    isRowsArray: Array.isArray(rows),
   });
 
+  if (loading) {
+    console.log("⏳ Está en loading");
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        Cargando leads...
+      </div>
+    );
+  }
+
+  if (!rows || !Array.isArray(rows)) {
+    console.error("❌ rows no es un array:", rows);
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        Error: datos inválidos
+      </div>
+    );
+  }
+
+  if (!rows.length) {
+    console.warn("⚠️ rows.length = 0");
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        No hay leads para mostrar
+      </div>
+    );
+  }
+
+  console.log("✅ Renderizando tabla con", rows.length, "filas");
+
+  const getUsuarioNombre = (id) => {
+    const usuario = usuarios.find((u) => String(u.id) === String(id));
+    return usuario ? getLabel(usuario) : `Usuario ${id}`;
+  };
+
+  const getEtapaNombre = (id) => {
+    const etapa = etapas.find((e) => String(e.id) === String(id));
+    return etapa ? getLabel(etapa) : `Etapa ${id}`;
+  };
+
+  const getClienteNombre = (id) => {
+    const cliente = clientes.find((c) => String(c.id) === String(id));
+    return cliente ? getLabel(cliente) : `Cliente ${id}`;
+  };
+
+  const getOrigenNombre = (id) => {
+    const origen = origenes.find((o) => String(o.id) === String(id));
+    return origen ? getLabel(origen) : `Origen ${id}`;
+  };
+
+  const handleAbrirLead = async (row) => {
+    console.log("🔗 Abriendo lead:", row.id);
+    router.push(`/leads/${row.id}`);
+  };
+
+  const handleVerDetalle = async (row) => {
+    const etapaActual = row.etapasconversion_id;
+    const esNuevoOAsignado = etapaActual === 1 || etapaActual === 2;
+
+    if (esNuevoOAsignado) {
+      setLoadingRow(row.id);
+      try {
+        const response = await fetch(
+          `/api/leads/${row.id}/cambiar-etapa`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              etapasconversion_id: 4,
+              created_by: 1,
+            }),
+          }
+        );
+
+        if (response.ok) {
+          toast.success("Etapa cambiada a 'En Atención'");
+          if (onRefresh) {
+            await onRefresh();
+          }
+        } else {
+          const error = await response.json();
+          toast.error(error.message || "Error cambiando etapa");
+        }
+      } catch (error) {
+        console.error("Error:", error);
+        toast.error("Error cambiando etapa");
+      } finally {
+        setLoadingRow(null);
+      }
+    }
+
+    router.push(`/leads/${row.id}`);
+  };
+
   return (
-    <TooltipProvider delayDuration={200}>
-      <div className="space-y-4">
-        {/* FILTRO DE RANGO */}
-        <div className="flex items-center gap-3 bg-gradient-to-r from-gray-50 to-gray-100 p-4 rounded-lg border border-gray-200">
-          <Calendar className="h-5 w-5 text-gray-600" />
-          <span className="text-sm font-medium text-gray-700">Filtrar por período:</span>
-          <Select value={filtroRango} onValueChange={setFiltroRango}>
-            <SelectTrigger className="w-[180px] bg-white border-gray-300">
-              <SelectValue placeholder="Selecciona rango" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="dia">📅 Por día</SelectItem>
-              <SelectItem value="semana">📆 Por semana</SelectItem>
-              <SelectItem value="mes">📊 Por mes</SelectItem>
-            </SelectContent>
-          </Select>
-          <span className="text-xs text-gray-600 ml-auto">
-            Mostrando <span className="font-semibold">{rowsFiltrados.length}</span> leads
-          </span>
-        </div>
+    <TooltipProvider>
+      <div className="border border-slate-200 rounded-lg overflow-hidden">
+        <Table>
+          <TableHeader className="bg-gradient-to-r from-slate-50 to-slate-100">
+            <TableRow className="border-b border-slate-200 hover:bg-transparent">
+              <TableHead className="text-xs font-semibold text-slate-700">
+                Código
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-slate-700">
+                Cliente
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-slate-700">
+                Origen
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-slate-700">
+                Etapa
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-slate-700">
+                Asignado a
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-slate-700">
+                Próxima Agenda
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-slate-700">
+                Temperatura
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-slate-700">
+                Detalle
+              </TableHead>
+              <TableHead className="text-xs font-semibold text-slate-700 text-right">
+                Acciones
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row) => {
+              const estadoTiempo = obtenerEstadoTiempo(
+                row.fecha_ultima_agenda,
+                row.hora_ultima_agenda,
+                estadosTiempo
+              );
 
-        {/* TABLA */}
-        <div className="rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <tr key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => (
-                      <th
-                        key={header.id}
-                        className="px-4 py-3 text-left font-semibold text-gray-700 whitespace-nowrap"
-                      >
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(header.column.columnDef.header, header.getContext())}
-                      </th>
-                    ))}
-                  </tr>
-                ))}
-              </thead>
+              const colorearFila = debeColorearse(
+                row.etapasconversion_id,
+                etapas
+              );
 
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td
-                      colSpan={11}
-                      className="px-4 py-12 text-center text-gray-500 font-medium"
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-                        Cargando datos...
-                      </div>
-                    </td>
-                  </tr>
-                ) : table.getRowModel().rows.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={11}
-                      className="px-4 py-12 text-center text-gray-500 font-medium"
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        <span className="text-3xl">📋</span>
-                        <div>No hay leads registrados en este período</div>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  table.getRowModel().rows.map((row, idx) => {
-                    const minutosRestantes = getMinutosRestantes(
-                      row.original?.fecha_agenda,
-                      row.original?.hora_agenda
-                    );
-                    const colores = getColorEstadoTiempo(
-                      minutosRestantes,
-                      row.original?.etapasconversion_id
-                    );
+              const estiloFila =
+                colorearFila && estadoTiempo
+                  ? {
+                      backgroundColor: hexToRgba(
+                        estadoTiempo.color_hexadecimal,
+                        0.25
+                      ),
+                    }
+                  : {};
 
-                    return (
-                      <tr
-                        key={row.id}
-                        className={`border-b transition-all hover:bg-blue-50 ${
-                          idx % 2 === 0 ? "bg-white" : "bg-gray-50"
-                        }`}
-                        style={{
-                          backgroundColor:
-                            colores.bg !== "transparent"
-                              ? colores.bg
-                              : idx % 2 === 0
-                              ? "white"
-                              : "#f9fafb",
-                          color: colores.text,
-                        }}
-                      >
-                        {row.getVisibleCells().map((cell) => (
-                          <td key={cell.id} className="px-4 py-3 whitespace-nowrap">
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </td>
-                        ))}
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+              const temperaturaCalculada = calcularTemperatura(
+                row.etapasconversion_id,
+                etapas
+              );
+              const temperaturaColor = getTemperaturaColor(temperaturaCalculada);
+              const temperaturaLabel = getTemperaturaLabel(temperaturaCalculada);
 
-        {/* PAGINACIÓN */}
-        <div className="flex items-center justify-between bg-gray-50 p-4 rounded-lg border border-gray-200">
-          <p className="text-sm text-gray-600 font-medium">
-            Página{" "}
-            <span className="font-semibold text-gray-900">
-              {table.getState().pagination.pageIndex + 1}
-            </span>{" "}
-            de{" "}
-            <span className="font-semibold text-gray-900">
-              {table.getPageCount() || 1}
-            </span>{" "}
-            •{" "}
-            <span className="text-gray-600">
-              {table.getRowModel().rows.length} de {rowsFiltrados.length} registros
-            </span>
-          </p>
+              const etapaEsCerrada = esEtapaCerrada(row.etapasconversion_id, etapas);
 
-          <div className="flex gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => table.previousPage()}
-                  disabled={!table.getCanPreviousPage()}
-                  className="gap-2"
+              return (
+                <TableRow
+                  key={row.id}
+                  className="border-b border-slate-200 hover:bg-slate-50 transition-colors"
+                  style={estiloFila}
                 >
-                  ← Anterior
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                Ir a página anterior
-              </TooltipContent>
-            </Tooltip>
+                  <TableCell className="text-sm font-medium text-slate-900">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          onClick={() => handleAbrirLead(row)}
+                          variant="ghost"
+                          className="p-0 h-auto text-blue-600 hover:text-blue-700 underline underline-offset-2 cursor-pointer"
+                        >
+                          {row.oportunidad_id || `LD-${row.id}`}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        ID: {row.id} (Haz clic para abrir)
+                      </TooltipContent>
+                    </Tooltip>
+                  </TableCell>
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => table.nextPage()}
-                  disabled={!table.getCanNextPage()}
-                  className="gap-2"
-                >
-                  Siguiente →
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                Ir a página siguiente
-              </TooltipContent>
-            </Tooltip>
-          </div>
-        </div>
+                  <TableCell className="text-sm text-slate-700">
+                    {getClienteNombre(row.cliente_id)}
+                  </TableCell>
 
-        {/* INFO */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700">
-          <span className="font-semibold">💡 Tip:</span> Pasa el mouse sobre cualquier elemento
-          para ver más información. Los colores de fondo indican el estado temporal del lead.
-        </div>
+                  <TableCell className="text-sm text-slate-700">
+                    {getOrigenNombre(row.origen_id)}
+                  </TableCell>
+
+                  <TableCell className="text-sm">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                      {getEtapaNombre(row.etapasconversion_id)}
+                    </span>
+                  </TableCell>
+
+                  <TableCell className="text-sm text-slate-700">
+                    {row.asignado_a
+                      ? getUsuarioNombre(row.asignado_a)
+                      : "No asignado"}
+                  </TableCell>
+
+                  <TableCell className="text-sm text-slate-700">
+                    {row.fecha_ultima_agenda ? (
+                      <div className="flex items-center gap-1">
+                        <Clock size={14} />
+                        <span>
+                          {row.fecha_ultima_agenda.split("T")[0]}{" "}
+                          {row.hora_ultima_agenda?.substring(0, 5) || ""}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400">Sin agenda</span>
+                    )}
+                  </TableCell>
+
+                  <TableCell className="text-sm">
+                    {etapaEsCerrada ? (
+                      <span className="text-slate-400 text-xs">-</span>
+                    ) : (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${temperaturaColor.bg} ${temperaturaColor.text} ${temperaturaColor.border} cursor-help`}
+                          >
+                            <Flame size={14} />
+                            {temperaturaCalculada}%
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          <div className="space-y-1">
+                            <p className="font-semibold">
+                              {temperaturaLabel}
+                            </p>
+                            <p className="text-xs">
+                              Temperatura: {temperaturaCalculada}%
+                            </p>
+                            <div className="text-xs mt-2 pt-2 border-t border-slate-400">
+                              <p className="font-semibold mb-1">Etapas incluidas:</p>
+                              {etapas
+                                .filter(
+                                  (e) =>
+                                    e.sort_order <=
+                                      etapas.find(
+                                        (et) =>
+                                          String(et.id) ===
+                                          String(row.etapasconversion_id)
+                                      )?.sort_order &&
+                                    e.is_active === 1
+                                )
+                                .map((e) => (
+                                  <p key={e.id}>
+                                    • {e.nombre}: +{e.descripcion}%
+                                  </p>
+                                ))}
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </TableCell>
+
+                  <TableCell className="text-sm text-slate-600 max-w-xs truncate">
+                    {row.detalle || "-"}
+                  </TableCell>
+
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            onClick={() => handleVerDetalle(row)}
+                            size="sm"
+                            variant="ghost"
+                            className="gap-1"
+                            disabled={loadingRow === row.id}
+                          >
+                            {loadingRow === row.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="left">
+                          Ver detalle completo
+                        </TooltipContent>
+                      </Tooltip>
+
+                      {canEdit && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              onClick={() => onEdit(row)}
+                              size="sm"
+                              variant="ghost"
+                              className="gap-1"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="left">
+                            Editar lead
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+
+                      {canAssign && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              onClick={() => onAssign(row)}
+                              size="sm"
+                              variant="ghost"
+                              className="gap-1"
+                            >
+                              <Send className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="left">
+                            Asignar usuario
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </div>
     </TooltipProvider>
   );
