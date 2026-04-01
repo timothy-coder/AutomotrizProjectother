@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, Bell, Car, Wrench, X } from "lucide-react";
+import { AlertTriangle, Bell, Car, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -135,7 +135,7 @@ const TYPE_CONFIG = {
   },
 };
 
-function NotificationCard({ notification, onOpen, onDismiss }) {
+function NotificationCard({ notification, onOpen }) {
   const { type, conversation: c } = notification;
   const cfg = TYPE_CONFIG[type];
   const Icon = cfg.icon;
@@ -149,16 +149,7 @@ function NotificationCard({ notification, onOpen, onDismiss }) {
             {cfg.label}
           </span>
         </div>
-        <div className="flex items-center gap-1">
-          <span className="text-[10px] text-gray-400">{timeAgo(c.last_message_at)}</span>
-          <button
-            type="button"
-            onClick={() => onDismiss(c.session_id)}
-            className="text-gray-300 hover:text-gray-500 transition-colors"
-          >
-            <X className="w-3 h-3" />
-          </button>
-        </div>
+        <span className="text-[10px] text-gray-400">{timeAgo(c.last_message_at)}</span>
       </div>
 
       <div>
@@ -188,19 +179,12 @@ function NotificationCard({ notification, onOpen, onDismiss }) {
 // ─── NotificationPanel principal ────────────────────────────────────────────
 
 export default function NotificationPanel({ conversations = [], onOpenConversation }) {
-  const [dismissed, setDismissed] = useState(new Set());
   const [open, setOpen] = useState(false);
 
   const notifications = useMemo(
-    () => buildNotifications(conversations).filter(
-      (n) => !dismissed.has(n.conversation.session_id)
-    ),
-    [conversations, dismissed]
+    () => buildNotifications(conversations),
+    [conversations]
   );
-
-  function handleDismiss(sessionId) {
-    setDismissed((prev) => new Set([...prev, sessionId]));
-  }
 
   function handleOpen(sessionId) {
     if (onOpenConversation) onOpenConversation(sessionId);
@@ -239,18 +223,7 @@ export default function NotificationPanel({ conversations = [], onOpenConversati
 
       <SheetContent side="right" className="w-80 sm:w-96 flex flex-col p-0">
         <SheetHeader className="px-4 py-3 border-b">
-          <div className="flex items-center justify-between">
-            <SheetTitle className="text-sm font-semibold">Alertas del sistema</SheetTitle>
-            {dismissed.size > 0 && (
-              <button
-                type="button"
-                onClick={() => setDismissed(new Set())}
-                className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                Restaurar
-              </button>
-            )}
-          </div>
+          <SheetTitle className="text-sm font-semibold">Alertas del sistema</SheetTitle>
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -259,7 +232,7 @@ export default function NotificationPanel({ conversations = [], onOpenConversati
               <Bell className="w-8 h-8 text-gray-200 mx-auto mb-2" />
               <p className="text-sm text-gray-400">Sin alertas activas</p>
               <p className="text-xs text-gray-300 mt-1">
-                Las alertas aparecen cuando hay mensajes urgentes o intenciones de compra/taller.
+                Las alertas desaparecen automáticamente cuando la conversación se cierra o se atiende.
               </p>
             </div>
           ) : (
@@ -268,7 +241,6 @@ export default function NotificationPanel({ conversations = [], onOpenConversati
                 key={`${n.type}-${n.conversation.session_id}`}
                 notification={n}
                 onOpen={handleOpen}
-                onDismiss={handleDismiss}
               />
             ))
           )}
