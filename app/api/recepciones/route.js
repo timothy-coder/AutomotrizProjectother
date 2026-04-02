@@ -1,31 +1,20 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { authorizeConversation } from "@/lib/conversationsAuth";
 
 
 // =====================================
 // GET → listar recepciones
 // =====================================
 export async function GET(req) {
+  const auth = authorizeConversation(req, "view");
+  if (!auth.ok) return auth.response;
+
   try {
     const { searchParams } = new URL(req.url);
 
     const fecha = searchParams.get("fecha"); // opcional filtro
     const cliente_id = searchParams.get("cliente_id");
-
-    const where = [];
-    const params = [];
-
-    if (fecha) {
-      where.push("r.fecha_recepcion = ?");
-      params.push(fecha);
-    }
-
-    if (cliente_id) {
-      where.push("r.cliente_id = ?");
-      params.push(cliente_id);
-    }
-
-    const whereSQL = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
     const [rows] = await db.query(
       `
@@ -42,10 +31,11 @@ export async function GET(req) {
       LEFT JOIN centros ce ON ce.id = r.centro_id
       LEFT JOIN talleres t ON t.id = r.taller_id
       LEFT JOIN usuarios u ON u.id = r.created_by
-      ${whereSQL}
+      WHERE (? IS NULL OR r.fecha_recepcion = ?)
+        AND (? IS NULL OR r.cliente_id = ?)
       ORDER BY r.id DESC
       `,
-      params
+      [fecha || null, fecha || null, cliente_id || null, cliente_id || null]
     );
 
     return NextResponse.json(rows);
@@ -64,6 +54,9 @@ export async function GET(req) {
 // POST → crear recepción
 // =====================================
 export async function POST(req) {
+  const auth = authorizeConversation(req, "edit");
+  if (!auth.ok) return auth.response;
+
   try {
     const body = await req.json();
 
@@ -81,8 +74,8 @@ export async function POST(req) {
     const taller_id = body.taller_id || null;
     const cita_id = body.cita_id || null;
 
-    const notas_cliente = body.notas_cliente || null;
-    const notas_generales = body.notas_generales || null;
+    const notas_cliente = body.notas_cliente?.trim() || null;
+    const notas_generales = body.notas_generales?.trim() || null;
 
     // fecha y hora automáticas si no se envían
     const fecha_recepcion =

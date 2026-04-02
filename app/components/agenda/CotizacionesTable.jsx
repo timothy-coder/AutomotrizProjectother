@@ -1,13 +1,7 @@
 "use client";
 
-import { FileText, ChevronDown, Package, Eye } from "lucide-react";
+import { FileText, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import CotizacionRow from "./CotizacionRow";
 
 export default function CotizacionesTable({
@@ -22,8 +16,6 @@ export default function CotizacionesTable({
   saving,
   userId,
   onOpenHistorialDialog,
-  onAddAccesorios,
-  onPreview,
 }) {
   const sortedCotizaciones = [...cotizaciones].sort((a, b) => {
     let aVal = a[sortConfig.key];
@@ -56,69 +48,65 @@ export default function CotizacionesTable({
   }
 
   return (
-    <TooltipProvider>
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-gray-50 border-b-2 border-gray-200">
-              <th className="text-left py-3 px-4">
-                <button
-                  onClick={() => onSort("id")}
-                  className="flex items-center gap-2 font-semibold text-gray-700 hover:text-gray-900"
-                >
-                  Número
-                  <ChevronDown size={16} />
-                </button>
-              </th>
-              <th className="text-left py-3 px-4">
-                <button
-                  onClick={() => onSort("estado")}
-                  className="flex items-center gap-2 font-semibold text-gray-700 hover:text-gray-900"
-                >
-                  Estado
-                  <ChevronDown size={16} />
-                </button>
-              </th>
-              <th className="text-left py-3 px-4">
-                <button
-                  onClick={() => onSort("created_at")}
-                  className="flex items-center gap-2 font-semibold text-gray-700 hover:text-gray-900"
-                >
-                  Fecha
-                  <ChevronDown size={16} />
-                </button>
-              </th>
-              <th className="text-center py-3 px-4 font-semibold text-gray-700">
-                Vistas
-              </th>
-              <th className="text-center py-3 px-4 font-semibold text-gray-700">
-                Enlace Público
-              </th>
-              <th className="text-center py-3 px-4 font-semibold text-gray-700">
-                Acciones
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedCotizaciones.map((cot, idx) => (
-              <CotizacionRow
-                key={cot.id}
-                cot={cot}
-                idx={idx}
-                onEdit={onEdit}
-                onDelete={onDelete}
-                onChangeStatus={onChangeStatus}
-                onDuplicate={onDuplicate}
-                onLoadHistorial={onLoadHistorial}
-                saving={saving}
-                onOpenHistorialDialog={onOpenHistorialDialog}
-                onAddAccesorios={onAddAccesorios}
-                onPreview={onPreview}
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </TooltipProvider>
+    <div className="overflow-x-auto rounded-lg border border-gray-200">
+      <table className="w-full">
+        <thead>
+          <tr className="bg-gray-50 border-b-2 border-gray-200">
+            <th className="text-left py-3 px-4">
+              <button
+                onClick={() => onSort("id")}
+                className="flex items-center gap-2 font-semibold text-gray-700 hover:text-gray-900"
+              >
+                Número
+                <ChevronDown size={16} />
+              </button>
+            </th>
+            <th className="text-left py-3 px-4">
+              <button
+                onClick={() => onSort("estado")}
+                className="flex items-center gap-2 font-semibold text-gray-700 hover:text-gray-900"
+              >
+                Estado
+                <ChevronDown size={16} />
+              </button>
+            </th>
+            <th className="text-left py-3 px-4">
+              <button
+                onClick={() => onSort("created_at")}
+                className="flex items-center gap-2 font-semibold text-gray-700 hover:text-gray-900"
+              >
+                Fecha
+                <ChevronDown size={16} />
+              </button>
+            </th>
+            <th className="text-center py-3 px-4 font-semibold text-gray-700">
+              Vistas
+            </th>
+            <th className="text-center py-3 px-4 font-semibold text-gray-700">
+              Enlace Público
+            </th>
+            <th className="text-center py-3 px-4 font-semibold text-gray-700">
+              Acciones
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {sortedCotizaciones.map((cot, idx) => (
+            <CotizacionRow
+              key={cot.id}
+              cot={cot}
+              idx={idx}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onChangeStatus={onChangeStatus}
+              onDuplicate={onDuplicate}
+              onLoadHistorial={onLoadHistorial}
+              saving={saving}
+              onOpenHistorialDialog={onOpenHistorialDialog}
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

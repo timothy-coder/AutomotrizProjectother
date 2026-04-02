@@ -1,7 +1,11 @@
 import { db } from "@/lib/db";
 import { NextResponse } from "next/server";
+import { authorizeConversation } from "@/lib/conversationsAuth";
 
 export async function GET(req, context) {
+  const auth = authorizeConversation(req, "view");
+  if (!auth.ok) return auth.response;
+
   try {
     const { id } = await context.params;
 
@@ -42,17 +46,14 @@ export async function GET(req, context) {
     return NextResponse.json(rows[0]);
   } catch (error) {
     console.error("ERROR GET /api/citas/[id]:", error);
-    return NextResponse.json(
-      {
-        message: "Error obteniendo cita",
-        error: error.message,
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: "Error obteniendo cita" }, { status: 500 });
   }
 }
 
 export async function PUT(req, context) {
+  const auth = authorizeConversation(req, "edit");
+  if (!auth.ok) return auth.response;
+
   try {
     const { id } = await context.params;
     const body = await req.json();
@@ -84,24 +85,7 @@ export async function PUT(req, context) {
 
     if (missing.length > 0) {
       return NextResponse.json(
-        {
-          message: "Datos incompletos",
-          missing,
-          received: {
-            centro_id,
-            taller_id,
-            cliente_id,
-            vehiculo_id,
-            asesor_id,
-            origen_id,
-            start_at,
-            end_at,
-            tipo_servicio,
-            servicio_valet,
-            fecha_promesa,
-            hora_promesa,
-          },
-        },
+        { message: `Datos incompletos: ${missing.join(", ")}` },
         { status: 400 }
       );
     }
@@ -139,8 +123,8 @@ export async function PUT(req, context) {
         servicio_valet ? 1 : 0,
         fecha_promesa || null,
         hora_promesa || null,
-        nota_cliente || null,
-        nota_interna || null,
+        nota_cliente?.trim() || null,
+        nota_interna?.trim() || null,
         id,
       ]
     );
@@ -158,12 +142,6 @@ export async function PUT(req, context) {
     });
   } catch (error) {
     console.error("ERROR PUT /api/citas/[id]:", error);
-    return NextResponse.json(
-      {
-        message: "Error actualizando cita",
-        error: error.message,
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: "Error actualizando cita" }, { status: 500 });
   }
 }

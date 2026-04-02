@@ -110,9 +110,7 @@ export default function ReservasPage() {
       return (
         reserva.id.toString().includes(search) ||
         reserva.created_by_name?.toLowerCase().includes(search) ||
-        reserva.cliente_nombre?.toLowerCase().includes(search) ||
-        reserva.oportunidad_id.toString().includes(search) ||
-        reserva.oportunidad_codigo?.toLowerCase().includes(search)
+        reserva.oportunidad_id.toString().includes(search)
       );
     }
 
@@ -313,7 +311,7 @@ export default function ReservasPage() {
                 <div className="relative">
                   <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                   <Input
-                    placeholder="ID, cliente, creador..."
+                    placeholder="ID, creador, oportunidad..."
                     value={searchTerm}
                     onChange={(e) => {
                       setSearchTerm(e.target.value);
@@ -413,9 +411,6 @@ export default function ReservasPage() {
                       <TableHead className="font-semibold">
                         Oportunidad
                       </TableHead>
-                      <TableHead className="font-semibold">
-                        Cliente
-                      </TableHead>
                       <TableHead className="font-semibold">Creado Por</TableHead>
                       <TableHead className="font-semibold">Estado</TableHead>
                       <TableHead className="font-semibold">Firmas</TableHead>
@@ -437,10 +432,7 @@ export default function ReservasPage() {
                           #{reserva.id}
                         </TableCell>
                         <TableCell className="text-sm">
-                          {reserva.oportunidad_codigo || "#" + reserva.oportunidad_id}
-                        </TableCell>
-                        <TableCell className="text-sm font-medium">
-                          {reserva.cliente_nombre || "Cliente"}
+                          #{reserva.oportunidad_id}
                         </TableCell>
                         <TableCell className="text-sm">
                           {reserva.created_by_name || "Usuario"}

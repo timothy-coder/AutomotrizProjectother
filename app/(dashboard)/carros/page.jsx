@@ -117,7 +117,11 @@ export default function PreciosPage() {
               p.version_id === version.id
           );
 
-          estructura[key][version.id] = precio?.precio_base || 0;
+          estructura[key][version.id] = {
+            precio_base: precio?.precio_base ?? "",
+            en_stock: precio ? Boolean(Number(precio.en_stock)) : true,
+            tiempo_entrega_dias: precio?.tiempo_entrega_dias ?? 0,
+          };
         });
       });
 
@@ -199,28 +203,65 @@ export default function PreciosPage() {
   // Cambiar precio y guardar automáticamente
   function handlePriceChange(marcaId, modeloId, versionId, value) {
     const key = `${marcaId}_${modeloId}`;
-
     setPreciosPorMarcaModeloVersion((prev) => ({
       ...prev,
       [key]: {
         ...prev[key],
-        [versionId]: parseFloat(value) || 0,
+        [versionId]: {
+          ...(prev[key]?.[versionId] || {}),
+          precio_base: parseFloat(value) || 0,
+        },
       },
     }));
+    scheduleAutoSave(marcaId, modeloId, versionId, key);
+  }
 
+  function handleStockChange(marcaId, modeloId, versionId, checked) {
+    const key = `${marcaId}_${modeloId}`;
+    setPreciosPorMarcaModeloVersion((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        [versionId]: {
+          ...(prev[key]?.[versionId] || {}),
+          en_stock: checked,
+        },
+      },
+    }));
+    scheduleAutoSave(marcaId, modeloId, versionId, key);
+  }
+
+  function handleDiasChange(marcaId, modeloId, versionId, value) {
+    const key = `${marcaId}_${modeloId}`;
+    setPreciosPorMarcaModeloVersion((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        [versionId]: {
+          ...(prev[key]?.[versionId] || {}),
+          tiempo_entrega_dias: parseInt(value) || 0,
+        },
+      },
+    }));
+    scheduleAutoSave(marcaId, modeloId, versionId, key);
+  }
+
+  function scheduleAutoSave(marcaId, modeloId, versionId, key) {
     setIsSaving(true);
-
-    if (saveTimers.current[key]) {
-      clearTimeout(saveTimers.current[key]);
+    if (saveTimers.current[`${key}_${versionId}`]) {
+      clearTimeout(saveTimers.current[`${key}_${versionId}`]);
     }
-
-    saveTimers.current[key] = setTimeout(() => {
-      savePrice(marcaId, modeloId, versionId, parseFloat(value) || 0, key);
+    saveTimers.current[`${key}_${versionId}`] = setTimeout(() => {
+      setPreciosPorMarcaModeloVersion((current) => {
+        const cell = current[key]?.[versionId] || {};
+        savePrice(marcaId, modeloId, versionId, cell);
+        return current;
+      });
     }, 500);
   }
 
   // Guardar precio individual
-  async function savePrice(marcaId, modeloId, versionId, precio, key) {
+  async function savePrice(marcaId, modeloId, versionId, cell) {
     try {
       const res = await fetch("/api/precios-region-version", {
         method: "POST",
@@ -229,20 +270,20 @@ export default function PreciosPage() {
           marca_id: marcaId,
           modelo_id: modeloId,
           version_id: versionId,
-          precio_base: precio,
+          precio_base: cell.precio_base ?? 0,
+          en_stock: cell.en_stock !== false,
+          tiempo_entrega_dias: cell.tiempo_entrega_dias ?? 0,
         }),
       });
 
-      if (res.ok) {
-        setIsSaving(false);
-      } else {
-        setIsSaving(false);
-        toast.error("Error guardando precio");
+      setIsSaving(false);
+      if (!res.ok) {
+        toast.error("Error guardando");
       }
     } catch (e) {
       console.error(e);
       setIsSaving(false);
-      toast.error("Error guardando precio");
+      toast.error("Error guardando");
     }
   }
 
@@ -610,18 +651,33 @@ export default function PreciosPage() {
                       Modelo
                     </th>
 
-                    {/* Columnas de versiones */}
+                {/* Columnas de versiones: 3 sub-cols cada una */}
                     {versiones.map((version) => (
                       <Tooltip key={version.id}>
                         <TooltipTrigger asChild>
-                          <th className="border-r border-slate-300 p-3 text-center font-bold bg-blue-100 text-blue-900 min-w-[140px] cursor-help hover:bg-blue-200 transition-colors">
+                          <th
+                            colSpan={3}
+                            className="border-r border-slate-300 p-3 text-center font-bold bg-blue-100 text-blue-900 min-w-[220px] cursor-help hover:bg-blue-200 transition-colors"
+                          >
                             {version.nombre}
                           </th>
                         </TooltipTrigger>
                         <TooltipContent side="top">
-                          Ingresa el precio base para {version.nombre}
+                          Precio, Stock y Días de entrega para {version.nombre}
                         </TooltipContent>
                       </Tooltip>
+                    ))}
+                  </tr>
+                  {/* Sub-headers */}
+                  <tr className="bg-slate-50 border-b border-slate-300">
+                    <th className="border-r border-slate-300 p-2 text-left text-xs font-semibold text-slate-500 bg-slate-100 sticky left-0 z-10 min-w-[128px]"></th>
+                    <th className="border-r border-slate-300 p-2 text-left text-xs font-semibold text-slate-500 bg-slate-100 sticky left-32 z-10 min-w-[128px]"></th>
+                    {versiones.map((version) => (
+                      <React.Fragment key={version.id}>
+                        <th className="border-r border-slate-200 p-2 text-center text-xs font-semibold text-blue-700 bg-blue-50 w-[95px]">Precio</th>
+                        <th className="border-r border-slate-200 p-2 text-center text-xs font-semibold text-green-700 bg-green-50 w-[60px]">Stock</th>
+                        <th className="border-r border-slate-300 p-2 text-center text-xs font-semibold text-orange-700 bg-orange-50 w-[65px]">Días</th>
+                      </React.Fragment>
                     ))}
                   </tr>
                 </thead>
@@ -665,30 +721,76 @@ export default function PreciosPage() {
                                   {modelo.name}
                                 </td>
 
-                                {/* Precios por versión */}
-                                {versiones.map((version) => (
-                                  <td
-                                    key={version.id}
-                                    className="border-r border-slate-300 p-2 text-center"
-                                  >
-                                    <input
-                                      type="number"
-                                      placeholder="—"
-                                      value={
-                                        preciosData[version.id] || ""
-                                      }
-                                      onChange={(e) =>
-                                        handlePriceChange(
-                                          modelo.marca_id,
-                                          modelo.id,
-                                          version.id,
-                                          e.target.value
-                                        )
-                                      }
-                                      className="w-full h-9 border border-slate-300 rounded-md px-2 py-1 text-center text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                    />
-                                  </td>
-                                ))}
+                                {/* Precios/Stock/Días por versión */}
+                                {versiones.map((version) => {
+                                  const cell = preciosData[version.id] || {};
+                                  return (
+                                    <React.Fragment key={version.id}>
+                                      {/* Precio */}
+                                      <td className="border-r border-slate-200 p-1.5 text-center bg-blue-50/30">
+                                        <input
+                                          type="number"
+                                          placeholder="—"
+                                          value={cell.precio_base ?? ""}
+                                          onChange={(e) =>
+                                            handlePriceChange(
+                                              modelo.marca_id,
+                                              modelo.id,
+                                              version.id,
+                                              e.target.value
+                                            )
+                                          }
+                                          className="w-full h-8 border border-slate-300 rounded px-1.5 py-1 text-center text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white"
+                                        />
+                                      </td>
+                                      {/* Stock toggle */}
+                                      <td className="border-r border-slate-200 p-1.5 text-center bg-green-50/30">
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                handleStockChange(
+                                                  modelo.marca_id,
+                                                  modelo.id,
+                                                  version.id,
+                                                  !cell.en_stock
+                                                )
+                                              }
+                                              className={`w-8 h-8 rounded-md flex items-center justify-center mx-auto transition-all border-2 ${
+                                                cell.en_stock !== false
+                                                  ? "bg-green-500 border-green-600 text-white hover:bg-green-600"
+                                                  : "bg-white border-slate-300 text-slate-400 hover:bg-slate-50"
+                                              }`}
+                                            >
+                                              <CheckCircle className="w-4 h-4" />
+                                            </button>
+                                          </TooltipTrigger>
+                                          <TooltipContent side="top">
+                                            {cell.en_stock !== false ? "En stock — clic para marcar sin stock" : "Sin stock — clic para marcar en stock"}
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </td>
+                                      {/* Días de entrega */}
+                                      <td className="border-r border-slate-300 p-1.5 text-center bg-orange-50/30">
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          value={cell.tiempo_entrega_dias ?? ""}
+                                          onChange={(e) =>
+                                            handleDiasChange(
+                                              modelo.marca_id,
+                                              modelo.id,
+                                              version.id,
+                                              e.target.value
+                                            )
+                                          }
+                                          className="w-full h-8 border border-slate-300 rounded px-1.5 py-1 text-center text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all bg-white"
+                                        />
+                                      </td>
+                                    </React.Fragment>
+                                  );
+                                })}
                               </tr>
                             );
                           })}

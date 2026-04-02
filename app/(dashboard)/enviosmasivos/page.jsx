@@ -77,7 +77,8 @@ function getFilterContextByCampaignType(campaignType) {
       description: "Se cruza con oportunidades activas y tabla de intereses de ventas por marca/modelo.",
       marcaLabel: "Marca de interes (multiple)",
       modeloLabel: "Modelo de interes (multiple)",
-      anioLabel: "Ano de interes",
+      showEtapas: true,
+      etapasLabel: "Etapa de conversión",
     };
   }
 
@@ -86,6 +87,7 @@ function getFilterContextByCampaignType(campaignType) {
     description: "Se filtra sobre vehiculos del cliente por marca/modelo/anio para mantenimiento y servicio.",
     marcaLabel: "Marca del vehiculo (multiple)",
     modeloLabel: "Modelo del vehiculo (multiple)",
+    showEtapas: false,
     anioLabel: "Ano del vehiculo",
   };
 }
@@ -116,6 +118,7 @@ export default function EnviosMasivosPage() {
       marca_ids: [],
       modelo_ids: [],
       anio: "",
+      etapa_ids: [],
     },
     content: {
       template_mode: "texto",
@@ -131,6 +134,7 @@ export default function EnviosMasivosPage() {
 
   const [marcas, setMarcas] = useState([]);
   const [modelos, setModelos] = useState([]);
+  const [etapas, setEtapas] = useState([]);
 
   function resetWizardState() {
     setStep(0);
@@ -145,6 +149,7 @@ export default function EnviosMasivosPage() {
         marca_ids: [],
         modelo_ids: [],
         anio: "",
+        etapa_ids: [],
       },
       content: {
         template_mode: "texto",
@@ -168,8 +173,9 @@ export default function EnviosMasivosPage() {
       marca_ids: form.filters.marca_ids,
       modelo_ids: form.filters.modelo_ids,
       anio: form.filters.anio,
+      etapa_ids: form.filters.etapa_ids,
     }),
-    [form.campaign_type, form.filters.anio, form.filters.marca_ids, form.filters.modelo_ids]
+    [form.campaign_type, form.filters.anio, form.filters.marca_ids, form.filters.modelo_ids, form.filters.etapa_ids]
   );
 
   const loadRows = useCallback(async () => {
@@ -193,14 +199,16 @@ export default function EnviosMasivosPage() {
 
   const loadCatalogs = useCallback(async () => {
     try {
-      const [marcasRes, modelosRes] = await Promise.all([
+      const [marcasRes, modelosRes, etapasRes] = await Promise.all([
         fetch("/api/marcas", { cache: "no-store" }),
         fetch("/api/modelos", { cache: "no-store" }),
+        fetch("/api/etapasconversion", { cache: "no-store" }),
       ]);
 
-      const [marcasData, modelosData] = await Promise.all([
+      const [marcasData, modelosData, etapasData] = await Promise.all([
         marcasRes.json(),
         modelosRes.json(),
+        etapasRes.json(),
       ]);
 
       if (!marcasRes.ok || !modelosRes.ok) {
@@ -209,10 +217,12 @@ export default function EnviosMasivosPage() {
 
       setMarcas(Array.isArray(marcasData) ? marcasData : []);
       setModelos(Array.isArray(modelosData) ? modelosData : []);
+      setEtapas(Array.isArray(etapasData) ? etapasData : []);
     } catch (error) {
       toast.error(error?.message || "Error cargando catálogos");
       setMarcas([]);
       setModelos([]);
+      setEtapas([]);
     }
   }, []);
 
@@ -756,15 +766,56 @@ export default function EnviosMasivosPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">{filterContext.anioLabel}</label>
-                  <Input
-                    value={form.filters.anio}
-                    onChange={(e) => setForm((prev) => ({
-                      ...prev,
-                      filters: { ...prev.filters, anio: e.target.value.replace(/\D/g, "").slice(0, 4) },
-                    }))}
-                    placeholder="Todos los años"
-                  />
+                  {filterContext.showEtapas ? (
+                    <>
+                      <label className="text-sm font-medium">{filterContext.etapasLabel}</label>
+                      <div className="max-h-40 space-y-2 overflow-y-auto rounded-md border p-2">
+                        {etapas.map((etapa) => {
+                          const checked = Array.isArray(form.filters.etapa_ids)
+                            && form.filters.etapa_ids.includes(Number(etapa.id));
+
+                          return (
+                            <label key={etapa.id} className="flex items-center gap-2 text-sm">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(e) => setForm((prev) => {
+                                  const current = Array.isArray(prev.filters.etapa_ids) ? prev.filters.etapa_ids : [];
+                                  const next = e.target.checked
+                                    ? [...current, Number(etapa.id)]
+                                    : current.filter((id) => Number(id) !== Number(etapa.id));
+
+                                  return {
+                                    ...prev,
+                                    filters: {
+                                      ...prev.filters,
+                                      etapa_ids: [...new Set(next)],
+                                    },
+                                  };
+                                })}
+                              />
+                              {etapa.nombre}
+                            </label>
+                          );
+                        })}
+                        {!etapas.length && (
+                          <p className="text-xs text-muted-foreground">No hay etapas configuradas.</p>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <label className="text-sm font-medium">{filterContext.anioLabel}</label>
+                      <Input
+                        value={form.filters.anio}
+                        onChange={(e) => setForm((prev) => ({
+                          ...prev,
+                          filters: { ...prev.filters, anio: e.target.value.replace(/\D/g, "").slice(0, 4) },
+                        }))}
+                        placeholder="Todos los años"
+                      />
+                    </>
+                  )}
                 </div>
               </div>
 

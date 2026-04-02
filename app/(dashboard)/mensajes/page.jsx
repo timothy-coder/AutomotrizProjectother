@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Eye } from "lucide-react";
+import { AlertTriangle, Bell, Eye, Hourglass, TrendingUp, UserCheck, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,18 +21,80 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import ConversationWorkspace from "@/app/components/conversations/ConversationWorkspace";
+import NotificationPanel from "@/app/components/conversations/NotificationPanel";
 import { useAuth } from "@/context/AuthContext";
 
-const METRIC_TOOLTIPS = {
-  total: "Total de conversaciones visibles según los filtros activos.",
-  active: "Conversaciones abiertas o pendientes. Haz clic para filtrar.",
-  unassigned: "Conversaciones sin asesor asignado. Haz clic para filtrar.",
-  overdue: "Conversaciones cuyo SLA venció. Haz clic para filtrar.",
-  unread: "Total de mensajes entrantes no leídos. Haz clic para filtrar.",
-  mine: "Mis conversaciones activas (asignadas a mí). Haz clic para filtrar.",
-  ftr: "Tiempo promedio en espera de las conversaciones de esta vista.",
-  wait: "Tiempo máximo de espera de las conversaciones de esta vista.",
-};
+
+// ── Helpers globales ─────────────────────────────────────────────────────────
+
+function getInitials(name) {
+  if (!name) return "?";
+  return name
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+}
+
+function formatRelativeTime(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffDays = Math.floor((now - d) / 86400000);
+  if (diffDays === 0)
+    return d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+  if (diffDays === 1) return "ayer";
+  if (diffDays < 7) return d.toLocaleDateString("es-AR", { weekday: "short" });
+  return d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" });
+}
+
+function assignmentColorClass(status) {
+  if (status === "open") return "bg-green-500";
+  if (status === "pending") return "bg-amber-400";
+  if (status === "closed") return "bg-gray-400";
+  return "bg-gray-300";
+}
+
+function ChannelPill({ channel }) {
+  const cfg = {
+    whatsapp: { abbr: "W", bg: "bg-green-500", label: "WhatsApp" },
+    instagram: { abbr: "IG", bg: "bg-gradient-to-br from-purple-500 to-pink-500", label: "Instagram" },
+    facebook: { abbr: "f", bg: "bg-blue-600", label: "Facebook" },
+  };
+  const c =
+    cfg[String(channel || "").toLowerCase()] || {
+      abbr: "?",
+      bg: "bg-gray-400",
+      label: channel || "canal",
+    };
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${c.bg} text-white font-bold text-[8px] flex-shrink-0`}
+        >
+          {c.abbr}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{c.label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function formatDurationCompact(seconds) {
+  if (seconds == null) return "--";
+  const totalMinutes = Math.round(Math.max(0, Number(seconds) || 0) / 60);
+  if (totalMinutes < 60) return `${totalMinutes}m`;
+  const totalHours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (totalHours < 24) return minutes > 0 ? `${totalHours}h ${minutes}m` : `${totalHours}h`;
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function ConversationsPage() {
   const router = useRouter();
@@ -69,9 +131,11 @@ export default function ConversationsPage() {
   const [summarySession, setSummarySession] = useState(null);
   const [summaryText, setSummaryText] = useState("");
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [focusComposerSignal, setFocusComposerSignal] = useState(0);
 
   async function load() {
+    setIsLoading(true);
     try {
       setPageError("");
 
@@ -103,6 +167,8 @@ export default function ConversationsPage() {
       console.error("Error cargando conversaciones:", error);
       setPageError(error?.message || "Error cargando conversaciones");
       setSessions([]);
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -110,8 +176,17 @@ export default function ConversationsPage() {
     load();
   }, [user?.id]);
 
-  function openTimeline(session) {
+  function handleOpenTimeline(session) {
     setSelectedSession(session);
+  }
+
+  function handleToggleChannel(ch) {
+    setChannelFilter((prev) => (prev === ch ? "all" : ch));
+  }
+
+  function openConversationById(sessionId) {
+    const found = sessions.find((s) => Number(s.session_id) === Number(sessionId));
+    if (found) setSelectedSession(found);
   }
 
   function resetQuickFilters() {
@@ -150,36 +225,8 @@ export default function ConversationsPage() {
     }
   }
 
-  function severityClass(level) {
-    if (level === "high") return "border-red-200 bg-red-50 text-red-900";
-    if (level === "medium") return "border-amber-200 bg-amber-50 text-amber-900";
-    if (level === "low") return "border-emerald-200 bg-emerald-50 text-emerald-900";
-    return "border bg-white text-gray-700";
-  }
 
-  function formatDurationCompact(seconds) {
-    if (seconds == null) return "--";
-
-    const totalSeconds = Math.max(0, Number(seconds) || 0);
-    const totalMinutes = Math.round(totalSeconds / 60);
-
-    if (totalMinutes < 60) {
-      return `${totalMinutes}m`;
-    }
-
-    const totalHours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-
-    if (totalHours < 24) {
-      return minutes > 0 ? `${totalHours}h ${minutes}m` : `${totalHours}h`;
-    }
-
-    const days = Math.floor(totalHours / 24);
-    const hours = totalHours % 24;
-    return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
-  }
-
-  async function openSummaryDialog(session) {
+  async function handleOpenSummaryDialog(session) {
     setSummarySession(session);
     setSummaryText("");
     setSummaryOpen(true);
@@ -203,8 +250,8 @@ export default function ConversationsPage() {
           }
         }
       }
-    } catch {
-      // fallback a continuación
+    } catch (err) {
+      console.error("Error cargando timeline en handleOpenSummaryDialog:", err);
     }
 
     // Fallback: intentar extraer del context_json
@@ -350,24 +397,8 @@ export default function ConversationsPage() {
       ? null
       : Math.round(effectiveMaxWait / 60);
 
-    // ── 1ra respuesta promedio calculada desde scopedSessions ──
-    // Aproximacion: promedio de (updated_at - created_at) para sesiones con asesor asignado
-    // Cuando hay solo 1 sesión (conversación abierta), muestra su tiempo de espera actual
-    let avgFtrSeconds = null;
-    const sessionsWithAssignment = scopedSessions.filter(
-      (s) => Number(s?.assigned_agent_id || 0) > 0
-    );
-    if (sessionsWithAssignment.length > 0) {
-      const totalWait = sessionsWithAssignment.reduce((acc, s) => {
-        const updatedAt = s?.updated_at ? new Date(s.updated_at).getTime() : 0;
-        const lastAt = s?.last_message_at ? new Date(s.last_message_at).getTime() : updatedAt;
-        return acc + Math.max(0, (nowMs - lastAt) / 1000);
-      }, 0);
-      avgFtrSeconds = Math.round(totalWait / sessionsWithAssignment.length);
-    } else if (scopedSessions.length === 0) {
-      // Caer al valor global del API si no hay sesiones en el scope
-      avgFtrSeconds = metrics.avg_first_response_seconds;
-    }
+    // ── 1ra respuesta promedio — valor real del API ────────────
+    const avgFtrSeconds = metrics?.avg_first_response_seconds ?? null;
 
     return [
       {
@@ -446,7 +477,26 @@ export default function ConversationsPage() {
     ];
   }, [metrics, scopedSessions, user]);
 
-  function toggleSessionSelection(sessionId) {
+  const kpiByKey = useMemo(
+    () => Object.fromEntries(metricsCards.map((c) => [c.key, c])),
+    [metricsCards]
+  );
+
+  const avgInteractionMin = useMemo(() => {
+    const nowMs = Date.now();
+    const active = scopedSessions.filter(
+      (s) =>
+        s?.assignment_status === "open" || s?.assignment_status === "pending"
+    );
+    if (active.length === 0) return null;
+    const totalMs = active.reduce((acc, s) => {
+      const created = s?.created_at ? new Date(s.created_at).getTime() : 0;
+      return acc + Math.max(0, nowMs - created);
+    }, 0);
+    return Math.round(totalMs / active.length / 60000);
+  }, [scopedSessions]);
+
+  function handleToggleSessionSelection(sessionId) {
     const normalized = Number(sessionId);
     setSelectedSessionIds((prev) => {
       if (prev.includes(normalized)) {
@@ -456,7 +506,7 @@ export default function ConversationsPage() {
     });
   }
 
-  function toggleSelectAllFiltered() {
+  function handleToggleSelectAll() {
     if (allFilteredSelected) {
       setSelectedSessionIds([]);
       return;
@@ -465,7 +515,7 @@ export default function ConversationsPage() {
     setSelectedSessionIds(filteredSessions.map((s) => Number(s.session_id)));
   }
 
-  async function sendBulkMessage() {
+  async function handleSendBulkMessage() {
     const text = bulkText.trim();
     if (!text || bulkSending) return;
 
@@ -523,122 +573,148 @@ export default function ConversationsPage() {
   return (
     <TooltipProvider>
       <div className="h-full min-h-0 flex flex-col gap-2 overflow-y-auto pr-1">
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-2 items-start">
-          {pageError && (
-            <div className="xl:col-span-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              {pageError}
-            </div>
-          )}
+        {pageError && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            {pageError}
+          </div>
+        )}
 
-          {/* Filtros */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por cliente, celular o mensaje"
-              className="sm:col-span-3 h-9"
+        {/* Panel de filtros */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h1 className="text-base font-semibold text-gray-800">Mensajes</h1>
+            <NotificationPanel
+              conversations={sessions}
+              onOpenConversation={openConversationById}
             />
+          </div>
 
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por cliente, celular o mensaje..."
+            className="h-10"
+          />
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Tooltip>
               <TooltipTrigger asChild>
-                <select
-                  className="h-8 rounded-md border bg-transparent px-2 text-xs"
-                  value={channelFilter}
-                  onChange={(e) => setChannelFilter(e.target.value)}
+                <button
+                  type="button"
+                  onClick={() => applyMetricFilter("mine")}
+                  className={`rounded-2xl border p-3 text-left transition-all shadow-sm hover:shadow-md ${
+                    ownerFilter === "mine"
+                      ? "bg-green-100 border-green-300 ring-2 ring-green-400"
+                      : "bg-green-50 border-green-200 hover:border-green-300"
+                  }`}
                 >
-                  <option value="all">Todos los canales</option>
-                  <option value="whatsapp">WhatsApp</option>
-                  <option value="instagram">Instagram</option>
-                  <option value="messenger">Messenger</option>
-                  <option value="n8n">n8n</option>
-                </select>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <UserCheck className="w-3.5 h-3.5 text-green-600" />
+                    <span className="text-[9px] text-green-600 uppercase tracking-wide font-semibold">Asignados</span>
+                  </div>
+                  <p className="text-xl font-semibold text-green-700 leading-none">{kpiByKey["mine"]?.value ?? 0}</p>
+                </button>
               </TooltipTrigger>
-              <TooltipContent>Filtrar por canal de origen del mensaje</TooltipContent>
+              <TooltipContent>Mis conversaciones activas asignadas. Clic para filtrar.</TooltipContent>
             </Tooltip>
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <select
-                  className="h-8 rounded-md border bg-transparent px-2 text-xs"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
+                <button
+                  type="button"
+                  onClick={() => applyMetricFilter("overdue")}
+                  className={`rounded-2xl border p-3 text-left transition-all shadow-sm hover:shadow-md ${
+                    priorityFilter === "overdue"
+                      ? "bg-red-100 border-red-300 ring-2 ring-red-400"
+                      : "bg-red-50 border-red-200 hover:border-red-300"
+                  }`}
                 >
-                  <option value="all">Todos los estados</option>
-                  <option value="received">Recibido</option>
-                  <option value="queued">En cola</option>
-                  <option value="sent">Enviado</option>
-                  <option value="delivered">Entregado</option>
-                  <option value="read">Leido</option>
-                  <option value="failed">Fallido</option>
-                  <option value="unread">No leidos</option>
-                </select>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Hourglass className="w-3.5 h-3.5 text-red-500 animate-pulse" />
+                    <span className="text-[9px] text-red-500 uppercase tracking-wide font-semibold">At. Urgente</span>
+                  </div>
+                  <p className="text-xl font-semibold text-red-700 leading-none">{kpiByKey["overdue"]?.value ?? 0}</p>
+                </button>
               </TooltipTrigger>
-              <TooltipContent>Filtrar por estado del último mensaje</TooltipContent>
+              <TooltipContent>Conversaciones con SLA vencido. Clic para filtrar.</TooltipContent>
             </Tooltip>
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <select
-                  className="h-8 rounded-md border bg-transparent px-2 text-xs"
-                  value={ownerFilter}
-                  onChange={(e) => setOwnerFilter(e.target.value)}
-                >
-                  <option value="all">Todas</option>
-                  <option value="mine">Mis conversaciones</option>
-                  <option value="unassigned">Sin asignar</option>
-                </select>
+                <div className="rounded-2xl border p-3 text-left shadow-sm bg-blue-50 border-blue-200 cursor-default">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <TrendingUp className="w-3.5 h-3.5 text-blue-500" />
+                    <span className="text-[9px] text-blue-500 uppercase tracking-wide font-semibold">Ritmo resp.</span>
+                  </div>
+                  <p className="text-xl font-semibold text-blue-700 leading-none">{kpiByKey["ftr"]?.value ?? "--"}</p>
+                </div>
               </TooltipTrigger>
-              <TooltipContent>Filtrar por propietario de la conversación</TooltipContent>
+              <TooltipContent>Tiempo promedio de primera respuesta (dato real del servidor).</TooltipContent>
             </Tooltip>
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <select
-                  className="h-8 rounded-md border bg-transparent px-2 text-xs"
-                  value={assignmentFilter}
-                  onChange={(e) => setAssignmentFilter(e.target.value)}
-                >
-                  <option value="all">Todos los flujos</option>
-                  <option value="active">Abiertas/Pendientes</option>
-                  <option value="open">Abiertas</option>
-                  <option value="pending">Pendientes</option>
-                  <option value="closed">Cerradas</option>
-                  <option value="unassigned">Sin asignar</option>
-                </select>
+                <div className="rounded-2xl border p-3 text-left shadow-sm bg-slate-50 border-slate-200 cursor-default">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Users className="w-3.5 h-3.5 text-slate-500" />
+                    <span className="text-[9px] text-slate-500 uppercase tracking-wide font-semibold">Interacción</span>
+                  </div>
+                  <p className="text-xl font-semibold text-slate-700 leading-none">
+                    {avgInteractionMin != null ? `${avgInteractionMin} min` : "--"}
+                  </p>
+                </div>
               </TooltipTrigger>
-              <TooltipContent>Filtrar por estado de asignación del agente</TooltipContent>
+              <TooltipContent>Duración promedio de conversaciones activas/pendientes.</TooltipContent>
             </Tooltip>
+          </div>
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <select
-                  className="h-8 rounded-md border bg-transparent px-2 text-xs"
-                  value={priorityFilter}
-                  onChange={(e) => setPriorityFilter(e.target.value)}
-                >
-                  <option value="all">Todas las prioridades</option>
-                  <option value="urgent">Urgente</option>
-                  <option value="high">Alta</option>
-                  <option value="normal">Normal</option>
-                  <option value="low">Baja</option>
-                  <option value="overdue">Vencidas SLA</option>
-                </select>
-              </TooltipTrigger>
-              <TooltipContent>Filtrar por nivel de prioridad o SLA vencido</TooltipContent>
-            </Tooltip>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleChannel("whatsapp")}
+                    className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all text-[11px] font-bold ${
+                      channelFilter === "whatsapp"
+                        ? "border-green-500 bg-green-50 shadow-md scale-110 text-green-700"
+                        : "border-gray-200 text-gray-400 hover:border-green-300 hover:text-green-600"
+                    }`}
+                  >
+                    WA
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{channelFilter === "whatsapp" ? "Quitar filtro WhatsApp" : "Filtrar por WhatsApp"}</TooltipContent>
+              </Tooltip>
 
-            <div className="flex items-center justify-between sm:col-span-3 text-xs text-gray-500 px-1 gap-1.5">
-              <span>
-                {filteredSessions.length} conversaciones · {selectedSessions.length} seleccionadas
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleChannel("instagram")}
+                    className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all text-[11px] font-bold ${
+                      channelFilter === "instagram"
+                        ? "border-pink-500 bg-pink-50 shadow-md scale-110 text-pink-700"
+                        : "border-gray-200 text-gray-400 hover:border-pink-300 hover:text-pink-600"
+                    }`}
+                  >
+                    IG
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{channelFilter === "instagram" ? "Quitar filtro Instagram" : "Filtrar por Instagram"}</TooltipContent>
+              </Tooltip>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400">{filteredSessions.length} conv. · {selectedSessions.length} sel.</span>
               <Button
                 variant="outline"
                 size="sm"
                 className="h-8 px-2 text-xs"
-                onClick={toggleSelectAllFiltered}
+                onClick={() => handleToggleSelectAll()}
                 disabled={filteredSessions.length === 0}
               >
-                {allFilteredSelected ? "Limpiar selección" : "Seleccionar filtrados"}
+                {allFilteredSelected ? "Limpiar" : "Seleccionar"}
               </Button>
               <Button
                 variant="outline"
@@ -651,39 +727,8 @@ export default function ConversationsPage() {
                   setBulkOpen(true);
                 }}
               >
-                Envío masivo básico
+                Masivo
               </Button>
-            </div>
-          </div>
-
-          {/* Indicadores / Métricas */}
-          <div className="border rounded-lg p-1.5 bg-white">
-            <div className="flex items-center justify-between px-1 mb-1">
-              <p className="text-[10px] text-gray-500">Indicadores</p>
-              {hasActiveFilters && (
-                <span className="text-[9px] bg-blue-100 text-blue-700 rounded-full px-1.5 py-0.5 font-medium">
-                  Filtrado activo
-                </span>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-1">
-              {metricsCards.map((card) => (
-                <Tooltip key={card.key}>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => card.clickable && applyMetricFilter(card.key)}
-                      className={`rounded-md px-1.5 py-1 text-left transition border ${severityClass(card.tone)} ${card.clickable ? "hover:shadow-sm cursor-pointer hover:opacity-90" : "cursor-default"}`}
-                    >
-                      <p className="text-[9px] opacity-70 leading-tight truncate">{card.title}</p>
-                      <p className="text-[13px] font-semibold leading-tight">{card.value}</p>
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-[200px] text-center">
-                    {METRIC_TOOLTIPS[card.key] || card.title}
-                  </TooltipContent>
-                </Tooltip>
-              ))}
             </div>
           </div>
         </div>
@@ -692,99 +737,98 @@ export default function ConversationsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-[330px_minmax(0,1fr)] gap-2 flex-1 min-h-0">
           <div className={`${selectedSession ? "hidden lg:flex" : "flex"} border rounded-xl overflow-hidden bg-white shadow min-h-0 h-full flex-col`}>
             <div className="overflow-y-auto flex-1 min-h-0">
-              {filteredSessions.map((s) => (
-                <div
-                  key={s.session_id}
-                  onClick={() => openTimeline(s)}
-                  onDoubleClick={() => {
-                    openTimeline(s);
-                    setFocusComposerSignal((prev) => prev + 1);
-                  }}
-                  className={`flex items-center justify-between p-4 border-b hover:bg-gray-50 cursor-pointer ${selectedSession?.session_id === s.session_id ? "bg-gray-50" : ""}`}
-                >
-                  <div>
-                    <div className="mb-1">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4"
-                        checked={selectedSessionIds.includes(Number(s.session_id))}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={() => toggleSessionSelection(s.session_id)}
-                        aria-label={`Seleccionar conversacion ${s.session_id}`}
-                      />
+              {filteredSessions.map((s) => {
+                const unread = Number(s?.unread_count || 0);
+                const isOverdue = Number(s?.is_overdue || 0) === 1;
+                const isSelected = selectedSession?.session_id === s.session_id;
+                return (
+                  <div
+                    key={s.session_id}
+                    onClick={() => handleOpenTimeline(s)}
+                    onDoubleClick={() => {
+                      handleOpenTimeline(s);
+                      setFocusComposerSignal((prev) => prev + 1);
+                    }}
+                    className={`flex items-start gap-3 px-4 py-3 border-b cursor-pointer transition-colors hover:bg-gray-50/80 group border-l-2 ${
+                      isSelected ? "bg-blue-50/50 border-l-blue-500" : "border-l-transparent"
+                    }`}
+                  >
+                    {/* Checkbox */}
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-3.5 w-3.5 rounded flex-shrink-0"
+                      checked={selectedSessionIds.includes(Number(s.session_id))}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={() => handleToggleSessionSelection(s.session_id)}
+                      aria-label={`Seleccionar conversacion ${s.session_id}`}
+                    />
+
+                    {/* Avatar con iniciales */}
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 text-white ${assignmentColorClass(s.assignment_status)}`}>
+                      {getInitials(s.cliente_nombre)}
                     </div>
 
-                    <div className="font-semibold">
-                      {s.cliente_nombre || "Cliente"}
-                    </div>
+                    {/* Contenido principal */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1">
+                        <p className="font-semibold text-sm text-gray-900 truncate">
+                          {s.cliente_nombre || "Cliente"}
+                        </p>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <span className="text-[10px] text-gray-400">{formatRelativeTime(s.last_message_at)}</span>
+                          {unread > 0 && (
+                            <span className="bg-blue-600 text-white text-[10px] rounded-full px-1.5 py-0.5 font-semibold">
+                              {unread}
+                            </span>
+                          )}
+                          {isOverdue && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="bg-red-500 text-white text-[10px] rounded-full px-1.5 py-0.5 font-semibold flex items-center gap-0.5">
+                                  <AlertTriangle className="w-2.5 h-2.5" />
+                                  Urgente
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>SLA vencido — requiere atención urgente</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                      </div>
 
-                    <div className="text-sm text-gray-500 truncate max-w-55">
-                      {s.ultimomensaje || "Sin mensajes"}
-                    </div>
+                      <p className="text-xs text-gray-500 truncate mt-0.5 leading-snug">
+                        {s.ultimomensaje || "Sin mensajes"}
+                      </p>
 
-                    <div className="text-xs text-gray-400">
-                      {s.celular || s.phone}
-                      {s.source_channel ? ` · ${s.source_channel}` : ""}
-                      {s.message_status ? ` · ${s.message_status}` : ""}
-                    </div>
-
-                    <div className="text-xs mt-1 text-gray-500">
-                      {s.assigned_agent_name
-                        ? `Asignado a: ${s.assigned_agent_name}`
-                        : "Sin asignar"}
-                      {s.assignment_status ? ` · ${s.assignment_status}` : ""}
-                    </div>
-
-                    <div className="text-xs mt-1 text-gray-500">
-                      Prioridad: {s.priority_level || "normal"}
-                      {s.sla_due_at ? ` · SLA: ${new Date(s.sla_due_at).toLocaleString()}` : ""}
-                      {Number(s?.is_overdue || 0) === 1 ? " · Vencida" : ""}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {Number(s?.is_overdue || 0) === 1 && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="h-6 px-2 rounded-full bg-amber-600 text-white text-xs inline-flex items-center justify-center">
-                            SLA
+                      <div className="flex items-center justify-between mt-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <ChannelPill channel={s.source_channel} />
+                          <span className="text-[10px] text-gray-400 capitalize">
+                            {s.assignment_status || "sin asignar"}
                           </span>
-                        </TooltipTrigger>
-                        <TooltipContent>SLA vencido — requiere atención urgente</TooltipContent>
-                      </Tooltip>
-                    )}
-
-                    {Number(s?.unread_count || 0) > 0 && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="min-w-6 h-6 px-2 rounded-full bg-red-600 text-white text-xs inline-flex items-center justify-center">
-                            {s.unread_count}
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent>{s.unread_count} mensaje{s.unread_count !== 1 ? "s" : ""} sin leer</TooltipContent>
-                      </Tooltip>
-                    )}
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="icon"
+                        </div>
+                        <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            openSummaryDialog(s);
+                            handleOpenSummaryDialog(s);
                           }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100"
                         >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Ver resumen de la conversación</TooltipContent>
-                    </Tooltip>
+                          <Eye className="w-3.5 h-3.5 text-gray-400" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
-              {filteredSessions.length === 0 && (
+              {isLoading && (
+                <div className="p-6 text-sm text-gray-400 text-center italic">
+                  Cargando conversaciones...
+                </div>
+              )}
+
+              {!isLoading && filteredSessions.length === 0 && (
                 <div className="p-6 text-sm text-gray-500 text-center">
                   No hay conversaciones que coincidan con los filtros.
                 </div>
@@ -860,7 +904,7 @@ export default function ConversationsPage() {
                 Cerrar
               </Button>
               <Button
-                onClick={sendBulkMessage}
+                onClick={() => handleSendBulkMessage()}
                 disabled={
                   bulkSending
                   || !bulkText.trim()

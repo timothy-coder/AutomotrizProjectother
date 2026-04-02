@@ -49,3 +49,13 @@ bd.sql
 .mcp.json
 /claude_code/
 .claude
+
+# embedded repo that must stay outside this project
+/engram/
+
+# local tooling and external repos not part of this project
+/.atl/
+/gentle-ai-repo/
+
+# operational docs (local use only, no tracking en repo)
+PENDIENTES.md

@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, Edit, Eye, FileText, Link, MoreVertical, Send, Trash2, Loader2, Package } from "lucide-react";
+import { Copy, Edit, Eye, FileText, Link, MoreVertical, Send, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -38,8 +38,6 @@ export default function CotizacionRow({
   onLoadHistorial,
   saving,
   onOpenHistorialDialog,
-  onAddAccesorios,
-  onPreview,
 }) {
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
@@ -298,46 +296,7 @@ export default function CotizacionRow({
         </div>
       </td>
       <td className="py-3 px-4">
-        <div className="flex justify-center gap-2">
-          {/* ✅ BOTÓN AGREGAR ACCESORIOS */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onAddAccesorios(cot)}
-                disabled={saving}
-                className="gap-1 text-xs"
-              >
-                <Package size={14} />
-                <span className="hidden sm:inline">Accesorios</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              Agregar accesorios a esta cotización
-            </TooltipContent>
-          </Tooltip>
-
-          {/* ✅ BOTÓN PREVISUALIZAR */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onPreview(cot)}
-                disabled={saving}
-                className="gap-1 text-xs"
-              >
-                <Eye size={14} />
-                <span className="hidden sm:inline">Preview</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              Previsualizar cotización completa
-            </TooltipContent>
-          </Tooltip>
-
-          {/* MENÚ DESPLEGABLE */}
+        <div className="flex justify-center">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button

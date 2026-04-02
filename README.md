@@ -194,7 +194,9 @@ Configurar en `.env.local`:
 
 ```env
 N8N_CONVERSATIONS_OUTBOUND_URL=https://tu-n8n/webhook/saliente
+VENTAS_WEBHOOK_SECRET=tu-secreto-ventas-webhook
 CONVERSATIONS_WEBHOOK_SECRET=tu-secreto-webhook
+ALERT_WEBHOOK_URL=https://tu-servicio-de-alertas.com/webhook
 CONVERSATIONS_SLA_MINUTES=30
 CONVERSATIONS_OUTBOX_MAX_RETRIES=5
 CONVERSATIONS_OUTBOX_SECRET=secreto-interno-para-job

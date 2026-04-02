@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  ChevronDown, ChevronUp, Filter, Phone, RefreshCw, User, X,
+  ArrowUpRight, ChevronDown, ChevronUp, Filter, RefreshCw, Trash2, User, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -51,10 +51,46 @@ function EstadoBadge({ estado }) {
 
 // ─── Panel de detalle del lead ────────────────────────────────────────────────
 
-function LeadPanel({ lead, onClose, onEstadoChanged }) {
+function LeadPanel({ lead, onClose, onEstadoChanged, onDeleted }) {
   const [estado, setEstado] = useState(lead.estado);
   const [notas, setNotas] = useState(lead.notas_agente || "");
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [promoting, setPromoting] = useState(false);
+  const [oportunidadId, setOportunidadId] = useState(lead.oportunidad_crm_codigo || (lead.oportunidad_crm_id ? `LD-?` : null));
+
+  async function handlePromover() {
+    if (oportunidadId) return; // ya promovido
+    setPromoting(true);
+    try {
+      const res = await fetch(`/api/ventas/leads/${lead.id}/promover`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Error al promover");
+      if (data.already_promoted || data.ok) {
+        setOportunidadId(data.oportunidad_id);
+        toast.success(`Lead enviado a Ventas: ${data.oportunidad_id}`);
+      }
+    } catch (err) {
+      toast.error(err.message || "No se pudo promover el lead");
+    } finally {
+      setPromoting(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm(`¿Eliminar la cotización de ${lead.nombre_cliente || "este cliente"}? Esta acción no se puede deshacer.`)) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/ventas/leads/${lead.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Error al eliminar");
+      toast.success("Cotización eliminada");
+      onDeleted(lead.id);
+    } catch {
+      toast.error("No se pudo eliminar la cotización");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -164,10 +200,34 @@ function LeadPanel({ lead, onClose, onEstadoChanged }) {
       </div>
 
       {/* Footer */}
-      <div className="border-t px-4 py-3">
+      <div className="border-t px-4 py-3 space-y-2">
         <Button onClick={handleSave} disabled={saving} className="w-full">
           {saving ? "Guardando…" : "Guardar cambios"}
         </Button>
+        <button
+          onClick={handlePromover}
+          disabled={promoting || !!oportunidadId}
+          className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            oportunidadId
+              ? "bg-green-50 text-green-700 border border-green-200 cursor-default"
+              : "bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+          }`}
+        >
+          <ArrowUpRight className="w-4 h-4" />
+          {oportunidadId
+            ? `Enviado a Ventas: ${oportunidadId}`
+            : promoting
+            ? "Enviando a Ventas…"
+            : "Enviar a Ventas"}
+        </button>
+        <button
+          onClick={handleDelete}
+          disabled={deleting}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium text-red-600 border border-red-200 hover:bg-red-50 disabled:opacity-50 transition-colors"
+        >
+          <Trash2 className="w-4 h-4" />
+          {deleting ? "Eliminando…" : "Eliminar cotización"}
+        </button>
       </div>
     </div>
   );
@@ -217,6 +277,12 @@ export default function VentasLeadsPage() {
   function handleEstadoChanged(updated) {
     setLeads((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
     setSelectedLead(updated);
+  }
+
+  function handleLeadDeleted(id) {
+    setLeads((prev) => prev.filter((l) => l.id !== id));
+    setSelectedLead(null);
+    setPagination((p) => ({ ...p, total: Math.max(0, p.total - 1) }));
   }
 
   const activeFilters = [filters.estado, filters.desde, filters.hasta].filter(Boolean).length;
@@ -408,6 +474,7 @@ export default function VentasLeadsPage() {
           lead={selectedLead}
           onClose={() => setSelectedLead(null)}
           onEstadoChanged={handleEstadoChanged}
+          onDeleted={handleLeadDeleted}
         />
       )}
     </div>

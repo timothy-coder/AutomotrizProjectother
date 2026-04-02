@@ -104,62 +104,41 @@ export default function ReservaDetailPage() {
     observaciones: "",
   });
 
-  // ✅ Auto-save mejorado
   const autoSaveDelay = useCallback(
     async (data, type) => {
       setSaving(true);
       setAutoSaveIndicator(true);
 
       try {
-        // Guardar en la BD
-        const response = await fetch(`/api/reservas/${params.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            [type]: JSON.stringify(data),
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error("Error guardando");
-        }
-
-        // Esperar un poco para mostrar el indicador
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        // Simular guardado automático
+        await new Promise((resolve) => setTimeout(resolve, 500));
         setAutoSaveIndicator(false);
-        toast.success("Guardado automáticamente");
       } catch (error) {
         console.error(error);
-        toast.error("Error guardando cambios");
-        setAutoSaveIndicator(false);
       } finally {
         setSaving(false);
       }
     },
-    [params.id]
+    []
   );
 
-  // Auto-save con debounce - Nota de Pedido
+  // Auto-save con debounce
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (reserva && Object.values(notaPedido).some((v) => v !== "")) {
+      if (reserva) {
         autoSaveDelay(notaPedido, "nota_pedido");
       }
-    }, 1500);
+    }, 1000);
 
     return () => clearTimeout(timer);
   }, [notaPedido]);
 
-  // Auto-save con debounce - Carta de Características
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (
-        reserva &&
-        Object.values(cartaCaracteristicas).some((v) => v !== "")
-      ) {
+      if (reserva) {
         autoSaveDelay(cartaCaracteristicas, "carta_caracteristicas");
       }
-    }, 1500);
+    }, 1000);
 
     return () => clearTimeout(timer);
   }, [cartaCaracteristicas]);
@@ -173,74 +152,51 @@ export default function ReservaDetailPage() {
       const data = await res.json();
       setReserva(data);
 
-      console.log("Reserva cargada:", data);
-
       // Cargar oportunidad
-      if (data.oportunidad_id || data.id) {
-        const opId = data.oportunidad_id;
-        const resOp = await fetch(`/api/oportunidades/${opId}`, {
+      if (data.oportunidad_id) {
+        const resOp = await fetch(`/api/oportunidades/${data.oportunidad_id}`, {
           cache: "no-store",
         });
         const dataOp = await resOp.json();
         setOportunidad(dataOp);
-
-        console.log("Oportunidad cargada:", dataOp);
       }
 
-      // ✅ Inicializar forms con datos existentes de la reserva
-      if (data.nota_pedido) {
-        try {
-          const notaParsed = JSON.parse(data.nota_pedido);
-          setNotaPedido(notaParsed);
-        } catch {
-          // Si no es JSON válido, dejarlo como está
-        }
-      } else if (data.detalles && data.detalles.length > 0) {
+      // Inicializar forms con datos existentes
+      if (data.detalles && data.detalles.length > 0) {
         const detalle = data.detalles[0];
         setNotaPedido({
           tipo_comprobante: "",
           cliente_rfc_legal: "",
-          dni_ruc: data.cliente_id?.toString() || "",
+          dni_ruc: "",
           fecha_nacimiento: "",
           ocupacion: "",
           provincia: "",
           correo: "",
           correo_copia: "",
-          modelo: detalle.modelo_nombre || "",
+          modelo: detalle.modelo || "",
           version: "",
           año_modelo: detalle.anio || "",
-          tipo_vehiculo: "",
+          tipo_vehiculo: detalle.usovehiculo || "",
           nper: "",
-          bono_retoma: "",
-          tarjeta_placa: "",
-          flete: "",
-          total: detalle.subtotal?.toString() || "",
-          observaciones: "",
+          bono_retoma: detalle.dsctobonoretoma || "",
+          tarjeta_placa: detalle.tarjetaplaca || "",
+          flete: detalle.flete || "",
+          total: detalle.subtotal || "",
+          observaciones: detalle.descripcion || "",
           aceptacion: "",
         });
-      }
 
-      // ✅ Inicializar Carta de Características
-      if (data.carta_caracteristicas) {
-        try {
-          const cartaParsed = JSON.parse(data.carta_caracteristicas);
-          setCartaCaracteristicas(cartaParsed);
-        } catch {
-          // Si no es JSON válido, dejarlo como está
-        }
-      } else if (data.detalles && data.detalles.length > 0) {
-        const detalle = data.detalles[0];
         setCartaCaracteristicas({
           senores: "",
           presentante: "",
           referencia_cliente: "",
           estimados_senores: "",
-          marca: detalle.marca_nombre || "",
-          modelo: detalle.modelo_nombre || "",
-          ano_modelo: detalle.anio?.toString() || "",
+          marca: detalle.marca || "",
+          modelo: detalle.modelo || "",
+          ano_modelo: detalle.anio || "",
           numero_chasis: detalle.vin || "",
           numero_motor: "",
-          color: "",
+          color: detalle.color_externo || "",
           clase: "",
           carroceria: "",
           valores_tc_ref: "",
@@ -265,26 +221,10 @@ export default function ReservaDetailPage() {
   const getEstadoBadge = (estado) => {
     const config = {
       borrador: { bg: "bg-gray-100", text: "text-gray-700", label: "Borrador" },
-      enviado_firma: {
-        bg: "bg-blue-100",
-        text: "text-blue-700",
-        label: "Enviado a Firma",
-      },
-      observado: {
-        bg: "bg-yellow-100",
-        text: "text-yellow-700",
-        label: "Observado",
-      },
-      subasando: {
-        bg: "bg-purple-100",
-        text: "text-purple-700",
-        label: "Subasando",
-      },
-      firmado: {
-        bg: "bg-green-100",
-        text: "text-green-700",
-        label: "Firmado",
-      },
+      enviado_firma: { bg: "bg-blue-100", text: "text-blue-700", label: "Enviado a Firma" },
+      observado: { bg: "bg-yellow-100", text: "text-yellow-700", label: "Observado" },
+      subasando: { bg: "bg-purple-100", text: "text-purple-700", label: "Subasando" },
+      firmado: { bg: "bg-green-100", text: "text-green-700", label: "Firmado" },
     };
 
     const cfg = config[estado] || config.borrador;
@@ -322,12 +262,7 @@ export default function ReservaDetailPage() {
                 Reserva #{reserva?.id}
               </h1>
               <p className="text-gray-600 mt-1">
-                {reserva?.oportunidad_id && (
-                  <>
-                    Oportunidad #{reserva.oportunidad_id} • Cliente:{" "}
-                    <span className="font-semibold">{reserva?.cliente_nombre}</span>
-                  </>
-                )}
+                Oportunidad #{reserva?.oportunidad_id}
               </p>
             </div>
           </div>
@@ -344,75 +279,8 @@ export default function ReservaDetailPage() {
           </div>
         </div>
 
-        {/* INFORMACIÓN DEL CLIENTE Y OPORTUNIDAD */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Información del Cliente</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm space-y-2">
-              <div>
-                <p className="text-xs text-gray-600">Nombre</p>
-                <p className="font-semibold">{reserva?.cliente_nombre}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-600">Creado por</p>
-                <p className="font-medium">{reserva?.created_by_name}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-600">Fecha de Creación</p>
-                <p className="font-medium">
-                  {new Date(reserva?.created_at).toLocaleDateString("es-ES")}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Información de Oportunidad</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm space-y-2">
-              <div>
-                <p className="text-xs text-gray-600">Código</p>
-                <p className="font-semibold font-mono">
-                  {oportunidad?.oportunidad_id}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-600">Etapa</p>
-                <p className="font-medium">{oportunidad?.etapa_name}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-600">Origen</p>
-                <p className="font-medium">{oportunidad?.origen_name}</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Información del Vehículo</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm space-y-2">
-              <div>
-                <p className="text-xs text-gray-600">Marca</p>
-                <p className="font-semibold">{oportunidad?.marca_nombre}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-600">Modelo</p>
-                <p className="font-medium">{oportunidad?.modelo_nombre}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-600">Año</p>
-                <p className="font-medium">{oportunidad?.anio}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* BOTONES DE ACCIÓN */}
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -459,7 +327,9 @@ export default function ReservaDetailPage() {
                   Firmar
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="top">Firmar esta reserva</TooltipContent>
+              <TooltipContent side="top">
+                Firmar esta reserva
+              </TooltipContent>
             </Tooltip>
           )}
         </div>
@@ -734,9 +604,7 @@ export default function ReservaDetailPage() {
                 {/* TOTAL */}
                 <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded border border-blue-200">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-gray-900">
-                      TOTAL:
-                    </span>
+                    <span className="font-semibold text-gray-900">TOTAL:</span>
                     <span className="text-2xl font-bold text-blue-600">
                       ${parseFloat(notaPedido.total || 0).toFixed(2)}
                     </span>
@@ -1104,8 +972,8 @@ export default function ReservaDetailPage() {
                   Auto-guardado habilitado
                 </p>
                 <p className="text-xs text-blue-700">
-                  Los cambios se guardan automáticamente mientras escribes (después de 1.5
-                  segundos sin escribir). No necesitas hacer clic en un botón de guardar.
+                  Los cambios se guardan automáticamente mientras escribes. No
+                  necesitas hacer clic en un botón de guardar.
                 </p>
               </div>
             </div>

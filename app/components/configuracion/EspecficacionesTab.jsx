@@ -41,6 +41,8 @@ import {
   Database,
   Info,
   AlertCircle,
+  ImageIcon,
+  Video,
 } from "lucide-react";
 
 export default function EspecificacionesTab() {
@@ -61,6 +63,7 @@ export default function EspecificacionesTab() {
   const [importType, setImportType] = useState("especificaciones");
   const [savingEspec, setSavingEspec] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
 
   const [editingEspec, setEditingEspec] = useState(null);
   const [editingModeloEspec, setEditingModeloEspec] = useState(null);
@@ -69,6 +72,7 @@ export default function EspecificacionesTab() {
   const [expandedEspec, setExpandedEspec] = useState({});
   const [importFile, setImportFile] = useState(null);
   const fileInputRef = useRef(null);
+  const mediaInputRef = useRef(null);
 
   const [formData, setFormData] = useState({
     nombre: "",
@@ -88,6 +92,7 @@ export default function EspecificacionesTab() {
     { value: "numero", label: "Número" },
     { value: "booleano", label: "Booleano" },
     { value: "lista", label: "Lista" },
+    { value: "media", label: "Imagen / Video" },
   ];
 
   // Cargar datos
@@ -355,6 +360,40 @@ export default function EspecificacionesTab() {
     setDialogEspecOpen(true);
   }
 
+  async function handleMediaUpload(file) {
+    setUploadingMedia(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      if (!res.ok) throw new Error("Error subiendo archivo");
+      const data = await res.json();
+      setModeloEspecFormData((prev) => ({ ...prev, valor: data.url }));
+    } catch (e) {
+      toast.error("Error subiendo archivo: " + e.message);
+    } finally {
+      setUploadingMedia(false);
+    }
+  }
+
+  function renderMediaPreview(url) {
+    if (!url) return null;
+    const isVideo = /\.(mp4|webm|ogg|mov)$/i.test(url);
+    return isVideo ? (
+      <video
+        src={url}
+        controls
+        className="mt-2 max-h-40 w-full rounded-md border border-slate-200 object-contain"
+      />
+    ) : (
+      <img
+        src={url}
+        alt="preview"
+        className="mt-2 max-h-40 w-full rounded-md border border-slate-200 object-contain"
+      />
+    );
+  }
+
   function renderInputValor(especificacion) {
     switch (especificacion.tipo_dato) {
       case "texto":
@@ -447,6 +486,68 @@ export default function EspecificacionesTab() {
               ))}
             </SelectContent>
           </Select>
+        );
+
+      case "media":
+        return (
+          <div className="space-y-2">
+            {modeloEspecFormData.valor ? (
+              <div className="space-y-2">
+                {renderMediaPreview(modeloEspecFormData.valor)}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-slate-300 text-xs"
+                  onClick={() =>
+                    setModeloEspecFormData((prev) => ({ ...prev, valor: "" }))
+                  }
+                >
+                  Cambiar archivo
+                </Button>
+              </div>
+            ) : (
+              <div className="border-2 border-dashed border-slate-300 rounded-md p-4 text-center">
+                {uploadingMedia ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <Loader2 className="h-6 w-6 animate-spin text-orange-600" />
+                    <p className="text-xs text-slate-500">Subiendo...</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-center gap-2 mb-2">
+                      <ImageIcon className="h-5 w-5 text-slate-400" />
+                      <Video className="h-5 w-5 text-slate-400" />
+                    </div>
+                    <p className="text-xs text-slate-500 mb-2">
+                      Selecciona una imagen o video
+                    </p>
+                    <input
+                      ref={mediaInputRef}
+                      type="file"
+                      accept="image/*,video/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleMediaUpload(file);
+                        e.target.value = "";
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-slate-300 text-xs"
+                      onClick={() => mediaInputRef.current?.click()}
+                    >
+                      <Upload className="h-3.5 w-3.5 mr-1" />
+                      Seleccionar archivo
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         );
 
       default:
@@ -853,9 +954,19 @@ export default function EspecificacionesTab() {
                                   <p className="font-semibold text-slate-900">
                                     {me.especificacion_nombre}
                                   </p>
-                                  <p className="text-sm text-slate-600 mt-0.5">
-                                    {me.valor}
-                                  </p>
+                                  {me.tipo_dato === "media" ? (
+                                    <p className="text-sm text-slate-500 mt-0.5 flex items-center gap-1">
+                                      {/\.(mp4|webm|ogg|mov)$/i.test(me.valor || "") ? (
+                                        <><Video className="h-3.5 w-3.5" /> Video</>
+                                      ) : (
+                                        <><ImageIcon className="h-3.5 w-3.5" /> Imagen</>
+                                      )}
+                                    </p>
+                                  ) : (
+                                    <p className="text-sm text-slate-600 mt-0.5">
+                                      {me.valor}
+                                    </p>
+                                  )}
                                 </div>
                               </div>
 
@@ -909,9 +1020,25 @@ export default function EspecificacionesTab() {
                                     <p className="text-orange-600 font-semibold">
                                       Valor
                                     </p>
-                                    <p className="text-orange-900 mt-1">
-                                      {me.valor}
-                                    </p>
+                                    {me.tipo_dato === "media" && me.valor ? (
+                                      /\.(mp4|webm|ogg|mov)$/i.test(me.valor) ? (
+                                        <video
+                                          src={me.valor}
+                                          controls
+                                          className="mt-2 max-h-48 w-full rounded object-contain"
+                                        />
+                                      ) : (
+                                        <img
+                                          src={me.valor}
+                                          alt={me.especificacion_nombre}
+                                          className="mt-2 max-h-48 w-full rounded object-contain"
+                                        />
+                                      )
+                                    ) : (
+                                      <p className="text-orange-900 mt-1">
+                                        {me.valor}
+                                      </p>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -993,7 +1120,7 @@ export default function EspecificacionesTab() {
                       <ul className="list-disc list-inside space-y-1">
                         <li>Columnas: nombre, tipo_dato, opciones</li>
                         <li>Para listas, separa opciones con |</li>
-                        <li>Tipos: texto, numero, booleano, lista</li>
+                        <li>Tipos: texto, numero, booleano, lista, media</li>
                       </ul>
                     ) : (
                       <ul className="list-disc list-inside space-y-1">

@@ -51,24 +51,23 @@ async function resolveSocialPlatformId({ phone, channel, platformId }) {
   if (!candidates.length) return { platform: channel, platformId: null };
 
   try {
-    const placeholders = candidates.map(() => "?").join(", ");
-    const [rows] = await db.query(
-      `
-      SELECT platform_id
-      FROM social_identities
-      WHERE platform = ?
-        AND celular IN (${placeholders})
-      ORDER BY id DESC
-      LIMIT 1
-      `,
-      [channel, ...candidates]
-    );
-
-    const found = rows?.[0]?.platform_id;
-    return {
-      platform: channel,
-      platformId: found ? String(found) : null,
-    };
+    for (const candidate of candidates) {
+      const [rows] = await db.query(
+        `
+        SELECT platform_id
+        FROM social_identities
+        WHERE platform = ?
+          AND celular = ?
+        ORDER BY id DESC
+        LIMIT 1
+        `,
+        [channel, candidate]
+      );
+      if (rows?.[0]?.platform_id) {
+        return { platform: channel, platformId: String(rows[0].platform_id) };
+      }
+    }
+    return { platform: channel, platformId: null };
   } catch (error) {
     if (error?.code === "ER_NO_SUCH_TABLE" || error?.errno === 1146 || isMissingColumnError(error)) {
       return { platform: channel, platformId: null };
@@ -384,24 +383,44 @@ export async function POST(req) {
     }
 
     const bulkId = randomUUID();
+
+    // Deduplicar por phone normalizado — evita enviar dos mensajes al mismo número
+    const seenPhones = new Set();
+    const deduplicatedRecipients = recipients.filter((r) => {
+      if (!r?.phone) return true; // sin phone (solo session_id): no deduplicar
+      const phoneKey = normalizeCell(r.phone);
+      if (!phoneKey) return true;
+      if (seenPhones.has(phoneKey)) return false;
+      seenPhones.add(phoneKey);
+      return true;
+    });
+
+    // Procesar en batches paralelos de 50 en lugar de secuencial puro
+    const BATCH_SIZE = 50;
     const results = [];
 
-    for (let i = 0; i < recipients.length; i += 1) {
+    for (let i = 0; i < deduplicatedRecipients.length; i += BATCH_SIZE) {
+      const batch = deduplicatedRecipients.slice(i, i + BATCH_SIZE);
       // eslint-disable-next-line no-await-in-loop
-      const result = await processBulkRecipient({
-        recipient: recipients[i],
-        index: i,
-        text,
-        defaultChannel,
-        bulkId,
-        source,
-      });
-
-      results.push(result);
+      const batchResults = await Promise.all(
+        batch.map((recipient, batchIndex) =>
+          processBulkRecipient({
+            recipient,
+            index: i + batchIndex,
+            text,
+            defaultChannel,
+            bulkId,
+            source,
+          })
+        )
+      );
+      results.push(...batchResults);
     }
 
+    const duplicatesRemoved = recipients.length - deduplicatedRecipients.length;
     const summary = {
       total: results.length,
+      duplicates_removed: duplicatesRemoved,
       sent: 0,
       queued: results.filter((r) => r.status === "queued").length,
       failed: results.filter((r) => r.status === "failed").length,

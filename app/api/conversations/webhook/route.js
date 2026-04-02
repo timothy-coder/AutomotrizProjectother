@@ -6,6 +6,8 @@ import {
   isMissingTableError,
   processOutboxItem,
 } from "@/lib/conversationsOutbox";
+import { normalizePhone as normalizePhoneDigits } from "@/lib/phoneUtils";
+import { logConversationAudit } from "@/lib/conversationsAudit";
 
 function normalizePhone(rawPhone) {
   return String(rawPhone || "")
@@ -14,18 +16,12 @@ function normalizePhone(rawPhone) {
 }
 
 function normalizePhoneForOptOut(rawPhone) {
-  const digits = String(rawPhone || "").replace(/\D/g, "").trim();
+  const digits = normalizePhoneDigits(rawPhone);
   if (!digits) return null;
   return `+${digits}`;
 }
 
-function normalizePhoneDigits(rawPhone) {
-  return String(rawPhone || "").replace(/\D/g, "").trim();
-}
-
-function getPhoneDigitsSql(columnName) {
-  return `REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${columnName}, '+', ''), ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')`;
-}
+const PHONE_DIGITS_SQL = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone_normalized, '+', ''), ' ', ''), '-', ''), '(', ''), ')', ''), '.', '')";
 
 function isMissingColumnError(error) {
   return error?.code === "ER_BAD_FIELD_ERROR" || error?.errno === 1054;
@@ -527,18 +523,8 @@ async function syncCampaignRecipientStatus({
         : "sent";
 
   try {
-    const whereParams = [];
-    const whereClauses = [];
-
-    if (campaignRecipientId) {
-      whereClauses.push("id = ?");
-      whereParams.push(campaignRecipientId);
-    }
-
-    if (messageLogId) {
-      whereClauses.push("message_log_id = ?");
-      whereParams.push(messageLogId);
-    }
+    const recipientId = campaignRecipientId || null;
+    const msgLogId = messageLogId || null;
 
     const [result] = await db.query(
       `
@@ -565,7 +551,8 @@ async function syncCampaignRecipientStatus({
           ELSE NULL
         END,
         updated_at = NOW()
-      WHERE ${whereClauses.join(" OR ")}
+      WHERE (? IS NOT NULL AND id = ?)
+         OR (? IS NOT NULL AND message_log_id = ?)
       `,
       [
         nextStatus,
@@ -574,7 +561,8 @@ async function syncCampaignRecipientStatus({
         nextStatus,
         nextStatus,
         providerPayload ? JSON.stringify(providerPayload) : null,
-        ...whereParams,
+        recipientId, recipientId,
+        msgLogId, msgLogId,
       ]
     );
 
@@ -582,9 +570,10 @@ async function syncCampaignRecipientStatus({
       `
       SELECT DISTINCT campaign_id
       FROM campaign_recipients
-      WHERE ${whereClauses.join(" OR ")}
+      WHERE (? IS NOT NULL AND id = ?)
+         OR (? IS NOT NULL AND message_log_id = ?)
       `,
-      whereParams
+      [recipientId, recipientId, msgLogId, msgLogId]
     );
 
     const campaignIds = (campaignRows || [])
@@ -617,39 +606,29 @@ async function markCampaignResponseWithinWindow({
   if (!inboundMessageId) return { matched: false };
 
   try {
-    const whereClauses = [];
-    const whereParams = [];
-
-    if (sessionId) {
-      whereClauses.push("session_id = ?");
-      whereParams.push(sessionId);
-    }
-
-    if (clientId) {
-      whereClauses.push("client_id = ?");
-      whereParams.push(clientId);
-    }
-
+    const sidParam = sessionId || null;
+    const cidParam = clientId || null;
     const phoneDigits = normalizePhoneDigits(phone);
-    if (phoneDigits) {
-      whereClauses.push(`${getPhoneDigitsSql("phone_normalized")} = ?`);
-      whereParams.push(phoneDigits);
-    }
+    const phoneParam = phoneDigits || null;
 
-    if (!whereClauses.length) return { matched: false };
+    if (!sidParam && !cidParam && !phoneParam) return { matched: false };
 
     const [rows] = await db.query(
       `
       SELECT id, campaign_id
       FROM campaign_recipients
-      WHERE (${whereClauses.join(" OR ")})
+      WHERE (
+        (? IS NOT NULL AND session_id = ?)
+        OR (? IS NOT NULL AND client_id = ?)
+        OR (? IS NOT NULL AND REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone_normalized, '+', ''), ' ', ''), '-', ''), '(', ''), ')', ''), '.', '') = ?)
+      )
         AND sent_at IS NOT NULL
         AND sent_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
         AND status IN ('queued', 'sent', 'delivered', 'read')
       ORDER BY sent_at DESC, id DESC
       LIMIT 1
       `,
-      whereParams
+      [sidParam, sidParam, cidParam, cidParam, phoneParam, phoneParam]
     );
 
     const recipient = rows?.[0];
@@ -818,7 +797,8 @@ export async function POST(req) {
     const expectedSecret = process.env.CONVERSATIONS_WEBHOOK_SECRET;
     const providedSecret = req.headers.get("x-conversations-webhook-secret") || "";
 
-    if (expectedSecret && providedSecret !== expectedSecret) {
+    if (!expectedSecret || providedSecret !== expectedSecret) {
+      console.warn("[webhook] Intento no autorizado — secret inválido o env var no seteada");
       return NextResponse.json({ message: "Webhook no autorizado" }, { status: 401 });
     }
 
@@ -1019,6 +999,16 @@ export async function POST(req) {
         `,
         [inserted.id, slaMinutes, isVentasSource, sessionId]
       );
+
+      // Auditoría: loguear el cambio de last_intent y sla_due_at para trazabilidad
+      logConversationAudit({
+        sessionId,
+        actionType: "INBOUND_MESSAGE",
+        actorUserId: null,
+        actorRole: source || "webhook",
+        changes: { last_intent: "INBOUND_MESSAGE", source_channel: sourceChannel },
+        metadata: { message_id: inserted.id, phone, source },
+      }).catch((err) => console.error("[webhook] logConversationAudit failed:", err));
     } catch (error) {
       if (!isMissingColumnError(error)) throw error;
 

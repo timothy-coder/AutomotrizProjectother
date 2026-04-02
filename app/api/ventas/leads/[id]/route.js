@@ -8,8 +8,10 @@ export async function GET(req, { params }) {
 
   const { id } = await params;
   const [rows] = await db.query(
-    `SELECT l.*, vm.nombre AS modelo_nombre_actual, vv.nombre_version AS version_nombre_actual
+    `SELECT l.*, o.oportunidad_id AS oportunidad_crm_codigo,
+            vm.nombre AS modelo_nombre_actual, vv.nombre_version AS version_nombre_actual
      FROM ventas_leads l
+     LEFT JOIN oportunidades o ON o.id = l.oportunidad_crm_id
      LEFT JOIN ventas_modelos vm ON vm.id = l.modelo_id
      LEFT JOIN ventas_versiones vv ON vv.id = l.version_id
      WHERE l.id = ? OR l.lead_uuid = ?`,
@@ -61,4 +63,19 @@ export async function PATCH(req, { params }) {
   );
 
   return NextResponse.json({ message: "Lead actualizado" });
+}
+
+export async function DELETE(req, { params }) {
+  const auth = authorizeConversation(req, "edit");
+  if (!auth.ok) return auth.response;
+
+  const { id } = await params;
+  const numId = isNaN(Number(id)) ? 0 : Number(id);
+
+  await db.query(
+    `DELETE FROM ventas_leads WHERE id = ? OR lead_uuid = ?`,
+    [numId, id]
+  );
+
+  return NextResponse.json({ message: "Lead eliminado" });
 }

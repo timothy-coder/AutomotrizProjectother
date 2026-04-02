@@ -10,6 +10,10 @@ const MIME_BY_EXT = {
   ".jpeg": "image/jpeg",
   ".webp": "image/webp",
   ".gif": "image/gif",
+  ".mp4": "video/mp4",
+  ".webm": "video/webm",
+  ".ogg": "video/ogg",
+  ".mov": "video/quicktime",
 };
 
 function sanitizeFilename(raw) {

@@ -146,36 +146,19 @@ export async function POST(req) {
       );
     }
 
-    // ✅ GENERAR oportunidad_id automático - FILTRAR SOLO OPO-
-    const year = new Date().getFullYear();
-    
-    // Buscar el último registro con prefijo OPO-{year}-
+    // Generar oportunidad_id automático
     const [lastOpo] = await db.query(
-      `SELECT oportunidad_id FROM oportunidades_oportunidades 
-       WHERE oportunidad_id LIKE ? 
-       ORDER BY id DESC LIMIT 1`,
-      [`OPO-${year}-%`]
+      "SELECT oportunidad_id FROM oportunidades_oportunidades ORDER BY id DESC LIMIT 1"
     );
 
     let nextNumber = 1;
-    
     if (lastOpo.length > 0 && lastOpo[0].oportunidad_id) {
       const parts = lastOpo[0].oportunidad_id.split("-");
-      // parts[0] = "OPO"
-      // parts[1] = año
-      // parts[2] = número
-      const currentNumber = parseInt(parts[2]);
-      nextNumber = currentNumber + 1;
-      
-      console.log(`📊 Último OPO encontrado: ${lastOpo[0].oportunidad_id}`);
-      console.log(`📊 Próximo número: ${nextNumber}`);
-    } else {
-      console.log(`📊 Primer OPO del año ${year}`);
+      nextNumber = parseInt(parts[2]) + 1;
     }
 
+    const year = new Date().getFullYear();
     const oportunidad_id = `OPO-${year}-${String(nextNumber).padStart(3, "0")}`;
-    
-    console.log(`✅ Creando oportunidad con ID: ${oportunidad_id}`);
 
     const [result] = await db.query(
       `INSERT INTO oportunidades_oportunidades 
