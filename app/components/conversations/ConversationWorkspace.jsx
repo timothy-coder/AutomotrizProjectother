@@ -74,6 +74,7 @@ export default function ConversationWorkspace({
   const composerRef = useRef(null);
   const lastMarkedRef = useRef(0);
   const stickToBottomRef = useRef(true);
+  const lastMessageIdRef = useRef(null);
 
 
   async function markAsRead(lastMessageId) {
@@ -186,6 +187,8 @@ export default function ConversationWorkspace({
   useEffect(() => {
     if (!session?.session_id) return;
     lastMarkedRef.current = 0;
+    lastMessageIdRef.current = null;
+    stickToBottomRef.current = true;
     loadTimeline();
   }, [session]);
 
@@ -220,7 +223,13 @@ export default function ConversationWorkspace({
     const el = scrollRef.current;
     if (!el) return;
 
-    if (stickToBottomRef.current) {
+    const lastMsg = messages[messages.length - 1];
+    const latestId = lastMsg?.id ?? null;
+    const isNewMessage = latestId !== lastMessageIdRef.current;
+    lastMessageIdRef.current = latestId;
+
+    // Solo hacer scroll si llegó un mensaje nuevo Y el usuario estaba al fondo
+    if (isNewMessage && stickToBottomRef.current) {
       el.scrollTop = el.scrollHeight;
     }
   }, [messages]);
