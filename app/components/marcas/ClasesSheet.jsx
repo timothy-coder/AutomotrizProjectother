@@ -149,11 +149,11 @@ export default function ClasesSheet({
           {/* Header */}
           <SheetHeader className="border-b pb-4">
             <div className="flex items-center gap-2">
-              <Package size={24} className="text-blue-600" />
+              <Package size={24} className="text-[#5d16ec]" />
               <div>
                 <SheetTitle className="text-xl">Clases de Vehículos</SheetTitle>
                 <SheetDescription>
-                  Gestiona las categorías de vehículos
+                  Gestiona las clases de vehículos
                 </SheetDescription>
               </div>
             </div>
@@ -186,7 +186,7 @@ export default function ClasesSheet({
                     <Button 
                       onClick={onNewClase} 
                       disabled={loading}
-                      className="bg-green-600 hover:bg-green-700 text-white gap-2 ml-auto"
+                      className="bg-[#5d16ec] hover:bg-[#5d16ec]/70 text-white gap-2 ml-auto"
                       size="sm"
                     >
                       <Plus size={16} />
@@ -239,9 +239,7 @@ export default function ClasesSheet({
                       clasesSorted.map((c, index) => (
                         <tr 
                           key={c.id} 
-                          className={`border-b hover:bg-slate-50 transition-colors ${
-                            index % 2 === 0 ? "bg-white" : "bg-slate-50/30"
-                          }`}
+                          className={`border-b transition-colors `}
                         >
                           <td className="p-3">
                             <span className="font-medium text-slate-900">
@@ -257,7 +255,6 @@ export default function ClasesSheet({
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      className="hover:bg-amber-100 hover:text-amber-700"
                                       onClick={() => onEditClase(c)}
                                       disabled={loading}
                                     >
@@ -273,8 +270,7 @@ export default function ClasesSheet({
                                   <TooltipTrigger asChild>
                                     <Button
                                       size="sm"
-                                      variant="ghost"
-                                      className="hover:bg-red-100 hover:text-red-700"
+                                      variant="destructive"
                                       onClick={() => askDeleteClase(c)}
                                       disabled={loading}
                                     >

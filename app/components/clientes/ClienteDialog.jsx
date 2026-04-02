@@ -150,7 +150,7 @@ export default function ClienteDialog({
         <DialogContent className="max-w-3xl">
 
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-[#5d16ec]">
               {isEdit ? "Editar Cliente" : "Nuevo Cliente"}
             </DialogTitle>
           </DialogHeader>
@@ -159,9 +159,17 @@ export default function ClienteDialog({
 
             {/* Nombre */}
             <div className="space-y-1">
-              <Label className="flex items-center gap-1">
+              <Label className="flex items-center gap-1 text-[#5d16ec]">
                 Nombre 
                 <span className="text-red-500">*</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertCircle size={14} className="text-gray-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        Nombre del cliente
+                      </TooltipContent>
+                    </Tooltip>
               </Label>
               <Input
                 value={form.nombre}
@@ -178,9 +186,17 @@ export default function ClienteDialog({
 
             {/* Apellido */}
             <div className="space-y-1">
-              <Label className="flex items-center gap-1">
+              <Label className="flex items-center gap-1 text-[#5d16ec]">
                 Apellido 
                 <span className="text-red-500">*</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertCircle size={14} className="text-gray-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        Apellido del cliente
+                      </TooltipContent>
+                    </Tooltip>
               </Label>
               <Input
                 value={form.apellido}
@@ -197,9 +213,17 @@ export default function ClienteDialog({
 
             {/* Email */}
             <div className="space-y-1">
-              <Label className="flex items-center gap-1">
+              <Label className="flex items-center gap-1 text-[#5d16ec]">
                 Email 
                 <span className="text-red-500">*</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertCircle size={14} className="text-gray-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        Email del cliente
+                      </TooltipContent>
+                    </Tooltip>
               </Label>
               <Input
                 type="email"
@@ -217,9 +241,17 @@ export default function ClienteDialog({
 
             {/* Celular */}
             <div className="space-y-1">
-              <Label className="flex items-center gap-1">
+              <Label className="flex items-center gap-1 text-[#5d16ec]">
                 Celular 
                 <span className="text-red-500">*</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertCircle size={14} className="text-gray-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        Número de celular del cliente
+                      </TooltipContent>
+                    </Tooltip>
               </Label>
               <Input
                 value={form.celular}
@@ -236,9 +268,17 @@ export default function ClienteDialog({
 
             {/* Tipo Identificación */}
             <div className="space-y-1">
-              <Label className="flex items-center gap-1">
+              <Label className="flex items-center gap-1 text-[#5d16ec]">
                 Tipo identificación
                 <span className="text-red-500">*</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertCircle size={14} className="text-gray-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        Tipo de identificación del cliente
+                      </TooltipContent>
+                    </Tooltip>
               </Label>
 
               <Select
@@ -266,9 +306,17 @@ export default function ClienteDialog({
 
             {/* Identificación Fiscal */}
             <div className="space-y-1">
-              <Label className="flex items-center gap-1">
+              <Label className="flex items-center gap-1 text-[#5d16ec]">
                 N° Documento 
                 <span className="text-red-500">*</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertCircle size={14} className="text-gray-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        Número de identificación fiscal del cliente
+                      </TooltipContent>
+                    </Tooltip>
               </Label>
               <Input
                 value={form.identificacion_fiscal}
@@ -286,9 +334,17 @@ export default function ClienteDialog({
             {/* Nombre Comercial - Solo si es RUC */}
             {form.tipo_identificacion === "RUC" && (
               <div className="space-y-1 md:col-span-2">
-                <Label className="flex items-center gap-1">
+                <Label className="flex items-center gap-1 text-[#5d16ec]">
                   Nombre Comercial 
                   <span className="text-red-500">*</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertCircle size={14} className="text-gray-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        Nombre comercial del cliente
+                      </TooltipContent>
+                    </Tooltip>
                 </Label>
                 <Input
                   value={form.nombre_comercial}

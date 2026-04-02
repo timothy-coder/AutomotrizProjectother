@@ -342,9 +342,9 @@ export default function UserDialog({
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="sticky top-0 bg-white border-b pb-4 z-10">
             <div className="flex items-center gap-2">
-              <User size={24} className="text-blue-600" />
+              <User size={24} className="text-[#5d16ec] " />
               <div>
-                <DialogTitle className="text-xl">
+                <DialogTitle className="text-xl text-[#5d16ec]">
                   {isView ? "Ver usuario" : isEdit ? "Editar usuario" : "Nuevo usuario"}
                 </DialogTitle>
                 <DialogDescription>
@@ -392,10 +392,10 @@ export default function UserDialog({
               className="space-y-4 max-h-[50vh] overflow-y-auto pr-4"
             >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                
+
                 {/* Nombre completo */}
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-1">
+                  <Label className="flex items-center gap-1 text-[#5d16ec]">
                     Nombre completo
                     <span className="text-red-500">*</span>
                     <Tooltip>
@@ -418,7 +418,7 @@ export default function UserDialog({
 
                 {/* Usuario */}
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-1">
+                  <Label className="flex items-center gap-1 text-[#5d16ec]">
                     Usuario
                     <span className="text-red-500">*</span>
                     <Tooltip>
@@ -441,9 +441,17 @@ export default function UserDialog({
 
                 {/* Email */}
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-1">
+                  <Label className="flex items-center gap-1 text-[#5d16ec]">
                     Email
                     <span className="text-red-500">*</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertCircle size={14} className="text-gray-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        Email del usuario
+                      </TooltipContent>
+                    </Tooltip>
                   </Label>
                   <Input
                     disabled={isView}
@@ -457,7 +465,18 @@ export default function UserDialog({
 
                 {/* Teléfono */}
                 <div className="space-y-2">
-                  <Label>Teléfono</Label>
+                  <Label className="text-[#5d16ec]">
+                    Teléfono
+                    <span className="text-red-500">*</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertCircle size={14} className="text-gray-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        Teléfono del usuario
+                      </TooltipContent>
+                    </Tooltip>
+                  </Label>
                   <Input
                     disabled={isView}
                     value={form.phone || ""}
@@ -469,7 +488,18 @@ export default function UserDialog({
 
                 {/* Rol */}
                 <div className="space-y-2">
-                  <Label>Rol</Label>
+                  <Label className="text-[#5d16ec]">
+                    Rol
+                    <span className="text-red-500">*</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertCircle size={14} className="text-gray-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        Rol del usuario
+                      </TooltipContent>
+                    </Tooltip>
+                  </Label>
                   <Input
                     disabled={isView}
                     value={form.role || ""}
@@ -481,7 +511,7 @@ export default function UserDialog({
 
                 {/* Color */}
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-1">
+                  <Label className="flex items-center gap-1 text-[#5d16ec]">
                     Color
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -534,7 +564,7 @@ export default function UserDialog({
                 {!isView && (
                   <>
                     <div className="space-y-2">
-                      <Label className="flex items-center gap-1">
+                      <Label className="flex items-center gap-1 text-[#5d16ec]">
                         Contraseña
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -555,7 +585,7 @@ export default function UserDialog({
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Confirmar contraseña</Label>
+                      <Label className="flex items-center gap-1 text-[#5d16ec]">Confirmar contraseña</Label>
                       <Input
                         type="password"
                         value={form.password2 || ""}
@@ -582,7 +612,7 @@ export default function UserDialog({
                     className="w-5 h-5"
                   />
                   <div>
-                    <p className="font-medium text-sm">Usuario activo</p>
+                    <p className="font-medium text-sm text-[#5d16ec]">Usuario activo</p>
                     <p className="text-xs text-gray-600">
                       {form.is_active ? "Puede acceder al sistema" : "Acceso bloqueado"}
                     </p>
@@ -604,7 +634,7 @@ export default function UserDialog({
                         disabled={isView}
                         onCheckedChange={(v) => setDayEnabled(d.key, !!v)}
                       />
-                      <Label className="font-semibold text-slate-900 cursor-pointer flex-1 mb-0">
+                      <Label className="font-semibold text-[#5d16ec] cursor-pointer flex-1 mb-0">
                         {d.label}
                       </Label>
                       {enabled && (
@@ -654,8 +684,8 @@ export default function UserDialog({
                   key={s.key}
                   className="border rounded-lg p-4 hover:border-slate-300 transition-colors"
                 >
-                  <div className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                    <Lock size={16} className="text-blue-600" />
+                  <div className="font-semibold text-[#5d16ec] mb-3 flex items-center gap-2">
+                    <Lock size={16} className="text-[#5d16ec]" />
                     {s.label}
                   </div>
 
@@ -685,20 +715,20 @@ export default function UserDialog({
               value="sitios"
               className="space-y-4 max-h-[55vh] overflow-y-auto pr-4"
             >
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="p-3 bg-[#5d16ec]/10 border border-[#5d16ec] rounded-lg">
                 <p className="text-sm text-slate-900">
-                  <span className="font-semibold">Centros seleccionados:</span>
+                  <span className="font-semibold text-[#5d16ec]">Centros seleccionados:</span>
                   <br />
                   <span className="text-slate-700">{centrosSeleccionadosTexto}</span>
                 </p>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                
+
                 {/* Centros */}
                 <div className="border rounded-lg p-4">
-                  <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                    <MapPin size={16} className="text-blue-600" />
+                  <h3 className="font-semibold text-[#5d16ec] mb-3 flex items-center gap-2">
+                    <MapPin size={16} className="text-[#5d16ec]" />
                     Centros
                   </h3>
 
@@ -733,8 +763,8 @@ export default function UserDialog({
 
                 {/* Talleres */}
                 <div className="border rounded-lg p-4">
-                  <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                    <Palette size={16} className="text-purple-600" />
+                  <h3 className="font-semibold text-[#5d16ec] mb-3 flex items-center gap-2">
+                    <MapPin size={16} className="text-[#5d16ec]" />
                     Talleres
                   </h3>
 
@@ -775,8 +805,8 @@ export default function UserDialog({
 
                 {/* Mostradores */}
                 <div className="border rounded-lg p-4">
-                  <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                    <Palette size={16} className="text-green-600" />
+                  <h3 className="font-semibold text-[#5d16ec] mb-3 flex items-center gap-2">
+                    <MapPin size={16} className="text-[#5d16ec]" />
                     Mostradores
                   </h3>
 
@@ -819,8 +849,8 @@ export default function UserDialog({
           </Tabs>
 
           <DialogFooter className="border-t pt-4 mt-6 flex gap-2 justify-end">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => onOpenChange(false)}
             >
               {isView ? "Cerrar" : "Cancelar"}
@@ -829,8 +859,8 @@ export default function UserDialog({
             {!isView && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button 
-                    onClick={handleSave} 
+                  <Button
+                    onClick={handleSave}
                     disabled={passMismatch}
                     className="bg-blue-600 hover:bg-blue-700 text-white"
                   >

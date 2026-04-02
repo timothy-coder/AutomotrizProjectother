@@ -171,7 +171,7 @@ export default function AlgoritmoVisitaSheet({
           {/* Header */}
           <SheetHeader className="border-b pb-4">
             <div className="flex items-center gap-2">
-              <Wrench size={24} className="text-blue-600" />
+              <Wrench size={24} className="text-[#5d16ec]" />
               <div>
                 <SheetTitle className="text-xl">Tiempo de Mantenimiento</SheetTitle>
                 <SheetDescription>
@@ -208,7 +208,7 @@ export default function AlgoritmoVisitaSheet({
                     <Button 
                       onClick={onNewRecord} 
                       disabled={loading}
-                      className="bg-green-600 hover:bg-green-700 text-white gap-2 ml-auto"
+                      className="bg-[#5d16ec] hover:bg-[#5d16ec]/70 text-white gap-2 ml-auto"
                       size="sm"
                     >
                       <Plus size={16} />
@@ -293,9 +293,7 @@ export default function AlgoritmoVisitaSheet({
                       recordsSorted.map((record, index) => (
                         <tr 
                           key={record.id}
-                          className={`border-b hover:bg-slate-50 transition-colors ${
-                            index % 2 === 0 ? "bg-white" : "bg-slate-50/30"
-                          }`}
+                          className={`border-b transition-colors `}
                         >
                           <td className="p-3">
                             <span className="font-medium text-slate-900">
@@ -326,7 +324,6 @@ export default function AlgoritmoVisitaSheet({
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      className="hover:bg-amber-100 hover:text-amber-700"
                                       onClick={() => onEditRecord(record)}
                                       disabled={loading}
                                     >
@@ -342,8 +339,7 @@ export default function AlgoritmoVisitaSheet({
                                   <TooltipTrigger asChild>
                                     <Button
                                       size="sm"
-                                      variant="ghost"
-                                      className="hover:bg-red-100 hover:text-red-700"
+                                      variant="destructive"
                                       onClick={() => askDeleteRecord(record)}
                                       disabled={loading}
                                     >

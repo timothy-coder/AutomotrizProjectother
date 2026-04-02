@@ -11,7 +11,7 @@ import {
 import { Menu } from "lucide-react";
 import SidebarContent from "./SidebarContent";
 
-export default function Sidebar() {
+export default function Sidebar({ user, logout }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -23,11 +23,16 @@ export default function Sidebar() {
           </Button>
         </SheetTrigger>
 
-        <SheetContent side="left" className="p-0 w-72   ">
+        <SheetContent side="left" className="p-0 w-72 flex flex-col">
           {/* ✅ Title requerido por accesibilidad (oculto visualmente) */}
           <SheetTitle className="sr-only">Menú de navegación</SheetTitle>
 
-          <SidebarContent onNavigate={() => setOpen(false)} />
+          {/* ✅ Pasa user y logout a SidebarContent */}
+          <SidebarContent 
+            onNavigate={() => setOpen(false)}
+            user={user}
+            logout={logout}
+          />
         </SheetContent>
       </Sheet>
     </div>

@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Package } from "lucide-react";
 
 export default function ClaseDialog({ open, onOpenChange, mode, clase, onSave }) {
   const isView = mode === "view";
@@ -37,18 +38,26 @@ export default function ClaseDialog({ open, onOpenChange, mode, clase, onSave })
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg w-full overflow-hidden">
-        <DialogHeader>
-          <DialogTitle>
-            {isView ? "Ver clase" : isEdit ? "Editar clase" : "Nueva clase"}
-          </DialogTitle>
-          <DialogDescription>
-            {isView ? "Solo lectura." : "Completa la información y guarda."}
-          </DialogDescription>
+        <DialogHeader >
+          <div className="flex items-center gap-2">
+            <Package size={24} className="text-[#5d16ec]" />
+            <div>
+              <DialogTitle className="text-[#5d16ec]">
+
+                {isView ? "Ver clase" : isEdit ? "Editar clase" : "Nueva clase"}
+              </DialogTitle>
+              <DialogDescription>
+                {isView ? "Solo lectura." : "Completa la información y guarda."}
+              </DialogDescription>
+            </div>
+          </div>
+
+
         </DialogHeader>
 
         <div className="space-y-4 mt-2">
           <div>
-            <Label>Nombre</Label>
+            <Label className="text-[#5d16ec]">Nombre</Label>
             <Input
               disabled={isView}
               value={form.name || ""}

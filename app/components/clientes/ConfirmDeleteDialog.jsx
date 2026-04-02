@@ -12,7 +12,7 @@ export default function ConfirmDeleteDialog({ open, onConfirm, onOpenChange }) {
         ¿Eliminar registro?
 
         <DialogFooter>
-          <Button variant="outline" onClick={()=>onOpenChange(false)}>Cancelar</Button>
+          <Button variant="ghost" onClick={()=>onOpenChange(false)}>Cancelar</Button>
           <Button variant="destructive" onClick={onConfirm}>Eliminar</Button>
         </DialogFooter>
 

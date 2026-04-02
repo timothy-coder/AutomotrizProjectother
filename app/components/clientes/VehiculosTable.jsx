@@ -41,20 +41,7 @@ export default function VehiculosTable({
             </p>
           </div>
 
-          {onCreate && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  onClick={onCreate}
-                  className="bg-green-600 hover:bg-green-700 text-white gap-2 w-full sm:w-auto"
-                >
-                  <Plus size={16} />
-                  Agregar vehículo
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Registrar nuevo vehículo</TooltipContent>
-            </Tooltip>
-          )}
+          
         </div>
 
         {/* Content */}
@@ -81,7 +68,7 @@ export default function VehiculosTable({
                   
                   {/* Placas y modelo */}
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="inline-flex items-center justify-center bg-blue-100 text-blue-700 px-3 py-1 rounded-md text-sm font-semibold">
+                    <span className="inline-flex items-center justify-center bg-[#5d16ec]/10 text-[#5d16ec] px-3 py-1 rounded-md text-sm font-semibold">
                       {v.placas || "SIN PLACAS"}
                     </span>
                     <div className="font-medium text-slate-900 truncate">
@@ -127,7 +114,6 @@ export default function VehiculosTable({
                         <Button 
                           size="sm" 
                           variant="ghost"
-                          className="hover:bg-amber-100 hover:text-amber-700"
                           onClick={() => onEdit(v)}
                         >
                           <Pencil size={16} />
@@ -142,8 +128,7 @@ export default function VehiculosTable({
                       <TooltipTrigger asChild>
                         <Button
                           size="sm"
-                          variant="ghost"
-                          className="hover:bg-red-100 hover:text-red-700"
+                          variant="destructive"
                           onClick={() => askDelete(v)}
                         >
                           <Trash2 size={16} />

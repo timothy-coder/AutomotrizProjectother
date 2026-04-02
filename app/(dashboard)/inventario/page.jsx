@@ -299,7 +299,7 @@ export default function InventarioPage() {
                         setOpenDialog(true);
                       }}
                     >
-                      <Eye size={16} className="text-blue-600" />
+                      <Eye size={16}  />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Ver detalles</TooltipContent>
@@ -319,7 +319,7 @@ export default function InventarioPage() {
                             setOpenDialog(true);
                           }}
                         >
-                          <Pencil size={16} className="text-amber-600" />
+                          <Pencil size={16}  />
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>Editar producto</TooltipContent>
@@ -336,7 +336,7 @@ export default function InventarioPage() {
                             setOpenDist(true);
                           }}
                         >
-                          <Boxes size={16} className="text-purple-600" />
+                          <Boxes size={16}  />
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>Distribuir stock</TooltipContent>
@@ -349,14 +349,14 @@ export default function InventarioPage() {
                     <TooltipTrigger asChild>
                       <Button
                         size="sm"
-                        variant="ghost"
+                        variant="destructive"
                         className="h-8 w-8 p-0"
                         onClick={() => {
                           setDeleteTarget(p);
                           setOpenDelete(true);
                         }}
                       >
-                        <Trash2 size={16} className="text-red-600" />
+                        <Trash2 size={16}  />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>Eliminar producto</TooltipContent>
@@ -403,7 +403,7 @@ export default function InventarioPage() {
       <div className="border-b border-slate-200 pb-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg">
+            <div className="p-2.5 bg-[#5d16ec] rounded-lg">
               <Package className="h-6 w-6 text-white" />
             </div>
             <div>
@@ -442,7 +442,7 @@ export default function InventarioPage() {
                         setDialogMode("create");
                         setOpenDialog(true);
                       }}
-                      className="gap-2 bg-blue-600 hover:bg-blue-700"
+                      className="gap-2 bg-[#5d16ec] hover:bg-[#5d16ec]/70"
                     >
                       <Plus className="h-4 w-4" />
                       Nuevo Producto

@@ -1,6 +1,6 @@
 import {
-  Users, Milestone, ListChecks, UserRound, Blinds, Boxes, Settings,
-  CalendarCheck, ClipboardList, Receipt, SquareDashedMousePointer, FileText, Home, CarFront, Columns2, Columns3, Coins, Calendar, MessageCircle, ShoppingCart, BookOpen, SlidersHorizontal
+  Users, Milestone, ListChecks, UserRound, Blinds, Boxes, Settings,Car,
+  CalendarCheck, ClipboardList, Receipt, SquareDashedMousePointer, FileText, Home, CarFront, Columns2, Wrench, Coins, Calendar, MessageCircle, ShoppingCart, BookOpen, SlidersHorizontal
 } from "lucide-react";
 export const HOME_ITEM = { to: "/home", label: "Panel de Control", icon: Home, perm: ["home", "view"] };
 export const NAV_TREE = [
@@ -10,14 +10,14 @@ export const NAV_TREE = [
     items: [
       { to: "/usuarios", label: "Usuarios", icon: Users, perm: ["usuarios", "view"] },
       { to: "/clientes", label: "Clientes", icon: UserRound, perm: ["clientes", "view"] },
-      { to: "/marcas", label: "Marcas", icon: Blinds, perm: ["marcas", "view"] },
+      { to: "/marcas", label: "Marcas", icon: Car, perm: ["marcas", "view"] },
     ],
   },
   {
     key: "ppventa",
     label: "Inventario PostVenta",
     items: [
-      { to: "/combomantenimiento", label: "Mantenimiento", icon: Columns3, perm: ["combomantenimiento", "view"] },
+      { to: "/combomantenimiento", label: "Mantenimiento", icon: Wrench, perm: ["combomantenimiento", "view"] },
       { to: "/precios", label: "Precios", icon: Coins, perm: ["precios", "view"] },
       { to: "/inventario", label: "Inventario", icon: Boxes, perm: ["inventario", "view"] },
 

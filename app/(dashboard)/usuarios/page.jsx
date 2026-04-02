@@ -77,7 +77,7 @@ export default function UsuariosPage() {
         {/* HEADER */}
         <div className="border-b border-gray-200 pb-6">
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-3 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg shadow-md">
+            <div className="p-3 bg-[#5d16ec] rounded-lg shadow-md">
               <Users className="h-6 w-6 text-white" />
             </div>
             <div>
@@ -99,10 +99,10 @@ export default function UsuariosPage() {
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-blue-600 font-medium">
+                      <p className="text-sm text-[#5d16ec] font-medium">
                         Total de Usuarios
                       </p>
-                      <p className="text-3xl font-bold text-blue-900 mt-2">
+                      <p className="text-3xl font-bold text-[#5d16ec] mt-2">
                         {stats.total}
                       </p>
                     </div>
@@ -164,11 +164,11 @@ export default function UsuariosPage() {
         </div>
 
         {/* BÚSQUEDA Y BOTÓN */}
-        <Card className="border-l-4 border-l-blue-500 shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b space-y-3">
+        <Card className="border-l-4 border-l-[#5d16ec] shadow-lg">
+          <CardHeader className=" border-b space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-blue-600 rounded-lg">
+                <div className="p-2.5 bg-[#5d16ec] rounded-lg">
                   <Users className="h-5 w-5 text-white" />
                 </div>
                 <div className="flex-1">
@@ -186,7 +186,7 @@ export default function UsuariosPage() {
                   <TooltipTrigger asChild>
                     <Button
                       onClick={handleNew}
-                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-md gap-2"
+                      className="bg-[#5d16ec] hover:bg-[#5d16ec]/90 text-white shadow-md gap-2"
                     >
                       <Plus className="h-4 w-4" />
                       <span className="hidden sm:inline">Nuevo Usuario</span>
@@ -199,17 +199,9 @@ export default function UsuariosPage() {
               )}
             </div>
 
-            <Badge
-              variant="secondary"
-              className="w-fit bg-blue-100 text-blue-900 border-blue-300"
-            >
-              <CheckCircle className="h-3 w-3 mr-1" />
-              {stats.total} usuario{stats.total !== 1 ? "s" : ""} registrado
-              {stats.total !== 1 ? "s" : ""}
-            </Badge>
           </CardHeader>
 
-          <CardContent className="pt-6">
+          <CardContent className="">
             <Tooltip>
               <TooltipTrigger asChild>
                 <div>
@@ -224,10 +216,10 @@ export default function UsuariosPage() {
         </Card>
 
         {/* TABLA PRINCIPAL */}
-        <Card className="border-l-4 border-l-blue-500 shadow-lg overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b space-y-3">
+        <Card className="border-l-4 border-l-[#5d16ec] shadow-lg overflow-hidden">
+          <CardHeader className="border-b space-y-3">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-blue-600 rounded-lg">
+              <div className="p-2.5 bg-[#5d16ec] rounded-lg">
                 <Users className="h-5 w-5 text-white" />
               </div>
               <div className="flex-1">
