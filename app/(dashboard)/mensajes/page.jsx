@@ -214,6 +214,15 @@ export default function ConversationsPage() {
     load();
   }, [user?.id]);
 
+  // ── Polling: actualizar lista de sesiones cada 15 s ──────────
+  useEffect(() => {
+    if (!user?.id) return;
+    const timer = setInterval(() => {
+      load();
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [user?.id]);
+
   // ── Favicon + título con contador de no leídos ───────────────
   useEffect(() => {
     const total = sessions.reduce((acc, s) => acc + Number(s?.unread_count || 0), 0);

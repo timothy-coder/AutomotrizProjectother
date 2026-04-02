@@ -40,7 +40,7 @@ export async function POST(req) {
     return NextResponse.json({ message: "channel inválido. Valores permitidos: whatsapp, instagram, facebook" }, { status: 400 });
   }
 
-  // Resolver session_id por teléfono
+  // Resolver session_id por teléfono — si no existe, crear la sesión
   let sessionId = null;
   try {
     const [sessions] = await db.query(
@@ -49,9 +49,18 @@ export async function POST(req) {
        ORDER BY updated_at DESC LIMIT 1`,
       [phone]
     );
-    sessionId = sessions[0]?.id || null;
+    if (sessions[0]?.id) {
+      sessionId = sessions[0].id;
+    } else {
+      const [created] = await db.query(
+        `INSERT INTO conversation_sessions (phone, state, assignment_status, created_at, updated_at)
+         VALUES (?, 'NO_HISTORIAL', 'open', NOW(), NOW())`,
+        [phone]
+      );
+      sessionId = created.insertId;
+    }
   } catch (e) {
-    console.warn("[send-message] No se pudo resolver session_id:", e.message);
+    console.warn("[send-message] No se pudo resolver/crear session_id:", e.message);
   }
 
   // Generar idempotency key para evitar doble envío
@@ -104,26 +113,33 @@ export async function POST(req) {
     if (outbox.enabled && outbox.id) {
       const result = await processOutboxItem(outbox.id);
       return NextResponse.json({
-        ok: result.ok,
-        outbox_id: outbox.id,
-        session_id: sessionId,
-        idempotency_key: idempotencyKey,
-        status: result.status || "retrying",
+        data: {
+          ok: result.ok,
+          outbox_id: outbox.id,
+          session_id: sessionId,
+          idempotency_key: idempotencyKey,
+          status: result.status || "retrying",
+        },
       });
     }
 
-    // Fallback si la tabla outbox no existe
+    // Fallback si la tabla outbox no existe o messageLogId no disponible
     const outboundUrl = process.env.N8N_CONVERSATIONS_OUTBOUND_URL;
     if (!outboundUrl) {
       return NextResponse.json({ message: "Error de configuración del servidor" }, { status: 500 });
     }
-    const res = await fetch(outboundUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(outboundPayload),
-      signal: AbortSignal.timeout(8000),
-    });
-    return NextResponse.json({ ok: res.ok, session_id: sessionId, idempotency_key: idempotencyKey });
+    try {
+      const res = await fetch(outboundUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(outboundPayload),
+        signal: AbortSignal.timeout(8000),
+      });
+      return NextResponse.json({ data: { ok: res.ok, session_id: sessionId, idempotency_key: idempotencyKey } });
+    } catch (fetchErr) {
+      console.error("[send-message] fetch fallback failed:", fetchErr.message);
+      return NextResponse.json({ message: "Error enviando mensaje" }, { status: 502 });
+    }
   } catch (e) {
     if (isMissingTableError(e)) {
       // Fallback directo si la tabla outbox no existe
@@ -138,13 +154,13 @@ export async function POST(req) {
           body: JSON.stringify(outboundPayload),
           signal: AbortSignal.timeout(8000),
         });
-        return NextResponse.json({ ok: res.ok, session_id: sessionId, idempotency_key: idempotencyKey });
+        return NextResponse.json({ data: { ok: res.ok, session_id: sessionId, idempotency_key: idempotencyKey } });
       } catch (fetchErr) {
         console.error("[send-message] fetch fallback failed:", fetchErr.message);
-        return NextResponse.json({ ok: false, message: "Error enviando mensaje" }, { status: 502 });
+        return NextResponse.json({ message: "Error enviando mensaje" }, { status: 502 });
       }
     }
     console.error("[send-message] Error inesperado:", e.message);
-    return NextResponse.json({ ok: false, message: "Error enviando mensaje" }, { status: 502 });
+    return NextResponse.json({ message: "Error enviando mensaje" }, { status: 502 });
   }
 }

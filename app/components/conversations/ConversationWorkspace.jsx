@@ -162,6 +162,11 @@ export default function ConversationWorkspace({
         throw new Error(data?.message || "No se pudo enviar el mensaje");
       }
 
+      // Advertir si el mensaje se registró pero no llegó al proveedor de mensajería
+      if (data?.message_status === "failed" || data?.n8n?.forwarded === false) {
+        setError("Mensaje guardado, pero no se pudo entregar al cliente. Verificá la configuración del servidor de envío.");
+      }
+
       setNewMessage("");
       setQuotedMessage(null);
       await loadTimeline();
