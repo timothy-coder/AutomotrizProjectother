@@ -85,17 +85,21 @@ export async function POST(req) {
   };
 
   // Encolar en outbox y procesar inmediatamente
+  // Si messageLogId es null (agent_actions_log no disponible) saltamos el outbox
+  // para no lanzar ER_BAD_NULL_ERROR en la columna NOT NULL message_log_id
   try {
-    const outbox = await enqueueOutbound({
-      sessionId,
-      messageLogId,
-      phone,
-      source: "ventas_ia",
-      sourceChannel: channel,
-      idempotencyKey,
-      externalMessageId: null,
-      payload: outboundPayload,
-    });
+    const outbox = messageLogId
+      ? await enqueueOutbound({
+          sessionId,
+          messageLogId,
+          phone,
+          source: "ventas_ia",
+          sourceChannel: channel,
+          idempotencyKey,
+          externalMessageId: null,
+          payload: outboundPayload,
+        })
+      : { enabled: false, id: null, reason: "messageLogId no disponible" };
 
     if (outbox.enabled && outbox.id) {
       const result = await processOutboxItem(outbox.id);
