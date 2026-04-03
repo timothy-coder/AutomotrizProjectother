@@ -1137,7 +1137,7 @@ export default function OportunidadDialog({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <label className="text-sm font-medium">
+                  <label className="text-sm font-medium text-[#5d16ec]">
                     Cliente *{" "}
                     {isEdit && (
                       <span className="text-xs text-muted-foreground">
@@ -1149,7 +1149,7 @@ export default function OportunidadDialog({
                     <TooltipTrigger asChild>
                       <Info
                         size={14}
-                        className="text-muted-foreground cursor-help"
+                        className="text-muted-foreground cursor-help text-red-500"
                       />
                     </TooltipTrigger>
                     <TooltipContent side="right">
@@ -1175,7 +1175,7 @@ export default function OportunidadDialog({
               </div>
 
               <div>
-                <label className="text-sm font-medium block mb-2">
+                <label className="text-sm font-medium block mb-2 text-[#5d16ec]">
                   Creado por
                 </label>
                 <div className="h-10 rounded-md border px-3 flex items-center text-sm bg-muted font-medium">
@@ -1184,13 +1184,13 @@ export default function OportunidadDialog({
               </div>
 
               <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <label className="text-sm font-medium">Origen *</label>
+                <div className="flex items-center gap-2 mb-2 ">
+                  <label className="text-sm font-medium text-[#5d16ec]">Origen *</label>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Info
                         size={14}
-                        className="text-muted-foreground cursor-help"
+                        className="text-muted-foreground cursor-help text-red-500"
                       />
                     </TooltipTrigger>
                     <TooltipContent side="right">
@@ -1211,7 +1211,7 @@ export default function OportunidadDialog({
               </div>
 
               <div>
-                <label className="text-sm font-medium block mb-2">
+                <label className="text-sm font-medium block mb-2 text-[#5d16ec]">
                   Suborigen
                 </label>
                 <Combobox
@@ -1233,12 +1233,12 @@ export default function OportunidadDialog({
 
               <div className="md:col-span-2">
                 <div className="flex items-center gap-2 mb-2">
-                  <label className="text-sm font-medium">Detalle</label>
+                  <label className="text-sm font-medium text-[#5d16ec]">Detalle</label>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Info
                         size={14}
-                        className="text-muted-foreground cursor-help"
+                        className="text-muted-foreground cursor-help text-red-500"
                       />
                     </TooltipTrigger>
                     <TooltipContent side="right">
@@ -1256,17 +1256,17 @@ export default function OportunidadDialog({
               </div>
 
               <div>
-                <label className="text-sm font-medium block mb-2">
+                <label className="text-sm font-medium block mb-2 text-[#5d16ec]">
                   Etapa actual
                 </label>
-                <div className="h-10 rounded-md border px-3 flex items-center text-sm bg-gradient-to-r from-blue-50 to-indigo-50 font-medium text-blue-700">
+                <div className="h-10 rounded-md border px-3 flex items-center text-sm bg-[#5d16ec]/20 font-medium text-[#5d16ec]">
                   {etapaActual ? getLabel(etapaActual) : "Nuevo"}
                 </div>
               </div>
 
               {permViewAll && (
                 <div>
-                  <label className="text-sm font-medium block mb-2">
+                  <label className="text-sm font-medium block mb-2 text-[#5d16ec]">
                     Asignado a
                   </label>
                   <Combobox
@@ -1334,7 +1334,7 @@ export default function OportunidadDialog({
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <History size={16} className="text-slate-600" />
+                        <History size={16} className="text-green-600" />
                         <h4 className="text-sm font-semibold text-slate-900">
                           Agendas ({detallesAMostrar.length})
                         </h4>
