@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, LogOut } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,23 +24,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const [user, setUser] = useState(null);
-  const [checkingAuth, setCheckingAuth] = useState(true);
-
-  // ✅ Verificar si ya está autenticado
-  useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      try {
-        const userData = JSON.parse(storedUser);
-        setUser(userData);
-      } catch (e) {
-        console.error("Error parsing user:", e);
-      }
-    }
-    setCheckingAuth(false);
-  }, []);
-
   async function handleLogin(e) {
     e.preventDefault();
     setLoading(true);
@@ -61,12 +44,11 @@ export default function LoginPage() {
       }
 
       // Cookie para protección (si tu backend no la setea)
-      // Si "Recordarme" = true, la cookie dura más
+      // Si “Recordarme” = true, la cookie dura más
       const maxAge = remember ? 60 * 60 * 24 * 30 : 60 * 60 * 8;
       document.cookie = `token=${data.token}; path=/; max-age=${maxAge}; samesite=lax`;
 
       localStorage.setItem("user", JSON.stringify(data.user));
-      setUser(data.user);
 
       router.push("/home");
     } catch {
@@ -76,90 +58,6 @@ export default function LoginPage() {
     }
   }
 
-  function handleLogout() {
-    localStorage.removeItem("user");
-    document.cookie = "token=; path=/;";
-    setUser(null);
-    setUsername("");
-    setPassword("");
-    setError("");
-  }
-
-  function handleGoToPortal() {
-    router.push("/home");
-  }
-
-  if (checkingAuth) {
-    return (
-      <div className="min-h-svh w-full flex items-center justify-center px-4 bg-slate-950">
-        <p className="text-slate-400">Cargando...</p>
-      </div>
-    );
-  }
-
-  // ✅ SI YA ESTÁ AUTENTICADO
-  if (user) {
-    return (
-      <div className="min-h-svh w-full flex items-center justify-center px-4 bg-slate-950">
-        <Card className="w-full max-w-3xl overflow-hidden shadow-sm border-white/10 bg-slate-950">
-          <div className="flex flex-col md:flex-row">
-            <aside className="w-full md:w-5/12 p-6 md:p-8 flex items-center justify-center border-b md:border-b-0 md:border-r border-white/10">
-              <div className="text-center">
-                <img src="/Logopreview.png" alt="Logo" className="max-h-40 mx-auto" />
-                <p className="text-lg font-semibold mt-2 text-white">¡Bienvenido de vuelta!</p>
-                <p className="text-sm text-slate-400">
-                  Ya tienes sesión iniciada
-                </p>
-              </div>
-            </aside>
-
-            <div className="w-full md:w-7/12">
-              <CardHeader>
-                <CardTitle className="text-2xl font-bold" style={{ color: BRAND }}>
-                  Sesión activa
-                </CardTitle>
-              </CardHeader>
-
-              <CardContent className="space-y-4">
-                {/* ✅ Información del usuario */}
-                <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-lg p-4">
-                  <p className="text-sm text-slate-400 mb-2">Usuario autenticado:</p>
-                  <p className="text-xl font-semibold text-white">
-                    {user.fullname}
-                  </p>
-                  <p className="text-sm text-slate-400 mt-1">
-                    {user.email}
-                  </p>
-                </div>
-
-                {/* ✅ Botones */}
-                <div className="space-y-3 pt-4">
-                  <Button
-                    onClick={handleGoToPortal}
-                    className="w-full text-white"
-                    style={{ backgroundColor: BRAND }}
-                  >
-                    Ir al portal
-                  </Button>
-
-                  <Button
-                    onClick={handleLogout}
-                    variant="outline"
-                    className="w-full text-slate-200 border-white/10 hover:bg-white/5"
-                  >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Cerrar sesión
-                  </Button>
-                </div>
-              </CardContent>
-            </div>
-          </div>
-        </Card>
-      </div>
-    );
-  }
-
-  // ✅ SI NO ESTÁ AUTENTICADO - MOSTRAR FORMULARIO DE LOGIN
   return (
     <div className="min-h-svh w-full flex items-center justify-center px-4 bg-slate-950">
       <Card className="w-full max-w-3xl overflow-hidden shadow-sm border-white/10 bg-slate-950">

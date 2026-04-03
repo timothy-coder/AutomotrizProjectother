@@ -61,6 +61,7 @@ export default function MarcasTable({
                   size="sm"
                   onClick={row.getToggleExpandedHandler()}
                   disabled={!hasModels}
+                  className="px-2 hover:bg-blue-100"
                 >
                   {row.getIsExpanded() ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                 </Button>
@@ -105,7 +106,7 @@ export default function MarcasTable({
           const marcaId = Number(row.original.id);
           const list = modelosByMarca.get(marcaId) || [];
           return (
-            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-[#5d16ec] text-xs font-semibold">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
               {list.length}
             </span>
           );
@@ -124,6 +125,7 @@ export default function MarcasTable({
                   <Button
                     size="sm"
                     variant="ghost"
+                    className="hover:bg-blue-100 hover:text-blue-700"
                     onClick={() => onViewMarca?.(m)}
                   >
                     <Eye size={16} />
@@ -138,6 +140,7 @@ export default function MarcasTable({
                     <Button
                       size="sm"
                       variant="ghost"
+                      className="hover:bg-amber-100 hover:text-amber-700"
                       onClick={() => onEditMarca?.(m)}
                     >
                       <Pencil size={16} />
@@ -152,7 +155,8 @@ export default function MarcasTable({
                   <TooltipTrigger asChild>
                     <Button
                       size="sm"
-                      variant="destructive"
+                      variant="ghost"
+                      className="hover:bg-red-100 hover:text-red-700"
                       onClick={() => onDeleteMarca?.(m)}
                     >
                       <Trash2 size={16} />
@@ -167,7 +171,7 @@ export default function MarcasTable({
                   <TooltipTrigger asChild>
                     <Button
                       size="sm"
-                      className="bg-[#5d16ec] hover:bg-[#5d16ec]/70 text-white gap-1"
+                      className="bg-green-600 hover:bg-green-700 text-white gap-1"
                       onClick={() => onNewModelo?.(m.id)}
                     >
                       <Plus size={16} />
@@ -301,7 +305,9 @@ export default function MarcasTable({
                   return (
                     <Fragment key={row.id}>
                       <tr 
-                        className={`border-b transition-colors`}
+                        className={`border-b hover:bg-slate-50 transition-colors ${
+                          index % 2 === 0 ? "bg-white" : "bg-slate-50/30"
+                        }`}
                       >
                         {row.getVisibleCells().map((cell) => (
                           <td 

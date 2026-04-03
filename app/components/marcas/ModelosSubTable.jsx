@@ -23,11 +23,11 @@ export default function ModelosSubTable({
 
         {/* Header */}
         <div className="flex items-center gap-2">
-          <Package size={20} className="text-[#5d16ec]" />
+          <Package size={20} className="text-blue-600" />
           <h3 className="font-semibold text-slate-900">
             Modelos de {marca?.name}
           </h3>
-          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-[#5d16ec] text-xs font-semibold">
+          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
             {modelos.length}
           </span>
         </div>
@@ -58,7 +58,9 @@ export default function ModelosSubTable({
                 {modelos.map((modelo, index) => (
                   <tr 
                     key={modelo.id} 
-                    className={`border-b  transition-colors `}
+                    className={`border-b hover:bg-slate-50 transition-colors ${
+                      index % 2 === 0 ? "bg-white" : "bg-slate-50/30"
+                    }`}
                   >
                     {/* Nombre */}
                     <td className="p-3">
@@ -87,6 +89,7 @@ export default function ModelosSubTable({
                               <Button
                                 size="sm"
                                 variant="ghost"
+                                className="hover:bg-amber-100 hover:text-amber-700"
                                 onClick={() => onEdit?.(modelo)}
                               >
                                 <Pencil size={16} />
@@ -101,7 +104,8 @@ export default function ModelosSubTable({
                             <TooltipTrigger asChild>
                               <Button
                                 size="sm"
-                                variant="destructive"
+                                variant="ghost"
+                                className="hover:bg-red-100 hover:text-red-700"
                                 onClick={() => onDelete?.(modelo)}
                               >
                                 <Trash2 size={16} />

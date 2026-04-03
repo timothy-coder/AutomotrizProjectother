@@ -2,10 +2,16 @@
 
 import SidebarContent from "./SidebarContent";
 
-export default function SidebarDesktop() {
+export default function SidebarDesktop({ open }) {
   return (
-    <div className="hidden md:block transition-all duration-300">
+    <aside
+      className={`
+        hidden md:block
+        transition-all duration-300
+        ${open ? "w-72" : "w-0 overflow-hidden"}
+      `}
+    >
       <SidebarContent />
-    </div>
+    </aside>
   );
 }

@@ -11,10 +11,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { Download, Upload, AlertCircle, Copy, Loader2, DollarSign, Coins } from "lucide-react";
-
-const BRAND_PRIMARY = "#5d16ec";
-const BRAND_SECONDARY = "#81929c";
+import { Download, Upload, AlertCircle, Copy, Loader2, DollarSign } from "lucide-react";
 
 export default function PreciosPage() {
   const [marcas, setMarcas] = useState([]);
@@ -234,118 +231,101 @@ export default function PreciosPage() {
 
   return (
     <TooltipProvider>
-      <div className="h-screen flex flex-col bg-white gap-3 sm:gap-4">
+      <div className="space-y-6">
         
-        {/* HEADER - FIJO */}
-        <div className="flex-shrink-0 space-y-3 sm:space-y-4 px-2 sm:px-4 pt-2 sm:pt-4">
-          
-          {/* Título */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="p-2 sm:p-3 rounded-lg bg-[#5d16ec]" >
-              <Coins className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold" >
-                Matriz de Precios
-              </h1>
-              <p className="text-xs sm:text-sm" style={{ color: BRAND_SECONDARY }}>
-                Gestiona precios de mantenimiento por modelo
-              </p>
-            </div>
-          </div>
-
-          {/* TOOLBAR */}
-          <div className="flex flex-col sm:flex-row gap-2 p-2 sm:p-3 rounded-lg border-2 transition-all" style={{ backgroundColor: `${BRAND_PRIMARY}08`, borderColor: `${BRAND_PRIMARY}30` }}>
-            
-            <div className="flex gap-1.5 sm:gap-2 flex-wrap">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    onClick={() => window.open("/api/precios/export-template")}
-                    variant="outline"
-                    size="sm"
-                    className="gap-1 text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3"
-                  >
-                    <Download size={14} />
-                    <span className="hidden sm:inline">Descargar formato</span>
-                    <span className="sm:hidden">Formato</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-xs">
-                  Descarga el formato de Excel para importar precios
-                </TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    onClick={() => window.open("/api/precios/export")}
-                    variant="outline"
-                    size="sm"
-                    className="gap-1 text-xs sm:text-sm h-7 sm:h-8 px-2 sm:px-3"
-                  >
-                    <Download size={14} />
-                    <span className="hidden sm:inline">Descargar precios</span>
-                    <span className="sm:hidden">Descargar</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-xs">
-                  Descarga todos los precios actuales en Excel
-                </TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <label className="flex items-center gap-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-md border-2 cursor-pointer text-xs sm:text-sm font-medium transition-all h-7 sm:h-8" style={{ borderColor: BRAND_PRIMARY, backgroundColor: `${BRAND_PRIMARY}05` }}>
-                    {uploading ? (
-                      <>
-                        <Loader2 size={14} className="animate-spin" />
-                        <span className="hidden sm:inline">Cargando...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Upload size={14} />
-                        <span className="hidden sm:inline">Cargar Excel</span>
-                        <span className="sm:hidden">Cargar</span>
-                      </>
-                    )}
-                    <input 
-                      type="file" 
-                      hidden 
-                      accept=".xlsx" 
-                      onChange={(e) => importExcel(e.target.files?.[0])}
-                      disabled={uploading}
-                    />
-                  </label>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-xs">
-                  Importa precios desde un archivo Excel
-                </TooltipContent>
-              </Tooltip>
-            </div>
-
-            {/* Info box - Derecha */}
-            <div className="ml-auto flex items-center gap-1.5 text-xs px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg" style={{ backgroundColor: '#fef3c710', color: '#92400e' }}>
-              <AlertCircle size={14} className="flex-shrink-0" />
-              <span className="hidden sm:inline">Los cambios se guardan automáticamente</span>
-              <span className="sm:hidden">Autoguardado</span>
-            </div>
+        {/* HEADER */}
+        <div className="flex items-center gap-3 px-1">
+          <DollarSign size={28} className="text-blue-600" />
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Matriz de Precios</h1>
+            <p className="text-sm text-gray-600 mt-1">Gestiona precios de mantenimiento por modelo</p>
           </div>
         </div>
 
-        {/* TABLA - SCROLLABLE */}
-        <div className="flex-1 min-h-0 overflow-auto px-2 sm:px-4 pb-3">
-          <div className="border-2 rounded-lg bg-white overflow-auto" style={{ borderColor: `${BRAND_PRIMARY}30` }}>
-            <table className="w-full text-xs sm:text-sm border-collapse">
+        {/* TOOLBAR */}
+        <div className="flex gap-2 flex-wrap p-4 bg-slate-50 rounded-lg border border-slate-200">
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                onClick={() => window.open("/api/precios/export-template")}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                <Download size={16} />
+                Descargar formato
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              Descarga el formato de Excel para importar precios
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                onClick={() => window.open("/api/precios/export")}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                <Download size={16} />
+                Descargar precios
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              Descarga todos los precios actuales en Excel
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <label className="flex items-center gap-2 px-3 py-2 rounded-md border border-slate-300 bg-white hover:bg-slate-50 cursor-pointer text-sm font-medium transition-colors">
+                {uploading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Cargando...
+                  </>
+                ) : (
+                  <>
+                    <Upload size={16} />
+                    Cargar Excel
+                  </>
+                )}
+                <input 
+                  type="file" 
+                  hidden 
+                  accept=".xlsx" 
+                  onChange={(e) => importExcel(e.target.files?.[0])}
+                  disabled={uploading}
+                />
+              </label>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              Importa precios desde un archivo Excel
+            </TooltipContent>
+          </Tooltip>
+
+          {/* Info box */}
+          <div className="ml-auto flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
+            <AlertCircle size={14} />
+            <span>Los cambios se guardan automáticamente</span>
+          </div>
+        </div>
+
+        {/* TABLA */}
+        <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
               
               {/* HEADER PRINCIPAL */}
-              <thead className="sticky top-0 z-10">
-                <tr style={{ backgroundColor: `${BRAND_PRIMARY}08` }}>
+              <thead>
+                <tr className="bg-slate-50 border-b">
                   {rowCols.map((c) => (
                     <th 
                       key={c.key} 
-                      className="border-r p-1.5 sm:p-3 text-left font-semibold min-w-max"
-                      style={{ color: BRAND_PRIMARY, borderColor: `${BRAND_PRIMARY}30` }}
+                      className="border-r p-3 text-left font-semibold text-slate-700 min-w-max"
                     >
                       {c.label}
                     </th>
@@ -355,8 +335,7 @@ export default function PreciosPage() {
                     <th 
                       key={grupo.type_id} 
                       colSpan={grupo.items.length} 
-                      className="border-r p-1 sm:p-2 text-center font-semibold text-xs sm:text-sm"
-                      style={{ backgroundColor: `${BRAND_PRIMARY}10`, color: BRAND_PRIMARY, borderColor: `${BRAND_PRIMARY}30` }}
+                      className="border-r p-2 text-center font-semibold text-slate-900 bg-blue-50"
                     >
                       {grupo.type_name}
                     </th>
@@ -364,9 +343,9 @@ export default function PreciosPage() {
                 </tr>
 
                 {/* HEADER SECUNDARIO (SWITCHES) */}
-                <tr style={{ backgroundColor: `${BRAND_PRIMARY}05`, borderBottomColor: `${BRAND_PRIMARY}30` }} className="border-b-2">
+                <tr className="bg-slate-50 border-b">
                   {rowCols.map((c) => (
-                    <th key={c.key} className="border-r" style={{ borderColor: `${BRAND_PRIMARY}30` }} />
+                    <th key={c.key} className="border-r" />
                   ))}
 
                   {grupos.map((grupo) =>
@@ -377,17 +356,16 @@ export default function PreciosPage() {
                       return (
                         <th 
                           key={`${grupo.type_id}_${item.id}`} 
-                          className="border-r p-0.5 sm:p-1 text-center min-w-[100px] sm:min-w-[140px]"
-                          style={{ borderColor: `${BRAND_PRIMARY}30` }}
+                          className="border-r p-1 text-center min-w-[140px]"
                         >
-                          <div className="flex flex-col items-center gap-0.5 py-0.5 sm:py-1">
+                          <div className="flex flex-col items-center gap-1 py-1">
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <p className="text-xs font-medium cursor-help truncate max-w-[90px] sm:max-w-full px-1" style={{ color: BRAND_PRIMARY }}>
+                                <p className="text-xs font-medium text-slate-700 cursor-help">
                                   {item.name}
                                 </p>
                               </TooltipTrigger>
-                              <TooltipContent side="top" className="max-w-xs text-xs">
+                              <TooltipContent side="top" className="max-w-xs">
                                 {item.description || "Sin descripción"}
                               </TooltipContent>
                             </Tooltip>
@@ -395,54 +373,51 @@ export default function PreciosPage() {
                             {/* Switch 1: TODOS */}
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <div className="flex items-center gap-0.5 text-xs px-1 py-0.5 rounded" style={{ backgroundColor: `${BRAND_PRIMARY}15`, color: BRAND_PRIMARY }}>
-                                  <Copy size={10} className="hidden sm:block" />
-                                  <span className="hidden sm:inline text-xs">Todos</span>
-                                  <span className="sm:hidden text-xs">T</span>
+                                <div className="flex items-center gap-1 text-[10px] bg-blue-50 px-1.5 py-0.5 rounded">
+                                  <Copy size={10} />
+                                  <span>Todos</span>
                                   <Switch
                                     checked={columnSync[ck] || false}
                                     onCheckedChange={(v) => {
                                       if (v) setClassSync((p) => ({ ...p, [ck]: false }));
                                       handleColumnToggle(mantenimientoId, item.id, v);
                                     }}
-                                    className="scale-50 sm:scale-75 -mr-1"
+                                    className="scale-75 data-[state=checked]:bg-blue-600"
                                   />
                                 </div>
                               </TooltipTrigger>
-                              <TooltipContent side="top" className="text-xs">
-                                Aplicar a todos
+                              <TooltipContent side="top">
+                                Aplicar este precio a todos los modelos
                               </TooltipContent>
                             </Tooltip>
 
                             {/* Switch 2: POR CLASE */}
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <div className="flex items-center gap-0.5 text-xs px-1 py-0.5 rounded" style={{ backgroundColor: '#f3e8ff', color: '#9333ea' }}>
-                                  <Copy size={10} className="hidden sm:block" />
-                                  <span className="hidden sm:inline text-xs">Clase</span>
-                                  <span className="sm:hidden text-xs">C</span>
+                                <div className="flex items-center gap-1 text-[10px] bg-purple-50 px-1.5 py-0.5 rounded">
+                                  <Copy size={10} />
+                                  <span>Clase</span>
                                   <Switch
                                     checked={classSync[ck] || false}
                                     onCheckedChange={(v) => {
                                       if (v) setColumnSync((p) => ({ ...p, [ck]: false }));
                                       handleClassColumnToggle(mantenimientoId, item.id, v);
                                     }}
-                                    className="scale-50 sm:scale-75 -mr-1"
+                                    className="scale-75 data-[state=checked]:bg-purple-600"
                                   />
                                 </div>
                               </TooltipTrigger>
-                              <TooltipContent side="top" className="text-xs">
-                                Aplicar a clase
+                              <TooltipContent side="top">
+                                Aplicar a todos los modelos de la misma clase
                               </TooltipContent>
                             </Tooltip>
 
                             {/* Indicadores visuales */}
                             {(columnSync[ck] || classSync[ck]) && (
-                              <div 
-                                className="text-xs font-semibold px-1 py-0.5 rounded text-white"
-                                style={{ backgroundColor: columnSync[ck] ? BRAND_PRIMARY : '#9333ea' }}
-                              >
-                                {columnSync[ck] ? "T" : "C"}
+                              <div className={`text-[9px] font-semibold px-1.5 py-0.5 rounded text-white ${
+                                columnSync[ck] ? "bg-blue-600" : "bg-purple-600"
+                              }`}>
+                                {columnSync[ck] ? "Todos activo" : "Clase activa"}
                               </div>
                             )}
                           </div>
@@ -458,18 +433,16 @@ export default function PreciosPage() {
                 {modelos.map((modelo, idx) => (
                   <tr 
                     key={`${modelo.marca_id}_${modelo.id}`}
-                    className="hover:opacity-80 transition-opacity border-b"
-                    style={{ borderColor: `${BRAND_PRIMARY}20` }}
+                    className={`border-b hover:bg-slate-50 transition-colors ${
+                      idx % 2 === 0 ? "bg-white" : "bg-slate-50/30"
+                    }`}
                   >
                     {rowCols.map((col) => (
                       <td 
                         key={col.key} 
-                        className="border-r p-1 sm:p-2 font-medium min-w-max"
-                        style={{ color: BRAND_PRIMARY, borderColor: `${BRAND_PRIMARY}30` }}
+                        className="border-r p-3 text-slate-900 font-medium min-w-max sticky"
                       >
-                        <div className="text-xs sm:text-sm truncate max-w-[70px] sm:max-w-none">
-                          {col.render(modelo)}
-                        </div>
+                        {col.render(modelo)}
                       </td>
                     ))}
 
@@ -488,26 +461,18 @@ export default function PreciosPage() {
 
                         const value = precios[key] ?? "";
                         const ck = colKey(mantenimientoId, item.id);
-                        const inputStyle = {
-                          backgroundColor: columnSync[ck] || classSync[ck] ? `${BRAND_PRIMARY}15` : "transparent",
-                          borderColor: `${BRAND_PRIMARY}30`,
-                          color: BRAND_PRIMARY
-                        };
 
                         return (
                           <td 
                             key={key} 
-                            className="border-r p-0.5 sm:p-1 text-center"
-                            style={{
-                              backgroundColor: columnSync[ck] || classSync[ck] ? `${BRAND_PRIMARY}15` : "transparent",
-                              borderColor: `${BRAND_PRIMARY}30`
-                            }}
+                            className={`border-r p-1 text-center ${
+                              columnSync[ck] || classSync[ck] ? "bg-blue-50/30" : ""
+                            }`}
                           >
                             <Input
                               type="number"
                               value={value}
-                              className="h-6 sm:h-8 text-center text-xs sm:text-sm font-medium border-0 p-0 focus:ring-2 focus:ring-opacity-50"
-                              style={inputStyle}
+                              className="h-8 text-center text-sm font-medium"
                               placeholder="—"
                               onChange={(e) =>
                                 handleChange({
@@ -527,8 +492,8 @@ export default function PreciosPage() {
 
                 {modelos.length === 0 && (
                   <tr>
-                    <td colSpan={rowCols.length + grupos.reduce((acc, g) => acc + g.items.length, 0)} className="p-4 sm:p-8 text-center" style={{ color: BRAND_SECONDARY }}>
-                      <p className="text-sm sm:text-base">No hay modelos disponibles</p>
+                    <td colSpan={rowCols.length + grupos.reduce((acc, g) => acc + g.items.length, 0)} className="p-8 text-center text-gray-500">
+                      No hay modelos disponibles
                     </td>
                   </tr>
                 )}
@@ -537,38 +502,39 @@ export default function PreciosPage() {
           </div>
         </div>
 
-        {/* STATUS - FIJO ABAJO */}
+        {/* STATUS */}
         {saving && (
-          <div className="flex-shrink-0 flex items-center gap-2 text-xs sm:text-sm px-2 sm:px-4 py-2 rounded-lg mx-2 sm:mx-4 mb-2" style={{ backgroundColor: `${BRAND_PRIMARY}15`, color: BRAND_PRIMARY }}>
-            <Loader2 size={14} className="animate-spin flex-shrink-0" />
-            <span>Guardando cambios…</span>
+          <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 border border-blue-200 px-4 py-3 rounded-lg">
+            <Loader2 size={16} className="animate-spin" />
+            Guardando cambios…
           </div>
         )}
 
-        {/* LEGEND - FIJO ABAJO */}
-        <div className="flex-shrink-0 grid grid-cols-2 sm:grid-cols-3 gap-2 p-2 sm:p-3 mx-2 sm:mx-4 mb-2 rounded-lg border-2 transition-all" style={{ backgroundColor: `${BRAND_PRIMARY}08`, borderColor: `${BRAND_PRIMARY}30` }}>
-          <div className="flex items-start gap-1.5 text-xs">
-            <div className="w-3 h-3 rounded flex-shrink-0 mt-0.5" style={{ backgroundColor: `${BRAND_PRIMARY}20` }} />
-            <div>
-              <p className="font-medium" style={{ color: BRAND_PRIMARY }}>Todos</p>
-              <p className="text-xs" style={{ color: BRAND_SECONDARY }}>A todos modelos</p>
+        {/* LEGEND */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+          <div className="flex items-start gap-2">
+            <div className="w-4 h-4 bg-blue-50 border border-blue-200 rounded flex-shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-medium text-slate-900">Todos activo</p>
+              <p className="text-xs text-gray-600">Precio se copia a todos los modelos</p>
             </div>
           </div>
-          <div className="flex items-start gap-1.5 text-xs">
-            <div className="w-3 h-3 rounded flex-shrink-0 mt-0.5" style={{ backgroundColor: '#f3e8ff' }} />
-            <div>
-              <p className="font-medium" style={{ color: '#9333ea' }}>Clase</p>
-              <p className="text-xs" style={{ color: BRAND_SECONDARY }}>Misma clase</p>
+          <div className="flex items-start gap-2">
+            <div className="w-4 h-4 bg-purple-50 border border-purple-200 rounded flex-shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-medium text-slate-900">Clase activa</p>
+              <p className="text-xs text-gray-600">Precio se copia a modelos de la misma clase</p>
             </div>
           </div>
-          <div className="flex items-start gap-1.5 text-xs col-span-2 sm:col-span-1">
-            <DollarSign size={12} className="flex-shrink-0 mt-0.5" style={{ color: BRAND_PRIMARY }} />
-            <div>
-              <p className="font-medium" style={{ color: BRAND_PRIMARY }}>Autoguardado</p>
-              <p className="text-xs" style={{ color: BRAND_SECONDARY }}>Cambios auto</p>
+          <div className="flex items-start gap-2">
+            <DollarSign size={16} className="text-green-600 flex-shrink-0" />
+            <div className="text-sm">
+              <p className="font-medium text-slate-900">Autoguardado</p>
+              <p className="text-xs text-gray-600">Los cambios se guardan automáticamente</p>
             </div>
           </div>
         </div>
+
       </div>
     </TooltipProvider>
   );

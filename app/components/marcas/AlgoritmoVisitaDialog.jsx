@@ -25,10 +25,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { AlertCircle, Plus, Trash2, Calendar, CheckCircle } from "lucide-react";
-
-const BRAND_PRIMARY = "#5d16ec";
-const BRAND_SECONDARY = "#81929c";
+import { AlertCircle, Plus, Trash2, Calendar } from "lucide-react";
 
 const EMPTY_FORM = {
   id: null,
@@ -276,56 +273,43 @@ const AlgoritmoVisitaDialog = ({
   return (
     <TooltipProvider>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-3xl w-full max-h-[90vh] bg-white rounded-lg overflow-hidden flex flex-col">
-          {/* HEADER */}
-          <DialogHeader className="pb-3 sm:pb-4 border-b flex-shrink-0" style={{ borderColor: `${BRAND_PRIMARY}20` }}>
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-1.5 sm:p-2 rounded-lg flex-shrink-0" style={{ backgroundColor: `${BRAND_PRIMARY}15` }}>
-                <Calendar size={22} style={{ color: BRAND_PRIMARY }} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <DialogTitle className="text-base sm:text-xl" style={{ color: BRAND_PRIMARY }}>
-                  {mode === "edit" ? "Editar Algoritmo de Visita" : "Nuevo Algoritmo de Visita"}
-                </DialogTitle>
-              </div>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="border-b pb-4">
+            <div className="flex items-center gap-2">
+              <Calendar className="text-blue-600" size={24} />
+              <DialogTitle className="text-xl">
+                {mode === "edit" ? "Editar Algoritmo de Visita" : "Nuevo Algoritmo de Visita"}
+              </DialogTitle>
             </div>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-            <div className="space-y-3 sm:space-y-4 py-3 sm:py-4 px-3 sm:px-6 overflow-y-auto flex-1">
+          <form onSubmit={handleSubmit}>
+            <div className="space-y-5 py-4">
 
               {/* Sección 1: Vehículo */}
-              <div className="space-y-3 p-3 sm:p-4 rounded-lg border-2 transition-all" style={{ backgroundColor: `${BRAND_PRIMARY}08`, borderColor: `${BRAND_PRIMARY}30` }}>
-                <h3 className="font-semibold text-sm sm:text-base flex items-center gap-2" style={{ color: BRAND_PRIMARY }}>
-                  <span className="w-6 h-6 rounded-full text-white text-xs flex items-center justify-center font-bold flex-shrink-0" style={{ backgroundColor: BRAND_PRIMARY }}>1</span>
-                  <span>Vehículo</span>
+              <div className="space-y-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center font-bold">1</span>
+                  Vehículo
                 </h3>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Marca */}
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-1 text-xs sm:text-sm font-medium" style={{ color: BRAND_PRIMARY }}>
+                  <div className="space-y-1">
+                    <Label className="flex items-center gap-1">
                       Marca
                       <span className="text-red-500">*</span>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <AlertCircle size={14} className="cursor-help opacity-60 flex-shrink-0" />
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="text-xs">
-                          Selecciona la marca del vehículo
-                        </TooltipContent>
-                      </Tooltip>
                     </Label>
                     <Select
                       value={formData.marca_id}
                       onValueChange={(value) => handleSelectChange("marca_id", value)}
                     >
-                      <SelectTrigger className={`h-8 sm:h-9 text-xs sm:text-sm border-gray-300 ${errors.marca_id ? "border-red-500" : ""}`}>
+                      <SelectTrigger className={errors.marca_id ? "border-red-500" : ""}>
                         <SelectValue placeholder="Seleccionar marca" />
                       </SelectTrigger>
-                      <SelectContent className="max-h-48">
+                      <SelectContent>
                         {marcas.map((marca) => (
-                          <SelectItem key={marca.id} value={String(marca.id)} className="text-xs sm:text-sm">
+                          <SelectItem key={marca.id} value={String(marca.id)}>
                             {marca.name}
                           </SelectItem>
                         ))}
@@ -339,18 +323,10 @@ const AlgoritmoVisitaDialog = ({
                   </div>
 
                   {/* Modelo */}
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-1 text-xs sm:text-sm font-medium" style={{ color: BRAND_PRIMARY }}>
+                  <div className="space-y-1">
+                    <Label className="flex items-center gap-1">
                       Modelo
                       <span className="text-red-500">*</span>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <AlertCircle size={14} className="cursor-help opacity-60 flex-shrink-0" />
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="text-xs">
-                          Selecciona el modelo del vehículo
-                        </TooltipContent>
-                      </Tooltip>
                     </Label>
                     <Select
                       value={formData.modelo_id}
@@ -359,7 +335,7 @@ const AlgoritmoVisitaDialog = ({
                       }
                       disabled={!formData.marca_id || loadingModelos}
                     >
-                      <SelectTrigger className={`h-8 sm:h-9 text-xs sm:text-sm border-gray-300 ${errors.modelo_id ? "border-red-500" : ""}`}>
+                      <SelectTrigger className={errors.modelo_id ? "border-red-500" : ""}>
                         <SelectValue
                           placeholder={
                             loadingModelos
@@ -368,9 +344,9 @@ const AlgoritmoVisitaDialog = ({
                           }
                         />
                       </SelectTrigger>
-                      <SelectContent className="max-h-48">
+                      <SelectContent>
                         {modelos.map((modelo) => (
-                          <SelectItem key={modelo.id} value={String(modelo.id)} className="text-xs sm:text-sm">
+                          <SelectItem key={modelo.id} value={String(modelo.id)}>
                             {modelo.name}
                           </SelectItem>
                         ))}
@@ -386,23 +362,23 @@ const AlgoritmoVisitaDialog = ({
               </div>
 
               {/* Sección 2: Mantenimiento */}
-              <div className="space-y-3 p-3 sm:p-4 rounded-lg border-2 transition-all" style={{ backgroundColor: `${BRAND_PRIMARY}08`, borderColor: `${BRAND_PRIMARY}30` }}>
-                <h3 className="font-semibold text-sm sm:text-base flex items-center gap-2" style={{ color: BRAND_PRIMARY }}>
-                  <span className="w-6 h-6 rounded-full text-white text-xs flex items-center justify-center font-bold flex-shrink-0" style={{ backgroundColor: BRAND_PRIMARY }}>2</span>
-                  <span>Intervalo de Mantenimiento</span>
+              <div className="space-y-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-green-600 text-white text-xs flex items-center justify-center font-bold">2</span>
+                  Intervalo de Mantenimiento
                 </h3>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Kilometraje */}
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-1 text-xs sm:text-sm font-medium" style={{ color: BRAND_SECONDARY }}>
+                  <div className="space-y-1">
+                    <Label className="flex items-center gap-1">
                       Kilometraje
                       <span className="text-red-500">*</span>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <AlertCircle size={14} className="cursor-help opacity-60 flex-shrink-0" />
+                          <AlertCircle size={14} className="text-gray-400 cursor-help" />
                         </TooltipTrigger>
-                        <TooltipContent side="top" className="text-xs">
+                        <TooltipContent side="top">
                           Cada cuántos km se recomienda mantenimiento
                         </TooltipContent>
                       </Tooltip>
@@ -414,7 +390,7 @@ const AlgoritmoVisitaDialog = ({
                       onChange={handleChange}
                       placeholder="Ej: 10000"
                       min="0"
-                      className={`h-8 sm:h-9 text-xs sm:text-sm border-gray-300 ${errors.kilometraje ? "border-red-500" : ""}`}
+                      className={errors.kilometraje ? "border-red-500" : ""}
                     />
                     {errors.kilometraje && (
                       <p className="text-xs text-red-500 flex items-center gap-1">
@@ -424,15 +400,15 @@ const AlgoritmoVisitaDialog = ({
                   </div>
 
                   {/* Meses */}
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-1 text-xs sm:text-sm font-medium" style={{ color: BRAND_SECONDARY }}>
+                  <div className="space-y-1">
+                    <Label className="flex items-center gap-1">
                       Meses
                       <span className="text-red-500">*</span>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <AlertCircle size={14} className="cursor-help opacity-60 flex-shrink-0" />
+                          <AlertCircle size={14} className="text-gray-400 cursor-help" />
                         </TooltipTrigger>
-                        <TooltipContent side="top" className="text-xs">
+                        <TooltipContent side="top">
                           Cada cuántos meses se recomienda mantenimiento
                         </TooltipContent>
                       </Tooltip>
@@ -444,7 +420,7 @@ const AlgoritmoVisitaDialog = ({
                       onChange={handleChange}
                       placeholder="Ej: 12"
                       min="0"
-                      className={`h-8 sm:h-9 text-xs sm:text-sm border-gray-300 ${errors.meses ? "border-red-500" : ""}`}
+                      className={errors.meses ? "border-red-500" : ""}
                     />
                     {errors.meses && (
                       <p className="text-xs text-red-500 flex items-center gap-1">
@@ -456,24 +432,25 @@ const AlgoritmoVisitaDialog = ({
               </div>
 
               {/* Sección 3: Años */}
-              <div className="space-y-3 p-3 sm:p-4 rounded-lg border-2 transition-all" style={{ backgroundColor: `${BRAND_PRIMARY}08`, borderColor: `${BRAND_PRIMARY}30` }}>
-                <h3 className="font-semibold text-sm sm:text-base flex items-center gap-2" style={{ color: BRAND_PRIMARY }}>
-                  <span className="w-6 h-6 rounded-full text-white text-xs flex items-center justify-center font-bold flex-shrink-0" style={{ backgroundColor: BRAND_PRIMARY }}>3</span>
-                  <span>Rango de Años</span>
+              <div className="space-y-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-purple-600 text-white text-xs flex items-center justify-center font-bold">3</span>
+                  Rango de Años
                 </h3>
 
                 <div className="space-y-3">
                   {/* Switch - Aplica todos */}
-                  <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg border-2 transition-all" style={{ borderColor: `${BRAND_PRIMARY}30`, backgroundColor: `${BRAND_PRIMARY}05` }}>
+                  <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-200">
                     <Switch 
                       checked={isAll} 
                       onCheckedChange={handleSwitchChange}
+                      className="data-[state=checked]:bg-blue-600"
                     />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-xs sm:text-sm" style={{ color: BRAND_PRIMARY }}>
+                    <div className="flex-1">
+                      <p className="font-medium text-sm text-slate-900">
                         Aplica a todos los años
                       </p>
-                      <p className="text-xs" style={{ color: BRAND_SECONDARY }}>
+                      <p className="text-xs text-gray-600">
                         Si está activado, ignora los rangos específicos
                       </p>
                     </div>
@@ -482,27 +459,26 @@ const AlgoritmoVisitaDialog = ({
                   {/* Rangos específicos */}
                   {!isAll && (
                     <div className="space-y-3">
-                      <p className="text-xs sm:text-sm" style={{ color: BRAND_SECONDARY }}>
+                      <p className="text-sm text-gray-600">
                         Define los rangos de años para aplicar este algoritmo:
                       </p>
 
                       {yearRanges.map((range, index) => (
                         <div 
                           key={index} 
-                          className="p-2.5 sm:p-3 rounded-lg border-2 space-y-2 transition-all"
-                          style={{ borderColor: `${BRAND_PRIMARY}40`, backgroundColor: `${BRAND_PRIMARY}05` }}
+                          className="p-3 bg-white rounded-lg border border-slate-200 space-y-2"
                         >
-                          <div className="flex items-center gap-2 text-xs font-semibold mb-2" style={{ color: BRAND_PRIMARY }}>
-                            <span className="w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ backgroundColor: BRAND_PRIMARY }}>
+                          <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-2">
+                            <span className="w-5 h-5 rounded-full bg-slate-300 flex items-center justify-center">
                               {index + 1}
                             </span>
                             Rango {index + 1}
                           </div>
 
-                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 sm:gap-2">
+                          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                             {/* Desde */}
-                            <div className="space-y-1">
-                              <label className="text-xs" style={{ color: BRAND_SECONDARY }}>Desde</label>
+                            <div>
+                              <label className="text-xs text-gray-600 block mb-1">Desde</label>
                               <Input
                                 type="number"
                                 value={range.start}
@@ -512,59 +488,59 @@ const AlgoritmoVisitaDialog = ({
                                 placeholder="0001"
                                 min="0001"
                                 max="9999"
-                                className="h-7 sm:h-8 text-xs border-gray-300"
+                                className="text-sm"
                               />
                             </div>
 
                             {/* Operador inicio */}
-                            <div className="space-y-1">
-                              <label className="text-xs" style={{ color: BRAND_SECONDARY }}>Op</label>
+                            <div>
+                              <label className="text-xs text-gray-600 block mb-1">Op</label>
                               <Select
                                 value={range.opStart}
                                 onValueChange={(value) =>
                                   handleOperatorStartChange(index, value)
                                 }
                               >
-                                <SelectTrigger className="h-7 sm:h-8 text-xs border-gray-300">
+                                <SelectTrigger className="text-sm">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="<=" className="text-xs">≤</SelectItem>
-                                  <SelectItem value="<" className="text-xs">&lt;</SelectItem>
+                                  <SelectItem value="<=">≤</SelectItem>
+                                  <SelectItem value="<">&lt;</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
 
                             {/* Año */}
-                            <div className="space-y-1">
-                              <label className="text-xs" style={{ color: BRAND_SECONDARY }}>Año</label>
-                              <div className="h-7 sm:h-8 flex items-center justify-center bg-gray-100 rounded border border-gray-300 text-xs font-medium" style={{ color: BRAND_SECONDARY }}>
+                            <div>
+                              <label className="text-xs text-gray-600 block mb-1">Año</label>
+                              <div className="h-9 flex items-center justify-center bg-slate-100 rounded border border-slate-300 text-sm font-medium text-gray-700">
                                 Año
                               </div>
                             </div>
 
                             {/* Operador fin */}
-                            <div className="space-y-1">
-                              <label className="text-xs" style={{ color: BRAND_SECONDARY }}>Op</label>
+                            <div>
+                              <label className="text-xs text-gray-600 block mb-1">Op</label>
                               <Select
                                 value={range.opEnd}
                                 onValueChange={(value) =>
                                   handleOperatorEndChange(index, value)
                                 }
                               >
-                                <SelectTrigger className="h-7 sm:h-8 text-xs border-gray-300">
+                                <SelectTrigger className="text-sm">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="<=" className="text-xs">≤</SelectItem>
-                                  <SelectItem value=">" className="text-xs">&gt;</SelectItem>
+                                  <SelectItem value="<=">≤</SelectItem>
+                                  <SelectItem value=">">&gt;</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
 
                             {/* Hasta */}
-                            <div className="space-y-1">
-                              <label className="text-xs" style={{ color: BRAND_SECONDARY }}>Hasta</label>
+                            <div>
+                              <label className="text-xs text-gray-600 block mb-1">Hasta</label>
                               <Input
                                 type="number"
                                 value={range.end}
@@ -574,27 +550,27 @@ const AlgoritmoVisitaDialog = ({
                                 placeholder="9999"
                                 min="0001"
                                 max="9999"
-                                className="h-7 sm:h-8 text-xs border-gray-300"
+                                className="text-sm"
                               />
                             </div>
                           </div>
 
                           {/* Botones acciones */}
-                          <div className="flex gap-1 sm:gap-2 justify-end pt-1 sm:pt-2">
+                          <div className="flex gap-2 justify-end pt-2">
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
                                   type="button"
                                   size="sm"
                                   variant="outline"
-                                  className="h-7 sm:h-8 px-2 sm:px-3 hover:bg-red-100 hover:text-red-700"
+                                  className="hover:bg-red-100 hover:text-red-700"
                                   onClick={() => handleRemoveColumn(index)}
                                   disabled={yearRanges.length === 1}
                                 >
                                   <Trash2 size={14} />
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent side="top" className="text-xs">Eliminar rango</TooltipContent>
+                              <TooltipContent side="top">Eliminar rango</TooltipContent>
                             </Tooltip>
 
                             <Tooltip>
@@ -602,14 +578,13 @@ const AlgoritmoVisitaDialog = ({
                                 <Button
                                   type="button"
                                   size="sm"
-                                  className="h-7 sm:h-8 px-2 sm:px-3 text-white"
-                                  style={{ backgroundColor: BRAND_PRIMARY }}
+                                  className="bg-green-600 hover:bg-green-700 text-white"
                                   onClick={handleAddColumn}
                                 >
                                   <Plus size={14} />
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent side="top" className="text-xs">Agregar rango</TooltipContent>
+                              <TooltipContent side="top">Agregar rango</TooltipContent>
                             </Tooltip>
                           </div>
                         </div>
@@ -619,39 +594,19 @@ const AlgoritmoVisitaDialog = ({
                 </div>
               </div>
 
-              {/* Resumen */}
-              {formData.marca_id && formData.modelo_id && (
-                <div className="p-2.5 sm:p-3 rounded-lg border-2 transition-all" style={{ backgroundColor: '#10b98110', borderColor: '#10b98140' }}>
-                  <p className="text-xs sm:text-sm" style={{ color: '#059669' }}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <CheckCircle size={16} className="flex-shrink-0" />
-                      <span className="font-semibold">Resumen:</span>
-                    </div>
-                    <span className="block text-xs opacity-90 ml-6">
-                      {marcas.find(m => String(m.id) === formData.marca_id)?.name} - {modelos.find(m => String(m.id) === formData.modelo_id)?.name}<br/>
-                      📋 Intervalo: <strong>{formData.kilometraje} km / {formData.meses} meses</strong><br/>
-                      {isAll ? "📅 Aplica a todos los años" : `📅 ${yearRanges.length} rango(s) definido(s)`}
-                    </span>
-                  </p>
-                </div>
-              )}
-
             </div>
 
-            {/* FOOTER */}
-            <DialogFooter className="border-t flex-shrink-0 pt-3 sm:pt-4 px-3 sm:px-6 pb-3 sm:pb-4 flex flex-col-reverse sm:flex-row gap-2 justify-end" style={{ borderColor: `${BRAND_PRIMARY}20` }}>
+            <DialogFooter className="border-t pt-4 flex gap-2 justify-end">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                className="h-8 sm:h-9 text-xs sm:text-sm w-full sm:w-auto"
               >
                 Cancelar
               </Button>
               <Button 
                 type="submit"
-                className="h-8 sm:h-9 text-xs sm:text-sm text-white w-full sm:w-auto"
-                style={{ backgroundColor: BRAND_PRIMARY }}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
               >
                 Guardar Algoritmo
               </Button>

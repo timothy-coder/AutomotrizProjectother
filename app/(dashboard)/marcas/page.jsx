@@ -258,7 +258,7 @@ export default function MarcasPage() {
         {/* HEADER */}
         <div className="border-b border-gray-200 pb-6">
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-3 bg-[#5d16ec] rounded-lg shadow-md">
+            <div className="p-3 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg shadow-md">
               <Car className="h-6 w-6 text-white" />
             </div>
             <div>
@@ -345,8 +345,8 @@ export default function MarcasPage() {
         </div>
 
         {/* BOTONES DE ACCIÓN */}
-        <Card className="border-l-4 border-l-[#5d16ec] shadow-lg">
-          <CardHeader className=" border-b">
+        <Card className="border-l-4 border-l-blue-500 shadow-lg">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b">
             <CardTitle className="text-lg font-bold text-gray-900">
               Herramientas
             </CardTitle>
@@ -418,7 +418,7 @@ export default function MarcasPage() {
                     <Button
                       onClick={onNewMarca}
                       disabled={loading}
-                      className="bg-[#5d16ec] hover:bg-[#5d16ec]/70 text-white shadow-md gap-2"
+                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-md gap-2"
                     >
                       <Plus size={16} />
                       Nueva Marca
@@ -434,10 +434,10 @@ export default function MarcasPage() {
         </Card>
 
         {/* TABLA PRINCIPAL */}
-        <Card className="border-l-4 border-l-[#5d16ec] shadow-lg overflow-hidden">
-          <CardHeader className=" border-b space-y-3">
+        <Card className="border-l-4 border-l-blue-500 shadow-lg overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b space-y-3">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-[#5d16ec] rounded-lg">
+              <div className="p-2.5 bg-blue-600 rounded-lg">
                 <Car className="h-5 w-5 text-white" />
               </div>
               <div className="flex-1">
@@ -450,6 +450,13 @@ export default function MarcasPage() {
               </div>
             </div>
 
+            <Badge
+              variant="secondary"
+              className="w-fit bg-blue-100 text-blue-900 border-blue-300"
+            >
+              <CheckCircle className="h-3 w-3 mr-1" />
+              {stats.totalMarcas} marca{stats.totalMarcas !== 1 ? "s" : ""}
+            </Badge>
           </CardHeader>
 
           <CardContent className="p-0">
@@ -461,7 +468,6 @@ export default function MarcasPage() {
                 </p>
               </div>
             ) : (
-              <>
               <MarcasTable
                 loading={loading}
                 marcas={marcas}
@@ -479,8 +485,6 @@ export default function MarcasPage() {
                 onEditModelo={onEditModelo}
                 onDeleteModelo={askDeleteModelo}
               />
-              </>
-              
             )}
           </CardContent>
         </Card>
@@ -497,7 +501,7 @@ export default function MarcasPage() {
                   Los modelos pueden estar clasificados por clase de vehículo
                 </li>
                 <li>
-                  Configura frecuencias de mantenimiento para cada modelo
+                  Configura algoritmos de mantenimiento para cada modelo
                 </li>
                 <li>
                   Usa la opción de ver marca para consultar detalles sin editar

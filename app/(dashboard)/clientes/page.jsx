@@ -33,9 +33,9 @@ import {
   AlertTriangle,
   Loader2,
   Info,
-  UserRound,
+  Users,
   Car,
-  CheckCircle
+  CheckCircle,
 } from "lucide-react";
 
 export default function ClientesPage() {
@@ -236,8 +236,8 @@ export default function ClientesPage() {
         {/* HEADER */}
         <div className="border-b border-gray-200 pb-6">
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-3 bg-[#5d16ec] rounded-lg shadow-md">
-              <UserRound className="h-6 w-6 text-white" />
+            <div className="p-3 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg shadow-md">
+              <Users className="h-6 w-6 text-white" />
             </div>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
@@ -265,7 +265,7 @@ export default function ClientesPage() {
                         {stats.totalClientes}
                       </p>
                     </div>
-                    <UserRound className="h-12 w-12 text-blue-200" />
+                    <Users className="h-12 w-12 text-blue-200" />
                   </div>
                 </CardContent>
               </Card>
@@ -300,12 +300,12 @@ export default function ClientesPage() {
         </div>
 
         {/* TABLA CLIENTES */}
-        <Card className="border-l-4 border-l-[#5d16ec] shadow-lg overflow-hidden">
-          <CardHeader className="border-b space-y-3">
+        <Card className="border-l-4 border-l-blue-500 shadow-lg overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-[#5d16ec] rounded-lg">
-                  <UserRound className="h-5 w-5 text-white" />
+                <div className="p-2.5 bg-blue-600 rounded-lg">
+                  <Users className="h-5 w-5 text-white" />
                 </div>
                 <div className="flex-1">
                   <CardTitle className="text-lg font-bold text-gray-900">
@@ -319,9 +319,17 @@ export default function ClientesPage() {
 
             </div>
 
+            <Badge
+              variant="secondary"
+              className="w-fit bg-blue-100 text-blue-900 border-blue-300"
+            >
+              <CheckCircle className="h-3 w-3 mr-1" />
+              {stats.totalClientes} cliente
+              {stats.totalClientes !== 1 ? "s" : ""}
+            </Badge>
           </CardHeader>
 
-          <CardContent className="px-2">
+          <CardContent className="p-0">
             {loading ? (
               <div className="flex flex-col items-center justify-center gap-3 py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
@@ -330,7 +338,7 @@ export default function ClientesPage() {
             ) : clientes.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <div className="p-4 bg-gray-100 rounded-full mb-3">
-                  <UserRound className="h-8 w-8 text-gray-400" />
+                  <Users className="h-8 w-8 text-gray-400" />
                 </div>
                 <p className="text-sm text-gray-600 font-medium">
                   No hay clientes registrados
@@ -373,11 +381,11 @@ export default function ClientesPage() {
 
         {/* TABLA VEHÍCULOS */}
         {selectedCliente && (
-          <Card className="border-l-4 border-l-[#5d16ec] shadow-lg overflow-hidden">
-            <CardHeader className=" border-b space-y-3">
+          <Card className="border-l-4 border-l-purple-500 shadow-lg overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-purple-50 to-purple-100 border-b space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-[#5d16ec] rounded-lg">
+                  <div className="p-2.5 bg-purple-600 rounded-lg">
                     <Car className="h-5 w-5 text-white" />
                   </div>
                   <div className="flex-1">
@@ -407,7 +415,7 @@ export default function ClientesPage() {
                         onClick={() =>
                           setVehiculoDialog({ open: true, mode: "create" })
                         }
-                        className="bg-[#5d16ec] hover:bg-[#4a12c8]/70 text-white shadow-md gap-2"
+                        className="bg-purple-600 hover:bg-purple-700 text-white shadow-md gap-2"
                       >
                         <Plus className="h-4 w-4" />
                         <span className="hidden sm:inline">Nuevo Vehículo</span>
@@ -422,7 +430,7 @@ export default function ClientesPage() {
 
               <Badge
                 variant="secondary"
-                className="w-fit bg-[#e0d6f5] text-[#5d16ec] border-[#c9b8e0]"
+                className="w-fit bg-purple-100 text-purple-900 border-purple-300"
               >
                 <Car className="h-3 w-3 mr-1" />
                 {vehiculos.length} vehículo
@@ -430,7 +438,7 @@ export default function ClientesPage() {
               </Badge>
             </CardHeader>
 
-            <CardContent className="px-2">
+            <CardContent className="p-0">
               {vehiculos.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12">
                   <div className="p-4 bg-gray-100 rounded-full mb-3">
