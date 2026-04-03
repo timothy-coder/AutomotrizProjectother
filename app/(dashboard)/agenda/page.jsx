@@ -733,7 +733,7 @@ export default function AgendaPage() {
                                                             setOpenOportunidadDialog(true);
                                                         }}
                                                     >
-                                                        Nueva
+                                                        Nueva Oportunidad
                                                     </button>
                                                 </div>
                                             )}
@@ -779,11 +779,10 @@ export default function AgendaPage() {
                                 return (
                                     <div
                                         key={`${dayString}-${h}`}
-                                        className={`border-t border-l relative min-h-16 ${
-                                            blocked
-                                                ? "bg-gray-100 cursor-not-allowed"
-                                                : "hover:bg-blue-50/50 cursor-pointer"
-                                        } transition-colors`}
+                                        className={`border-t border-l relative min-h-16 ${blocked
+                                            ? "bg-gray-100 cursor-not-allowed"
+                                            : "hover:bg-blue-50/50 cursor-pointer"
+                                            } transition-colors`}
                                         onClick={(e) => {
                                             if (blocked || !permCreate) return;
                                             openMenu(d, h, e);
@@ -873,7 +872,7 @@ export default function AgendaPage() {
                                                             setOpenOportunidadDialog(true);
                                                         }}
                                                     >
-                                                        Nueva
+                                                        Nueva Oportunidad
                                                     </button>
                                                 </div>
                                             )}
@@ -909,8 +908,10 @@ export default function AgendaPage() {
             <div className="h-screen flex flex-col gap-3 p-4 bg-white">
                 {/* ==================== HEADER ====================*/}
                 <div className="flex flex-col md:flex-row gap-2 items-start md:items-center pb-3 border-b flex-shrink-0">
-                    <div className="flex items-center gap-2 flex-1">
-                        <CalendarIcon className="w-5 h-5 text-blue-600" />
+                    <div className="flex items-center gap-2 flex-1 ">
+                        <div className="p-3 bg-[#5d16ec] rounded-lg shadow-md">
+                            <CalendarIcon className="h-6 w-6 text-white" />
+                        </div>
                         <div>
                             <h1 className="text-xl font-bold text-slate-900">Agenda</h1>
                             <p className="text-xs text-muted-foreground">
@@ -943,7 +944,7 @@ export default function AgendaPage() {
                                         <ChevronLeft size={14} />
                                     </Button>
                                 </TooltipTrigger>
-                                <TooltipContent side="top">Anterior</TooltipContent>
+                                <TooltipContent side="top">Anterior Semana</TooltipContent>
                             </Tooltip>
 
                             <Tooltip>
@@ -962,7 +963,7 @@ export default function AgendaPage() {
                                         <ChevronRight size={14} />
                                     </Button>
                                 </TooltipTrigger>
-                                <TooltipContent side="top">Siguiente</TooltipContent>
+                                <TooltipContent side="top">Siguiente Semana</TooltipContent>
                             </Tooltip>
 
                             <Tooltip>
@@ -1036,7 +1037,7 @@ export default function AgendaPage() {
                                             });
                                             setOpenOportunidadDialog(true);
                                         }}
-                                        className="gap-1"
+                                        className="gap-1 bg-[#5d16ec] hover:bg-[#5d16ec]/70 text-white"
                                     >
                                         <Plus size={14} />
                                         Nueva
@@ -1060,21 +1061,26 @@ export default function AgendaPage() {
                         )}
                     </div>
 
-                    <Select value={createdByFilter} onValueChange={setCreatedByFilter}>
-                        <SelectTrigger className="w-32 h-8">
-                            <SelectValue placeholder="Creado por" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Todos</SelectItem>
-                            {createdByOptions.map((item) => (
-                                <SelectItem key={item.id} value={item.id}>
-                                    {item.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <div>
+                        <p className="text-xs font-medium text-slate-600">Creado por:</p>
+                        <Select value={createdByFilter} onValueChange={setCreatedByFilter}>
+                            <SelectTrigger className="w-32 h-8">
+                                <SelectValue placeholder="Creado por" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todos</SelectItem>
+                                {createdByOptions.map((item) => (
+                                    <SelectItem key={item.id} value={item.id}>
+                                        {item.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
 
-                    <Select value={assignedToFilter} onValueChange={setAssignedToFilter}>
+                    <div>
+                        <p className="text-xs font-medium text-slate-600">Asignado a:</p>
+                        <Select value={assignedToFilter} onValueChange={setAssignedToFilter}>
                         <SelectTrigger className="w-32 h-8">
                             <SelectValue placeholder="Asignado a" />
                         </SelectTrigger>
@@ -1087,8 +1093,11 @@ export default function AgendaPage() {
                             ))}
                         </SelectContent>
                     </Select>
+                    </div>
 
-                    {/* ✅ CORREGIDO: Cliente Popover con búsqueda */}
+                    <div>
+                        <p className="text-xs font-medium text-slate-600">Cliente:</p>
+                        {/* ✅ CORREGIDO: Cliente Popover con búsqueda */}
                     <Popover open={clienteSearchOpen} onOpenChange={setClienteSearchOpen}>
                         <PopoverTrigger asChild>
                             <Button
@@ -1149,6 +1158,7 @@ export default function AgendaPage() {
                             </Command>
                         </PopoverContent>
                     </Popover>
+                    </div>
 
                     <div className="flex items-center gap-1 border rounded-lg p-0.5 bg-white">
                         <Button

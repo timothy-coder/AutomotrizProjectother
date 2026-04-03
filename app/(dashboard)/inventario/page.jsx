@@ -633,7 +633,7 @@ export default function InventarioPage() {
                 table.getPaginationRowModel().rows.map((row) => (
                   <TableRow 
                     key={row.id} 
-                    className="border-b border-slate-100 hover:bg-blue-50 transition-colors"
+                    className="border-b border-slate-100 transition-colors"
                   >
                     {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id} className="py-3">

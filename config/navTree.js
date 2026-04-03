@@ -1,5 +1,5 @@
 import {
-  Users, Milestone, ListChecks, UserRound, Blinds, Boxes, Settings,Car,
+  Users, Milestone, DollarSign, UserRound, Package, Boxes, Settings,Car,
   CalendarCheck, ClipboardList, Receipt, SquareDashedMousePointer, FileText, Home, CarFront, Columns2, Wrench, Coins, Calendar, MessageCircle, ShoppingCart, BookOpen, SlidersHorizontal
 } from "lucide-react";
 export const HOME_ITEM = { to: "/home", label: "Panel de Control", icon: Home, perm: ["home", "view"] };
@@ -19,7 +19,7 @@ export const NAV_TREE = [
     items: [
       { to: "/combomantenimiento", label: "Mantenimiento", icon: Wrench, perm: ["combomantenimiento", "view"] },
       { to: "/precios", label: "Precios", icon: Coins, perm: ["precios", "view"] },
-      { to: "/inventario", label: "Inventario", icon: Boxes, perm: ["inventario", "view"] },
+      { to: "/inventario", label: "Inventario", icon: Package, perm: ["inventario", "view"] },
 
     ],
   },
@@ -27,7 +27,7 @@ export const NAV_TREE = [
     key: "pventa",
     label: "Inventario Venta",
     items: [
-      { to: "/carros", label: "Precios de Carros", icon: Boxes, perm: ["inventariocarros", "view"] },
+      { to: "/carros", label: "Precios de Carros", icon: DollarSign, perm: ["inventariocarros", "view"] },
       { to: "/accesorios", label: "Precios de Accesorios", icon: Boxes, perm: ["inventariocarros", "view"] },
       { to: "/ventas/catalogo", label: "Catálogo", icon: BookOpen, perm: ["mensajs", "view"] },
     ],
@@ -49,8 +49,8 @@ export const NAV_TREE = [
     label: "Ventas",
     items: [
       { to: "/agenda", label: "Agenda", icon: Calendar, perm: ["agenda", "view"] },
-      { to: "/oportunidades", label: "Oportunidades", icon: Calendar, perm: ["oportunidades", "view"] },
-      { to: "/leads", label: "Leads", icon: Calendar, perm: ["leads", "view"] },
+      { to: "/oportunidades", label: "Oportunidades", icon: Calendar, perm: ["agenda", "view"] },
+      { to: "/leads", label: "Leads", icon: Calendar, perm: ["agenda", "view"] },
       { to: "/reservas", label: "Reservas", icon: Calendar, perm: ["reservas", "view"] },
     ],
   },
