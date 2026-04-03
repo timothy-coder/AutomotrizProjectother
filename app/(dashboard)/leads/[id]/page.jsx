@@ -161,7 +161,7 @@ export default function LeadDetailPage() {
     try {
       if (!userId) return false;
 
-      const response = await fetch(`/api/leads/${leadId}/etapa`, {
+      const response = await fetch(`/api/leads/${leadId}/cambiar-etapa`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

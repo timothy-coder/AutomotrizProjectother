@@ -245,7 +245,7 @@ export default function LeadsTable({
 
   const handleAbrirLead = async (row) => {
     console.log("🔗 Abriendo lead:", row.id);
-    router.push(`/leads/${row.id}`);
+    router.push(`/oportunidades/${row.id}`);
   };
 
   const handleVerDetalle = async (row) => {
@@ -256,7 +256,7 @@ export default function LeadsTable({
       setLoadingRow(row.id);
       try {
         const response = await fetch(
-          `/api/leads/${row.id}/cambiar-etapa`,
+          `/api/leads/${row.id}/etapa`,
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
@@ -284,7 +284,8 @@ export default function LeadsTable({
       }
     }
 
-    router.push(`/leads/${row.id}`);
+    router.push(`/oportunidades/${row.id}`);
+
   };
 
   return (

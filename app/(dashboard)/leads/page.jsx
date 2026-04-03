@@ -154,7 +154,7 @@ export default function LeadsPage() {
 
   const canCreate = hasPermission(permissions, "leads", "create");
   const canEdit = hasPermission(permissions, "leads", "edit");
-  const canViewAll = hasPermission(permissions, "agenda", "viewall");
+  const canViewAll = hasPermission(permissions, "leads", "viewall");
   const canAssign = hasPermission(permissions, "leads", "asignar");
 
   const [rows, setRows] = useState([]);
@@ -333,7 +333,15 @@ export default function LeadsPage() {
     if (canView) loadData();
   }, [canView]);
 
-  // ✅ LÓGICA DE PERMISOS: Si tienes viewall ves TODO, si no ves SOLO los asignados a ti
+  // ✅ PRESELECCIONAR FILTRO "SIN ASIGNAR" cuando canViewAll es false
+  useEffect(() => {
+    if (!canViewAll && filterAsignado === FILTER_ALL) {
+      console.log("🔽 Preseleccionando filtro 'Sin asignar'");
+      setFilterAsignado(FILTER_SIN_ASIGNAR);
+    }
+  }, [canViewAll]);
+
+  // ✅ MOSTRAR: leads sin asignar + asignados al usuario actual (basado en permisos)
   const visibleRows = useMemo(() => {
     console.log("👁️ visibleRows calculando:", {
       rowsLength: rows.length,
@@ -351,15 +359,19 @@ export default function LeadsPage() {
       return rows;
     }
     
-    // ✅ SIN viewall: SOLO mostrar leads asignados a este usuario
+    // ✅ Mostrar: leads sin asignar O asignados a este usuario
     const filtered = rows.filter(
-      (row) => String(row.asignado_a) === String(user.id)
+      (row) =>
+        !row.asignado_a || // Sin asignar
+        String(row.asignado_a) === String(user.id) // Asignados a este usuario
     );
     
-    console.log("🔽 Sin viewall - Filtrando solo leads asignados a mí:", {
+    console.log("🔽 Filtrando por permisos:", {
       userId: user.id,
       total: rows.length,
-      asignadosAMi: filtered.length,
+      sinAsignar: rows.filter(r => !r.asignado_a).length,
+      asignadosAMi: rows.filter(r => String(r.asignado_a) === String(user.id)).length,
+      found: filtered.length,
     });
     
     return filtered;
@@ -369,7 +381,6 @@ export default function LeadsPage() {
     console.log("🔍 Calculando baseFilteredRows desde visibleRows:", {
       visibleRowsLength: visibleRows.length,
       filterAsignado,
-      canViewAll,
     });
     
     const fechas = getFechaFiltros();
@@ -391,17 +402,15 @@ export default function LeadsPage() {
         filterEtapa === FILTER_ALL ||
         String(row?.etapasconversion_id ?? "") === filterEtapa;
 
-      // ✅ MANEJAR FILTRO "ASIGNADO A" - SOLO SI TIENE viewall
-      let matchesAsignado = true;
-      if (canViewAll) {
-        // Solo aplicar filtro de asignado si tiene viewall
-        matchesAsignado = filterAsignado === FILTER_ALL;
-        if (!matchesAsignado) {
-          if (filterAsignado === FILTER_SIN_ASIGNAR) {
-            matchesAsignado = !row.asignado_a;
-          } else {
-            matchesAsignado = String(row?.asignado_a ?? "") === filterAsignado;
-          }
+      // ✅ MANEJAR FILTRO "ASIGNADO A"
+      let matchesAsignado = filterAsignado === FILTER_ALL;
+      if (!matchesAsignado) {
+        if (filterAsignado === FILTER_SIN_ASIGNAR) {
+          // Mostrar solo leads sin asignar
+          matchesAsignado = !row.asignado_a;
+        } else {
+          // Mostrar leads asignados a un usuario específico
+          matchesAsignado = String(row?.asignado_a ?? "") === filterAsignado;
         }
       }
 
@@ -447,7 +456,6 @@ export default function LeadsPage() {
     filterEtapa,
     filterAsignado,
     filterFecha,
-    canViewAll,
   ]);
 
   function handleOpenEdit(row) {
@@ -469,9 +477,7 @@ export default function LeadsPage() {
     setFilterCliente(FILTER_ALL);
     setFilterOrigen(FILTER_ALL);
     setFilterEtapa(FILTER_ALL);
-    if (canViewAll) {
-      setFilterAsignado(FILTER_ALL);
-    }
+    setFilterAsignado(FILTER_ALL);
     setCreatedByFilter(FILTER_ALL_CREATED);
     setFilterFecha(FILTER_ALL);
   }
@@ -480,7 +486,7 @@ export default function LeadsPage() {
     filterCliente !== FILTER_ALL ||
     filterOrigen !== FILTER_ALL ||
     filterEtapa !== FILTER_ALL ||
-    (canViewAll && (filterAsignado !== FILTER_ALL && filterAsignado !== FILTER_SIN_ASIGNAR)) ||
+    (filterAsignado !== FILTER_ALL && filterAsignado !== FILTER_SIN_ASIGNAR) ||
     createdByFilter !== FILTER_ALL_CREATED ||
     filterFecha !== FILTER_ALL;
 
@@ -617,88 +623,85 @@ export default function LeadsPage() {
                 />
               </div>
 
-              {/* ✅ SOLO MOSTRAR FILTRO "ASIGNADO A" SI TIENE viewall */}
-              {canViewAll && (
-                <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-2">
-                    Asignado a
-                  </label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-between h-9 text-sm"
-                      >
-                        {filterAsignado === FILTER_ALL
-                          ? "Todos"
-                          : filterAsignado === FILTER_SIN_ASIGNAR
-                          ? "Sin asignar"
-                          : usuarios.find(u => String(u.id) === filterAsignado)?.fullname || `Usuario ${filterAsignado}`}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[200px] p-0" align="start">
-                      <Command>
-                        <CommandList>
-                          <CommandGroup>
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-2">
+                  Asignado a
+                </label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-between h-9 text-sm"
+                    >
+                      {filterAsignado === FILTER_ALL
+                        ? "Todos"
+                        : filterAsignado === FILTER_SIN_ASIGNAR
+                        ? "Sin asignar"
+                        : usuarios.find(u => String(u.id) === filterAsignado)?.fullname || `Usuario ${filterAsignado}`}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[200px] p-0" align="start">
+                    <Command>
+                      <CommandList>
+                        <CommandGroup>
+                          <CommandItem
+                            value={FILTER_ALL}
+                            onSelect={() => setFilterAsignado(FILTER_ALL)}
+                            className="cursor-pointer"
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                filterAsignado === FILTER_ALL
+                                  ? "opacity-100"
+                                  : "opacity-0"
+                              )}
+                            />
+                            Todos
+                          </CommandItem>
+
+                          {/* ✅ OPCIÓN "SIN ASIGNAR" */}
+                          <CommandItem
+                            value={FILTER_SIN_ASIGNAR}
+                            onSelect={() => setFilterAsignado(FILTER_SIN_ASIGNAR)}
+                            className="cursor-pointer"
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                filterAsignado === FILTER_SIN_ASIGNAR
+                                  ? "opacity-100"
+                                  : "opacity-0"
+                              )}
+                            />
+                            Sin asignar
+                          </CommandItem>
+
+                          {usuarios.map((usuario) => (
                             <CommandItem
-                              value={FILTER_ALL}
-                              onSelect={() => setFilterAsignado(FILTER_ALL)}
+                              key={usuario.id}
+                              value={String(usuario.id)}
+                              onSelect={() => setFilterAsignado(String(usuario.id))}
                               className="cursor-pointer"
                             >
                               <Check
                                 className={cn(
                                   "mr-2 h-4 w-4",
-                                  filterAsignado === FILTER_ALL
+                                  filterAsignado === String(usuario.id)
                                     ? "opacity-100"
                                     : "opacity-0"
                                 )}
                               />
-                              Todos
+                              {usuario.fullname || usuario.username}
                             </CommandItem>
-
-                            {/* ✅ OPCIÓN "SIN ASIGNAR" */}
-                            <CommandItem
-                              value={FILTER_SIN_ASIGNAR}
-                              onSelect={() => setFilterAsignado(FILTER_SIN_ASIGNAR)}
-                              className="cursor-pointer"
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  filterAsignado === FILTER_SIN_ASIGNAR
-                                    ? "opacity-100"
-                                    : "opacity-0"
-                                )}
-                              />
-                              Sin asignar
-                            </CommandItem>
-
-                            {usuarios.map((usuario) => (
-                              <CommandItem
-                                key={usuario.id}
-                                value={String(usuario.id)}
-                                onSelect={() => setFilterAsignado(String(usuario.id))}
-                                className="cursor-pointer"
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    filterAsignado === String(usuario.id)
-                                      ? "opacity-100"
-                                      : "opacity-0"
-                                  )}
-                                />
-                                {usuario.fullname || usuario.username}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              )}
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
 
               <div>
                 <label className="text-xs font-medium text-slate-600 block mb-2">
