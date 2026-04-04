@@ -69,7 +69,10 @@ export default function ReservasPage() {
       setLoading(true);
       const res = await fetch("/api/reservas", { cache: "no-store" });
       const data = await res.json();
-      setReservas(Array.isArray(data) ? data : []);
+      
+      // ✅ Manejo correcto de la estructura de respuesta
+      const reservasData = data.data || (Array.isArray(data) ? data : []);
+      setReservas(Array.isArray(reservasData) ? reservasData : []);
     } catch (error) {
       console.error(error);
       toast.error("Error cargando reservas");
@@ -86,8 +89,8 @@ export default function ReservasPage() {
 
   // Filtrar reservas
   const filteredReservas = reservas.filter((reserva) => {
-    // Filtro por estado
-    if (filterEstado !== "todos" && reserva.estado !== filterEstado) {
+    // Filtro por estado (si la API devuelve estado)
+    if (filterEstado !== "todos" && reserva.estado && reserva.estado !== filterEstado) {
       return false;
     }
 
@@ -108,10 +111,10 @@ export default function ReservasPage() {
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
       return (
-        reserva.id.toString().includes(search) ||
+        reserva.id?.toString().includes(search) ||
         reserva.created_by_name?.toLowerCase().includes(search) ||
         reserva.cliente_nombre?.toLowerCase().includes(search) ||
-        reserva.oportunidad_id.toString().includes(search) ||
+        reserva.oportunidad_id?.toString().includes(search) ||
         reserva.oportunidad_codigo?.toLowerCase().includes(search)
       );
     }
@@ -175,6 +178,23 @@ export default function ReservasPage() {
     return Math.round((firmadas / firmas.length) * 100);
   };
 
+  const getEstadoReserva = (reserva) => {
+    // ✅ Si la API no devuelve estado, calculamos basado en firmas
+    if (reserva.estado) {
+      return reserva.estado;
+    }
+
+    // Fallback: calcular estado basado en firmas
+    if (!reserva.firmas || reserva.firmas.length === 0) {
+      return "borrador";
+    }
+
+    const tienePendiente = reserva.firmas.some((f) => f.estado === "pendiente");
+    if (tienePendiente) return "enviado_firma";
+
+    return "firmado";
+  };
+
   if (loading || authLoading) {
     return (
       <div className="flex justify-center items-center py-12">
@@ -229,7 +249,7 @@ export default function ReservasPage() {
                         Firmadas
                       </p>
                       <p className="text-3xl font-bold text-green-900 mt-2">
-                        {reservas.filter((r) => r.estado === "firmado").length}
+                        {reservas.filter((r) => getEstadoReserva(r) === "firmado").length}
                       </p>
                     </div>
                     <CheckCircle className="h-12 w-12 text-green-200" />
@@ -280,7 +300,7 @@ export default function ReservasPage() {
                       </p>
                       <p className="text-3xl font-bold text-red-900 mt-2">
                         {
-                          reservas.filter((r) => r.estado === "observado")
+                          reservas.filter((r) => getEstadoReserva(r) === "observado")
                             .length
                         }
                       </p>
@@ -446,7 +466,7 @@ export default function ReservasPage() {
                           {reserva.created_by_name || "Usuario"}
                         </TableCell>
                         <TableCell>
-                          {getEstadoBadge(reserva.estado)}
+                          {getEstadoBadge(getEstadoReserva(reserva))}
                         </TableCell>
                         <TableCell>
                           <div className="space-y-1">

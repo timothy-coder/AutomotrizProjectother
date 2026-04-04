@@ -108,12 +108,14 @@ export default function OportunidadDetailPage() {
 
   // Cierres
   const [cierres, setCierres] = useState([]);
+  const [cierreDetalles, setCierreDetalles] = useState([]);
   const [dialogCierreOpen, setDialogCierreOpen] = useState(false);
   const [editingCierre, setEditingCierre] = useState(null);
   const [deleteCierreDialog, setDeleteCierreDialog] = useState(false);
   const [deleteCierreTarget, setDeleteCierreTarget] = useState(null);
   const [cierreFormData, setCierreFormData] = useState({
     detalle: "",
+    cierre_detalle_id: null,
   });
 
   // Vehículos de interés
@@ -358,7 +360,7 @@ export default function OportunidadDetailPage() {
         );
         if (resReservas.ok) {
           const dataReservas = await resReservas.json();
-          setReservas(Array.isArray(dataReservas) ? dataReservas : []);
+          setReservas(Array.isArray(dataReservas.data) ? dataReservas.data : []);
         }
 
         const resCierres = await fetch(
@@ -367,7 +369,20 @@ export default function OportunidadDetailPage() {
         );
         if (resCierres.ok) {
           const dataCierres = await resCierres.json();
-          setCierres(Array.isArray(dataCierres) ? dataCierres : []);
+          setCierres(Array.isArray(dataCierres.data) ? dataCierres.data : []);
+        }
+
+        // ✅ CARGAR DETALLES DE CIERRE
+        const resCierreDetalles = await fetch("/api/cierres-detalles", {
+          cache: "no-store",
+        });
+        if (resCierreDetalles.ok) {
+          const dataCierreDetalles = await resCierreDetalles.json();
+          setCierreDetalles(
+            Array.isArray(dataCierreDetalles.data)
+              ? dataCierreDetalles.data
+              : []
+          );
         }
 
         const [m, mo, v] = await Promise.all([
@@ -694,7 +709,7 @@ export default function OportunidadDetailPage() {
         );
         if (resReservas.ok) {
           const dataReservas = await resReservas.json();
-          setReservas(Array.isArray(dataReservas) ? dataReservas : []);
+          setReservas(Array.isArray(dataReservas.data) ? dataReservas.data : []);
         }
       } else {
         const data = await response.json();
@@ -723,7 +738,7 @@ export default function OportunidadDetailPage() {
         );
         if (resReservas.ok) {
           const dataReservas = await resReservas.json();
-          setReservas(Array.isArray(dataReservas) ? dataReservas : []);
+          setReservas(Array.isArray(dataReservas.data) ? dataReservas.data : []);
         }
       } else {
         toast.error("Error eliminando reserva");
@@ -737,13 +752,19 @@ export default function OportunidadDetailPage() {
   // CIERRE FUNCTIONS
   function openCreateCierre() {
     setEditingCierre(null);
-    setCierreFormData({ detalle: "" });
+    setCierreFormData({ 
+      detalle: "",
+      cierre_detalle_id: null,
+    });
     setDialogCierreOpen(true);
   }
 
   function openEditCierre(cierre) {
     setEditingCierre(cierre);
-    setCierreFormData({ detalle: cierre.detalle });
+    setCierreFormData({ 
+      detalle: cierre.detalle,
+      cierre_detalle_id: cierre.cierre_detalle_id || null,
+    });
     setDialogCierreOpen(true);
   }
 
@@ -764,10 +785,14 @@ export default function OportunidadDetailPage() {
       const method = editingCierre ? "PUT" : "POST";
 
       const body = editingCierre
-        ? { detalle: cierreFormData.detalle }
+        ? { 
+          detalle: cierreFormData.detalle,
+          cierre_detalle_id: cierreFormData.cierre_detalle_id || null,
+        }
         : {
           oportunidad_id: Number(oportunidadId),
           detalle: cierreFormData.detalle,
+          cierre_detalle_id: cierreFormData.cierre_detalle_id || null,
           created_by: userId,
         };
 
@@ -780,7 +805,7 @@ export default function OportunidadDetailPage() {
       if (response.ok) {
         toast.success(editingCierre ? "Cierre actualizado" : "Cierre creado");
         setDialogCierreOpen(false);
-        setCierreFormData({ detalle: "" });
+        setCierreFormData({ detalle: "", cierre_detalle_id: null });
 
         if (!editingCierre) {
           const cambioExitoso = await cambiarEtapa(10, "Oportunidad cerrada: " + cierreFormData.detalle);
@@ -795,7 +820,7 @@ export default function OportunidadDetailPage() {
         );
         if (resCierres.ok) {
           const dataCierres = await resCierres.json();
-          setCierres(Array.isArray(dataCierres) ? dataCierres : []);
+          setCierres(Array.isArray(dataCierres.data) ? dataCierres.data : []);
         }
       } else {
         const data = await response.json();
@@ -824,7 +849,7 @@ export default function OportunidadDetailPage() {
         );
         if (resCierres.ok) {
           const dataCierres = await resCierres.json();
-          setCierres(Array.isArray(dataCierres) ? dataCierres : []);
+          setCierres(Array.isArray(dataCierres.data) ? dataCierres.data : []);
         }
       } else {
         toast.error("Error eliminando cierre");
@@ -1007,7 +1032,7 @@ export default function OportunidadDetailPage() {
             type="number"
             value={valor}
             onChange={(e) => handleRespuestaChange(pregunta.id, e.target.value)}
-            placeholder="Ingresa un n��mero"
+            placeholder="Ingresa un número"
             className="w-full mt-1 p-2 border rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
           />
         );
@@ -1358,7 +1383,7 @@ export default function OportunidadDetailPage() {
                 </CardContent>
               </Card>
 
-              {/* INFORMACIÓN DE ETAPA - CON BOTONES PARA GUARDAR PREGUNTAS */}
+              {/* INFORMACIÓN DE ETAPA */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">
@@ -1366,8 +1391,6 @@ export default function OportunidadDetailPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  
-
                   {preguntas.length > 0 && (
                     <div className="space-y-4 pt-4 border-t border-slate-200">
                       <h3 className="font-semibold text-slate-900 flex items-center gap-2">
@@ -1621,7 +1644,6 @@ export default function OportunidadDetailPage() {
                       setSelectedHistorial(historialData);
                       setHistorialDialog(true);
                     }}
-                    // ✅ NUEVOS PROPS PARA ACCESORIOS Y PREVIEW
                     onAddAccesorios={(cot) => {
                       setSelectedCotizacionForAccesorios(cot);
                       setDialogAccesoriosOpen(true);
@@ -1757,22 +1779,38 @@ export default function OportunidadDetailPage() {
                               ID: {reserva.id}
                             </p>
                           </div>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="icon"
-                                variant="destructive"
-                                onClick={() => {
-                                  setDeleteReservaTarget(reserva);
-                                  setDeleteReservaDialog(true);
-                                }}
-                                className="h-8 w-8"
-                              >
-                                <Trash2 size={14} />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">Eliminar</TooltipContent>
-                          </Tooltip>
+                          <div className="flex gap-2">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  onClick={() => router.push(`/reservas/${reserva.id}`)}
+                                  className="h-8 w-8 border-green-300 hover:bg-green-100"
+                                >
+                                  <Eye size={14} className="text-green-600" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Ver detalles</TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="destructive"
+                                  onClick={() => {
+                                    setDeleteReservaTarget(reserva);
+                                    setDeleteReservaDialog(true);
+                                  }}
+                                  className="h-8 w-8"
+                                >
+                                  <Trash2 size={14} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">Eliminar</TooltipContent>
+                            </Tooltip>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1811,8 +1849,13 @@ export default function OportunidadDetailPage() {
                               {new Date(cierre.created_at).toLocaleString("es-ES")}
                             </p>
                             <p className="text-sm text-slate-900">{cierre.detalle}</p>
+                            {cierre.cierre_detalle_nombre && (
+                              <p className="text-xs text-slate-600 mt-2 italic border-t border-slate-300 pt-2">
+                                📋 {cierre.cierre_detalle_nombre}
+                              </p>
+                            )}
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 flex-shrink-0">
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
@@ -1849,8 +1892,6 @@ export default function OportunidadDetailPage() {
                   )}
                 </CardContent>
               </Card>
-
-
             </div>
 
             {/* RIGHT COLUMN */}
@@ -2286,7 +2327,7 @@ export default function OportunidadDetailPage() {
                     }))
                   }
                   placeholder="Notas adicionales"
-                  rows="3"
+                  rows={3}
                   className="w-full p-2 border rounded-md text-sm"
                 />
               </div>
@@ -2350,6 +2391,7 @@ export default function OportunidadDetailPage() {
           </AlertDialogContent>
         </AlertDialog>
 
+        
         {/* CIERRE DIALOG */}
         <Dialog open={dialogCierreOpen} onOpenChange={setDialogCierreOpen}>
           <DialogContent>
@@ -2367,13 +2409,49 @@ export default function OportunidadDetailPage() {
                 <textarea
                   value={cierreFormData.detalle}
                   onChange={(e) =>
-                    setCierreFormData({ detalle: e.target.value })
+                    setCierreFormData((prev) => ({ 
+                      ...prev,
+                      detalle: e.target.value 
+                    }))
                   }
                   placeholder="Describe el motivo del cierre"
-                  rows="4"
+                  rows={4}
                   className="w-full p-2 border rounded-md text-sm"
                 />
               </div>
+
+              {/* ✅ CLASIFICACIÓN DE CIERRE - SIN EMPTY STRING */}
+              {cierreDetalles.length > 0 && (
+                <div>
+                  <label className="text-sm font-medium text-slate-700 block mb-2">
+                    Clasificación de Cierre (opcional)
+                  </label>
+                  <Select
+                    value={cierreFormData.cierre_detalle_id ? String(cierreFormData.cierre_detalle_id) : "none"}
+                    onValueChange={(value) =>
+                      setCierreFormData((prev) => ({
+                        ...prev,
+                        cierre_detalle_id: value === "none" ? null : parseInt(value),
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona una clasificación" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin clasificación</SelectItem>
+                      {cierreDetalles.map((detalle) => (
+                        <SelectItem
+                          key={detalle.id}
+                          value={String(detalle.id)}
+                        >
+                          {detalle.detalle}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             <DialogFooter>
@@ -2450,7 +2528,7 @@ export default function OportunidadDetailPage() {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* ✅ COTIZACIÓN DIALOG */}
+        {/* COTIZACIÓN DIALOG */}
         <CotizacionDialog
           open={dialogCotizacionOpen}
           onOpenChange={setDialogCotizacionOpen}
@@ -2471,7 +2549,7 @@ export default function OportunidadDetailPage() {
           precargadaModeloId={cotizacionVehiculoModeloId}
         />
 
-        {/* ✅ HISTORIAL DIALOG */}
+        {/* HISTORIAL DIALOG */}
         <HistorialDialog
           open={historialDialog}
           onOpenChange={setHistorialDialog}
@@ -2479,7 +2557,7 @@ export default function OportunidadDetailPage() {
           loading={historialLoading}
         />
 
-        {/* ✅ ACCESORIOS DIALOG */}
+        {/* ACCESORIOS DIALOG */}
         <AgregarAccesoriosDialog
           open={dialogAccesoriosOpen}
           onOpenChange={setDialogAccesoriosOpen}
@@ -2488,7 +2566,7 @@ export default function OportunidadDetailPage() {
           modeloId={selectedCotizacionForAccesorios?.modelo_id}
         />
 
-        {/* ✅ PREVIEW DIALOG */}
+        {/* PREVIEW DIALOG */}
         <PreviewCotizacionDialog
           open={previewCotizacionOpen}
           onOpenChange={setPreviewCotizacionOpen}

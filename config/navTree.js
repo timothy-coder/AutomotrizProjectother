@@ -1,6 +1,8 @@
 import {
   Users, Milestone, DollarSign, UserRound, Package, Boxes, Settings,Car,
-  CalendarCheck, ClipboardList, Receipt, SquareDashedMousePointer, FileText, Home, CarFront, Columns2, Wrench, Coins, Calendar, MessageCircle, ShoppingCart, BookOpen, SlidersHorizontal
+  CalendarCheck, ClipboardList, Receipt, SquareDashedMousePointer, FileText, Home, CarFront, Columns2, Wrench, Coins, Calendar, MessageCircle, ShoppingCart, BookOpen, SlidersHorizontal,
+  CalendarDays,
+  CalendarRange
 } from "lucide-react";
 export const HOME_ITEM = { to: "/home", label: "Panel de Control", icon: Home, perm: ["home", "view"] };
 export const NAV_TREE = [
@@ -49,8 +51,13 @@ export const NAV_TREE = [
     label: "Ventas",
     items: [
       { to: "/agenda", label: "Agenda", icon: Calendar, perm: ["agenda", "view"] },
-      { to: "/oportunidades", label: "Oportunidades", icon: Calendar, perm: ["agenda", "view"] },
-      { to: "/leads", label: "Leads", icon: Calendar, perm: ["agenda", "view"] },
+      { to: "/oportunidades", label: "Oportunidades", icon: CalendarDays, perm: ["agenda", "view"] },
+       { 
+      to: "/leads", 
+      label: "Leads", 
+      icon: CalendarRange,   
+      perm: ["agenda", "view"]
+    },
       { to: "/reservas", label: "Reservas", icon: Calendar, perm: ["reservas", "view"] },
     ],
   },

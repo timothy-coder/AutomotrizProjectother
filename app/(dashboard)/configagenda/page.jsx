@@ -9,6 +9,7 @@ import ConfiguracionEstadosTiempoTab from "@/app/components/configuracion/Config
 import AgendaCentroTab from "@/app/components/configuracion/AgendaCentroTab";
 import PreguntasAgendaTab from "@/app/components/configuracion/PreguntasAgendaTab";
 import EspecificacionesTab from "@/app/components/configuracion/EspecficacionesTab";
+import CierresDetalleTab from "@/app/components/configuracion/CierreDetalleTab";
 
 export default function ConfiguracionAgendaPage() {
 
@@ -25,9 +26,10 @@ export default function ConfiguracionAgendaPage() {
 
           <TabsTrigger value="horarios">Horarios Agenda</TabsTrigger>
           <TabsTrigger value="conversion">Etapas de Conversión</TabsTrigger>
-<TabsTrigger value="tiempos">Tiempos</TabsTrigger>
-<TabsTrigger value="preguntas">Preguntas</TabsTrigger>
-<TabsTrigger value="tipoespecificaciones">Tipo de Especificaciones</TabsTrigger>
+          <TabsTrigger value="tiempos">Tiempos</TabsTrigger>
+          <TabsTrigger value="preguntas">Preguntas</TabsTrigger>
+          <TabsTrigger value="tipoespecificaciones">Tipo de Especificaciones</TabsTrigger>
+          <TabsTrigger value="cierres">Detalles de cierre</TabsTrigger>
         </TabsList>
         <TabsContent value="horarios">
           <Card>
@@ -61,6 +63,13 @@ export default function ConfiguracionAgendaPage() {
           <Card>
             <CardContent className="pt-6">
               <EspecificacionesTab />
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="cierres">
+          <Card>
+            <CardContent className="pt-6">
+              <CierresDetalleTab />
             </CardContent>
           </Card>
         </TabsContent>

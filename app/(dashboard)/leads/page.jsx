@@ -29,15 +29,14 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
-import { useRequirePerm } from "@/hooks/useRequirePerm";
 import { useAuth } from "@/context/AuthContext";
 
+import { hasPermission } from "@/lib/permissions";
 import LeadDialog from "@/app/components/leads/LeadDialog";
 import AssignmentDialog from "@/app/components/leads/AssignmentDialog";
 import LeadsTable from "@/app/components/leads/LeadsTable";
 import VistaPorUsuarios from "@/app/components/leads/VistaPorUsuarios";
 import VistaPorEtapas from "@/app/components/leads/VistaPorEtapas";
-import { hasPermission } from "@/lib/permissions";
 
 const FILTER_ALL_CREATED = "__all_created__";
 const FILTER_ALL = "__all__";
@@ -45,6 +44,22 @@ const FILTER_SIN_ASIGNAR = "__sin_asignar__";
 const FILTER_TODAY = "hoy";
 const FILTER_THIS_WEEK = "esta_semana";
 const FILTER_THIS_MONTH = "este_mes";
+
+const BRAND_PRIMARY = "#5d16ec";
+const BRAND_SECONDARY = "#81929c";
+
+// ==================== TABLA DE PERMISOS ====================
+/*
+  LEADS - TABLA DE PERMISOS Y FUNCIONALIDADES
+  
+  | Permiso    | Acción                      | Puede ver                  | Filtro "Asignado a" |
+  |------------|-----------------------------|-----------------------------|----------------------|
+  | view       | Ver leads                   | Solo sus asignaciones       | ❌ No                |
+  | viewall    | Ver + Filtrar "Asignado a"  | Todas las oportunidades     | ✅ Sí (Preseleccionado "Sin asignar") |
+  | create     | Crear nuevos leads          | —                           | —                    |
+  | edit       | Editar leads                | —                           | —                    |
+  | asignar    | Asignar a otros             | Solo con viewall            | —                    |
+*/
 
 // Componente FilterCombobox mejorado
 function FilterCombobox({
@@ -58,7 +73,6 @@ function FilterCombobox({
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 
-  // Filtrar items según búsqueda
   const filteredItems = useMemo(() => {
     if (!searchValue.trim()) return items;
     
@@ -89,10 +103,10 @@ function FilterCombobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between h-9 text-sm"
+          className="w-full justify-between h-8 sm:h-9 text-xs sm:text-sm"
         >
-          {selectedLabel}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <span className="truncate">{selectedLabel}</span>
+          <ChevronsUpDown className="ml-2 h-3 sm:h-4 w-3 sm:w-4 shrink-0 opacity-50 flex-shrink-0" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[200px] p-0" align="start">
@@ -101,21 +115,21 @@ function FilterCombobox({
             placeholder={placeholder}
             value={searchValue}
             onValueChange={setSearchValue}
-            className="h-9"
+            className="h-8 sm:h-9 text-xs sm:text-sm"
           />
           <CommandList>
             {filteredItems.length === 0 ? (
-              <CommandEmpty>{emptyText}</CommandEmpty>
+              <CommandEmpty className="text-xs">{emptyText}</CommandEmpty>
             ) : (
               <CommandGroup>
                 <CommandItem
                   value="__all__"
                   onSelect={() => handleSelect(FILTER_ALL)}
-                  className="cursor-pointer"
+                  className="cursor-pointer text-xs sm:text-sm"
                 >
                   <Check
                     className={cn(
-                      "mr-2 h-4 w-4",
+                      "mr-2 h-3 sm:h-4 w-3 sm:w-4",
                       value === FILTER_ALL || value === FILTER_ALL_CREATED
                         ? "opacity-100"
                         : "opacity-0"
@@ -128,11 +142,11 @@ function FilterCombobox({
                     key={item.id}
                     value={String(item.id)}
                     onSelect={() => handleSelect(String(item.id))}
-                    className="cursor-pointer"
+                    className="cursor-pointer text-xs sm:text-sm"
                   >
                     <Check
                       className={cn(
-                        "mr-2 h-4 w-4",
+                        "mr-2 h-3 sm:h-4 w-3 sm:w-4",
                         value === String(item.id) ? "opacity-100" : "opacity-0"
                       )}
                     />
@@ -149,12 +163,17 @@ function FilterCombobox({
 }
 
 export default function LeadsPage() {
-  const canView = useRequirePerm("leads", "view");
   const { user, permissions } = useAuth();
 
+  // ==================== PERMISOS ====================
+  // ✅ view: Permite acceso básico a leads
+  // ✅ viewall: Permite ver TODOS los leads + filtrar por usuario
+  const canView = hasPermission(permissions, "leads", "view") || 
+                  hasPermission(permissions, "leads", "viewall");
+  
   const canCreate = hasPermission(permissions, "leads", "create");
   const canEdit = hasPermission(permissions, "leads", "edit");
-  const canViewAll = hasPermission(permissions, "leads", "viewall");
+  const canViewAll = hasPermission(permissions, "leads", "viewall"); // ✅ SOLO CON ESTO VE TODOS
   const canAssign = hasPermission(permissions, "leads", "asignar");
 
   const [rows, setRows] = useState([]);
@@ -165,10 +184,11 @@ export default function LeadsPage() {
   const [estadosTiempo, setEstadosTiempo] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Estados de filtros
+  // Filtros
   const [filterCliente, setFilterCliente] = useState(FILTER_ALL);
   const [filterOrigen, setFilterOrigen] = useState(FILTER_ALL);
   const [filterEtapa, setFilterEtapa] = useState(FILTER_ALL);
+  // ✅ PRESELECCIONAR "SIN ASIGNAR" SI TIENE viewall
   const [filterAsignado, setFilterAsignado] = useState(FILTER_ALL);
   const [createdByFilter, setCreatedByFilter] = useState(FILTER_ALL_CREATED);
   const [filterFecha, setFilterFecha] = useState(FILTER_ALL);
@@ -200,22 +220,15 @@ export default function LeadsPage() {
 
   async function enriquecerLeadsConDetalles(leads) {
     try {
-      console.log("📌 Enriqueciendo leads:", leads.length);
-      
       const leadsEnriquecidos = await Promise.all(
         leads.map(async (lead) => {
           try {
-            console.log(`🔄 Enriqueciendo lead ${lead.id}...`);
-            
             const res = await fetch(
               `/api/leads/${lead.id}/detalles?limit=1`,
               { cache: "no-store" }
             );
 
-            console.log(`✅ Respuesta para lead ${lead.id}:`, res.status);
-
             if (!res.ok) {
-              console.warn(`⚠️ Error en detalles del lead ${lead.id}: ${res.status}`);
               return {
                 ...lead,
                 ultimoDetalle: null,
@@ -225,7 +238,6 @@ export default function LeadsPage() {
             }
 
             const data = await res.json();
-            console.log(`📊 Detalles de lead ${lead.id}:`, data);
 
             let ultimoDetalle = null;
             if (Array.isArray(data)) {
@@ -234,8 +246,6 @@ export default function LeadsPage() {
               ultimoDetalle = data.data[0];
             }
 
-            console.log(`🎯 Último detalle de lead ${lead.id}:`, ultimoDetalle);
-
             return {
               ...lead,
               ultimoDetalle,
@@ -243,7 +253,7 @@ export default function LeadsPage() {
               hora_ultima_agenda: ultimoDetalle?.hora_agenda,
             };
           } catch (error) {
-            console.error(`❌ Error enriqueciendo lead ${lead.id}:`, error);
+            console.error(`Error enriqueciendo lead ${lead.id}:`, error);
             return {
               ...lead,
               ultimoDetalle: null,
@@ -254,10 +264,9 @@ export default function LeadsPage() {
         })
       );
 
-      console.log("✅ Leads enriquecidos:", leadsEnriquecidos);
       return leadsEnriquecidos;
     } catch (error) {
-      console.error("❌ Error enriqueciendo leads:", error);
+      console.error("Error enriqueciendo leads:", error);
       return leads.map(lead => ({
         ...lead,
         ultimoDetalle: null,
@@ -291,20 +300,7 @@ export default function LeadsPage() {
         throw new Error(leadsData?.message || "No se pudo cargar leads");
       }
 
-      // ✅ MANEJO CORRECTO DE RESPUESTA
       let leads = leadsData?.data || [];
-
-      console.log("📊 Datos sin filtrar:", leads.length);
-      console.log("📊 Primer lead:", leads[0]);
-
-      // ✅ FILTRAR SOLO LEADS CON PREFIJO "LD-"
-      leads = leads.filter((lead) => {
-        const prefijo = lead.oportunidad_id?.substring(0, 2);
-        return prefijo === "LD";
-      });
-
-      console.log("✅ Leads LD después de filtrar:", leads.length);
-      console.log("✅ Leads filtrados:", leads);
 
       const leadsEnriquecidos = await enriquecerLeadsConDetalles(leads);
 
@@ -318,11 +314,8 @@ export default function LeadsPage() {
         ? estadosData.filter((e) => e.activo === 1 || e.activo === true)
         : [];
       setEstadosTiempo(estadosFiltrados);
-
-      console.log("✅ Leads LD cargados:", leadsEnriquecidos.length);
-      console.log("📊 Filas finales:", leadsEnriquecidos);
     } catch (error) {
-      console.error("❌ Error cargando datos:", error);
+      console.error("Error cargando datos:", error);
       toast.error(error.message || "No se pudo cargar información");
     } finally {
       setLoading(false);
@@ -333,59 +326,44 @@ export default function LeadsPage() {
     if (canView) loadData();
   }, [canView]);
 
-  // ✅ PRESELECCIONAR FILTRO "SIN ASIGNAR" cuando canViewAll es false
+  // ✅ PRESELECCIONAR "SIN ASIGNAR" AUTOMÁTICAMENTE CUANDO TIENE viewall
   useEffect(() => {
-    if (!canViewAll && filterAsignado === FILTER_ALL) {
-      console.log("🔽 Preseleccionando filtro 'Sin asignar'");
+    if (canViewAll && filterAsignado === FILTER_ALL) {
+      console.log("🔽 Preseleccionando 'Sin asignar' automáticamente");
       setFilterAsignado(FILTER_SIN_ASIGNAR);
     }
   }, [canViewAll]);
 
-  // ✅ MOSTRAR: leads sin asignar + asignados al usuario actual (basado en permisos)
+  // ==================== LÓGICA DE VISIBILIDAD ====================
+  // ✅ CON "view": Ve SOLO sus asignaciones (no sin asignar)
+  // ✅ CON "viewall": Ve TODOS los leads (sin asignar + todos asignados)
   const visibleRows = useMemo(() => {
-    console.log("👁️ visibleRows calculando:", {
-      rowsLength: rows.length,
-      canViewAll,
+    console.log("👁️ Calculando visibleRows:", {
       userId: user?.id,
+      canViewAll,
+      totalRows: rows.length,
     });
 
-    if (!user?.id) {
-      console.log("⚠️ No hay user.id");
-      return rows;
-    }
+    if (!user?.id) return rows;
+    if (canViewAll) return rows; // Ve TODO
     
-    if (canViewAll) {
-      console.log("✅ canViewAll es true, retornando todos los rows");
-      return rows;
-    }
-    
-    // ✅ Mostrar: leads sin asignar O asignados a este usuario
+    // ✅ SOLO SUS ASIGNACIONES (sin los sin asignar)
     const filtered = rows.filter(
-      (row) =>
-        !row.asignado_a || // Sin asignar
-        String(row.asignado_a) === String(user.id) // Asignados a este usuario
+      (row) => String(row.asignado_a) === String(user.id)
     );
     
-    console.log("🔽 Filtrando por permisos:", {
+    console.log("🔽 Solo con view - Solo asignados a mi:", {
       userId: user.id,
-      total: rows.length,
-      sinAsignar: rows.filter(r => !r.asignado_a).length,
-      asignadosAMi: rows.filter(r => String(r.asignado_a) === String(user.id)).length,
-      found: filtered.length,
+      asignadosAMi: filtered.length,
     });
     
     return filtered;
   }, [rows, canViewAll, user]);
 
   const baseFilteredRows = useMemo(() => {
-    console.log("🔍 Calculando baseFilteredRows desde visibleRows:", {
-      visibleRowsLength: visibleRows.length,
-      filterAsignado,
-    });
-    
     const fechas = getFechaFiltros();
 
-    const resultado = visibleRows.filter((row) => {
+    return visibleRows.filter((row) => {
       const matchesCreatedBy =
         createdByFilter === FILTER_ALL_CREATED ||
         String(row?.created_by ?? "") === createdByFilter;
@@ -402,17 +380,19 @@ export default function LeadsPage() {
         filterEtapa === FILTER_ALL ||
         String(row?.etapasconversion_id ?? "") === filterEtapa;
 
-      // ✅ MANEJAR FILTRO "ASIGNADO A"
-      let matchesAsignado = filterAsignado === FILTER_ALL;
-      if (!matchesAsignado) {
-        if (filterAsignado === FILTER_SIN_ASIGNAR) {
-          // Mostrar solo leads sin asignar
-          matchesAsignado = !row.asignado_a;
-        } else {
-          // Mostrar leads asignados a un usuario específico
-          matchesAsignado = String(row?.asignado_a ?? "") === filterAsignado;
+      // ✅ FILTRO "ASIGNADO A" - SOLO DISPONIBLE CON "viewall"
+      let matchesAsignado = true;
+      if (canViewAll) {
+        // Con viewall: aplicar filtro
+        if (filterAsignado !== FILTER_ALL) {
+          if (filterAsignado === FILTER_SIN_ASIGNAR) {
+            matchesAsignado = !row.asignado_a;
+          } else {
+            matchesAsignado = String(row?.asignado_a ?? "") === filterAsignado;
+          }
         }
       }
+      // Con view: no aplicar filtro (ya está filtrado en visibleRows)
 
       let matchesFecha = filterFecha === FILTER_ALL;
       if (!matchesFecha && row.fecha_ultima_agenda) {
@@ -445,9 +425,6 @@ export default function LeadsPage() {
         matchesFecha
       );
     });
-
-    console.log("📊 baseFilteredRows resultado:", resultado.length);
-    return resultado;
   }, [
     visibleRows,
     createdByFilter,
@@ -456,6 +433,7 @@ export default function LeadsPage() {
     filterEtapa,
     filterAsignado,
     filterFecha,
+    canViewAll,
   ]);
 
   function handleOpenEdit(row) {
@@ -477,21 +455,24 @@ export default function LeadsPage() {
     setFilterCliente(FILTER_ALL);
     setFilterOrigen(FILTER_ALL);
     setFilterEtapa(FILTER_ALL);
-    setFilterAsignado(FILTER_ALL);
+    // ✅ Si tiene viewall, volver a "Sin asignar", si no dejar como está
+    if (canViewAll) {
+      setFilterAsignado(FILTER_SIN_ASIGNAR);
+    }
     setCreatedByFilter(FILTER_ALL_CREATED);
     setFilterFecha(FILTER_ALL);
   }
 
+  // ✅ NO CONTAR "SIN ASIGNAR" COMO FILTRO ACTIVO SI ES EL DEFAULT
   const hasActiveFilters =
     filterCliente !== FILTER_ALL ||
     filterOrigen !== FILTER_ALL ||
     filterEtapa !== FILTER_ALL ||
-    (filterAsignado !== FILTER_ALL && filterAsignado !== FILTER_SIN_ASIGNAR) ||
+    (canViewAll && filterAsignado !== FILTER_SIN_ASIGNAR && filterAsignado !== FILTER_ALL) ||
     createdByFilter !== FILTER_ALL_CREATED ||
     filterFecha !== FILTER_ALL;
 
-  // ✅ DIAGNÓSTICO PERMISOS
-  console.log("🔐 PERMISOS:", {
+  console.log("🔐 PERMISOS LEADS:", {
     canView,
     canCreate,
     canEdit,
@@ -500,23 +481,34 @@ export default function LeadsPage() {
     user: user?.id,
   });
 
-  if (!canView) return null;
+  if (!canView) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <p className="text-sm" style={{ color: BRAND_SECONDARY }}>
+          No tienes permiso para acceder a esta página
+        </p>
+      </div>
+    );
+  }
 
   return (
     <TooltipProvider>
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
+        
         {/* ENCABEZADO */}
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: BRAND_PRIMARY }}>
               Leads
             </h1>
-            <p className="text-sm text-slate-600 mt-1">
+            <p className="text-xs sm:text-sm mt-1" style={{ color: BRAND_SECONDARY }}>
               Gestiona todos tus leads de negocio (LD)
+              {!canViewAll && " • Solo tus asignaciones"}
+              {canViewAll && ` • Vista completa`}
             </p>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 w-full sm:w-auto">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -524,13 +516,15 @@ export default function LeadsPage() {
                   disabled={loading}
                   variant="outline"
                   size="sm"
-                  className="gap-2"
+                  className="gap-2 text-xs sm:text-sm h-8 sm:h-9 flex-1 sm:flex-none"
                 >
-                  <RefreshCw className="h-4 w-4" />
+                  <RefreshCw className="h-3 sm:h-4 w-3 sm:w-4" />
                   Actualizar
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="top">Recargar datos</TooltipContent>
+              <TooltipContent side="top" className="text-xs">
+                Recargar datos
+              </TooltipContent>
             </Tooltip>
 
             {canCreate && (
@@ -541,13 +535,14 @@ export default function LeadsPage() {
                       setSelectedLead(null);
                       setDialogOpen(true);
                     }}
-                    className="gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
+                    className="gap-2 text-white text-xs sm:text-sm h-8 sm:h-9 flex-1 sm:flex-none"
+                    style={{ backgroundColor: BRAND_PRIMARY }}
                   >
-                    <Plus className="h-4 w-4" />
-                    Agregar lead
+                    <Plus className="h-3 sm:h-4 w-3 sm:w-4" />
+                    <span>Agregar lead</span>
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="top">
+                <TooltipContent side="top" className="text-xs">
                   Crear nuevo lead
                 </TooltipContent>
               </Tooltip>
@@ -557,9 +552,11 @@ export default function LeadsPage() {
 
         {/* FILTROS */}
         {activeTab === "general" && (
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-4">
+          <div className="bg-gradient-to-br border-2 rounded-lg p-3 sm:p-4 space-y-3 sm:space-y-4" style={{ backgroundColor: `${BRAND_PRIMARY}08`, borderColor: `${BRAND_PRIMARY}30` }}>
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-900">Filtros</h3>
+              <h3 className="text-sm font-semibold" style={{ color: BRAND_PRIMARY }}>
+                Filtros
+              </h3>
               {hasActiveFilters && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -567,22 +564,22 @@ export default function LeadsPage() {
                       onClick={clearFilters}
                       variant="ghost"
                       size="sm"
-                      className="gap-1 text-xs"
+                      className="gap-1 text-xs h-7 sm:h-8 px-2"
                     >
                       <X className="h-3 w-3" />
-                      Limpiar filtros
+                      Limpiar
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent side="left">
+                  <TooltipContent side="left" className="text-xs">
                     Eliminar todos los filtros
                   </TooltipContent>
                 </Tooltip>
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-6 gap-2 sm:gap-3">
               <div>
-                <label className="text-xs font-medium text-slate-600 block mb-2">
+                <label className="text-xs font-medium block mb-1" style={{ color: BRAND_SECONDARY }}>
                   Cliente
                 </label>
                 <FilterCombobox
@@ -596,7 +593,7 @@ export default function LeadsPage() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-600 block mb-2">
+                <label className="text-xs font-medium block mb-1" style={{ color: BRAND_SECONDARY }}>
                   Origen
                 </label>
                 <FilterCombobox
@@ -610,7 +607,7 @@ export default function LeadsPage() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-600 block mb-2">
+                <label className="text-xs font-medium block mb-1" style={{ color: BRAND_SECONDARY }}>
                   Etapa
                 </label>
                 <FilterCombobox
@@ -623,88 +620,92 @@ export default function LeadsPage() {
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-medium text-slate-600 block mb-2">
-                  Asignado a
-                </label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-between h-9 text-sm"
-                    >
-                      {filterAsignado === FILTER_ALL
-                        ? "Todos"
-                        : filterAsignado === FILTER_SIN_ASIGNAR
-                        ? "Sin asignar"
-                        : usuarios.find(u => String(u.id) === filterAsignado)?.fullname || `Usuario ${filterAsignado}`}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[200px] p-0" align="start">
-                    <Command>
-                      <CommandList>
-                        <CommandGroup>
-                          <CommandItem
-                            value={FILTER_ALL}
-                            onSelect={() => setFilterAsignado(FILTER_ALL)}
-                            className="cursor-pointer"
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                filterAsignado === FILTER_ALL
-                                  ? "opacity-100"
-                                  : "opacity-0"
-                              )}
-                            />
-                            Todos
-                          </CommandItem>
-
-                          {/* ✅ OPCIÓN "SIN ASIGNAR" */}
-                          <CommandItem
-                            value={FILTER_SIN_ASIGNAR}
-                            onSelect={() => setFilterAsignado(FILTER_SIN_ASIGNAR)}
-                            className="cursor-pointer"
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                filterAsignado === FILTER_SIN_ASIGNAR
-                                  ? "opacity-100"
-                                  : "opacity-0"
-                              )}
-                            />
-                            Sin asignar
-                          </CommandItem>
-
-                          {usuarios.map((usuario) => (
+              {/* ✅ SOLO MOSTRAR FILTRO "ASIGNADO A" CON "viewall" */}
+              {canViewAll && (
+                <div>
+                  <label className="text-xs font-medium block mb-1" style={{ color: BRAND_SECONDARY }}>
+                    Asignado a
+                  </label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-between h-8 sm:h-9 text-xs sm:text-sm"
+                      >
+                        <span className="truncate">
+                          {filterAsignado === FILTER_ALL
+                            ? "Todos"
+                            : filterAsignado === FILTER_SIN_ASIGNAR
+                            ? "Sin asignar"
+                            : usuarios.find(u => String(u.id) === filterAsignado)?.fullname || `Usuario ${filterAsignado}`}
+                        </span>
+                        <ChevronsUpDown className="ml-2 h-3 sm:h-4 w-3 sm:w-4 shrink-0 opacity-50 flex-shrink-0" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[200px] p-0" align="start">
+                      <Command>
+                        <CommandList>
+                          <CommandGroup>
                             <CommandItem
-                              key={usuario.id}
-                              value={String(usuario.id)}
-                              onSelect={() => setFilterAsignado(String(usuario.id))}
-                              className="cursor-pointer"
+                              value={FILTER_ALL}
+                              onSelect={() => setFilterAsignado(FILTER_ALL)}
+                              className="cursor-pointer text-xs sm:text-sm"
                             >
                               <Check
                                 className={cn(
-                                  "mr-2 h-4 w-4",
-                                  filterAsignado === String(usuario.id)
+                                  "mr-2 h-3 sm:h-4 w-3 sm:w-4",
+                                  filterAsignado === FILTER_ALL
                                     ? "opacity-100"
                                     : "opacity-0"
                                 )}
                               />
-                              {usuario.fullname || usuario.username}
+                              Todos
                             </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
+
+                            <CommandItem
+                              value={FILTER_SIN_ASIGNAR}
+                              onSelect={() => setFilterAsignado(FILTER_SIN_ASIGNAR)}
+                              className="cursor-pointer text-xs sm:text-sm"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-3 sm:h-4 w-3 sm:w-4",
+                                  filterAsignado === FILTER_SIN_ASIGNAR
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                                )}
+                              />
+                              Sin asignar
+                            </CommandItem>
+
+                            {usuarios.map((usuario) => (
+                              <CommandItem
+                                key={usuario.id}
+                                value={String(usuario.id)}
+                                onSelect={() => setFilterAsignado(String(usuario.id))}
+                                className="cursor-pointer text-xs sm:text-sm"
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-3 sm:h-4 w-3 sm:w-4",
+                                    filterAsignado === String(usuario.id)
+                                      ? "opacity-100"
+                                      : "opacity-0"
+                                  )}
+                                />
+                                {usuario.fullname || usuario.username}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
 
               <div>
-                <label className="text-xs font-medium text-slate-600 block mb-2">
+                <label className="text-xs font-medium block mb-1" style={{ color: BRAND_SECONDARY }}>
                   Creado por
                 </label>
                 <FilterCombobox
@@ -720,23 +721,25 @@ export default function LeadsPage() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-600 block mb-2">
+                <label className="text-xs font-medium block mb-1" style={{ color: BRAND_SECONDARY }}>
                   Fecha Agenda
                 </label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className="w-full justify-between h-9 text-sm"
+                      className="w-full justify-between h-8 sm:h-9 text-xs sm:text-sm"
                     >
-                      {filterFecha === FILTER_ALL
-                        ? "Todas"
-                        : filterFecha === FILTER_TODAY
-                          ? "Hoy"
-                          : filterFecha === FILTER_THIS_WEEK
-                            ? "Esta semana"
-                            : "Este mes"}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      <span className="truncate">
+                        {filterFecha === FILTER_ALL
+                          ? "Todas"
+                          : filterFecha === FILTER_TODAY
+                            ? "Hoy"
+                            : filterFecha === FILTER_THIS_WEEK
+                              ? "Esta semana"
+                              : "Este mes"}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-3 sm:h-4 w-3 sm:w-4 shrink-0 opacity-50 flex-shrink-0" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[200px] p-0" align="start">
@@ -746,11 +749,11 @@ export default function LeadsPage() {
                           <CommandItem
                             value={FILTER_ALL}
                             onSelect={() => setFilterFecha(FILTER_ALL)}
-                            className="cursor-pointer"
+                            className="cursor-pointer text-xs sm:text-sm"
                           >
                             <Check
                               className={cn(
-                                "mr-2 h-4 w-4",
+                                "mr-2 h-3 sm:h-4 w-3 sm:w-4",
                                 filterFecha === FILTER_ALL
                                   ? "opacity-100"
                                   : "opacity-0"
@@ -761,11 +764,11 @@ export default function LeadsPage() {
                           <CommandItem
                             value={FILTER_TODAY}
                             onSelect={() => setFilterFecha(FILTER_TODAY)}
-                            className="cursor-pointer"
+                            className="cursor-pointer text-xs sm:text-sm"
                           >
                             <Check
                               className={cn(
-                                "mr-2 h-4 w-4",
+                                "mr-2 h-3 sm:h-4 w-3 sm:w-4",
                                 filterFecha === FILTER_TODAY
                                   ? "opacity-100"
                                   : "opacity-0"
@@ -776,11 +779,11 @@ export default function LeadsPage() {
                           <CommandItem
                             value={FILTER_THIS_WEEK}
                             onSelect={() => setFilterFecha(FILTER_THIS_WEEK)}
-                            className="cursor-pointer"
+                            className="cursor-pointer text-xs sm:text-sm"
                           >
                             <Check
                               className={cn(
-                                "mr-2 h-4 w-4",
+                                "mr-2 h-3 sm:h-4 w-3 sm:w-4",
                                 filterFecha === FILTER_THIS_WEEK
                                   ? "opacity-100"
                                   : "opacity-0"
@@ -791,11 +794,11 @@ export default function LeadsPage() {
                           <CommandItem
                             value={FILTER_THIS_MONTH}
                             onSelect={() => setFilterFecha(FILTER_THIS_MONTH)}
-                            className="cursor-pointer"
+                            className="cursor-pointer text-xs sm:text-sm"
                           >
                             <Check
                               className={cn(
-                                "mr-2 h-4 w-4",
+                                "mr-2 h-3 sm:h-4 w-3 sm:w-4",
                                 filterFecha === FILTER_THIS_MONTH
                                   ? "opacity-100"
                                   : "opacity-0"
@@ -812,9 +815,9 @@ export default function LeadsPage() {
             </div>
 
             {hasActiveFilters && (
-              <div className="text-xs text-slate-600">
-                Mostrando {baseFilteredRows.length} de {visibleRows.length}{" "}
-                leads
+              <div className="text-xs" style={{ color: BRAND_SECONDARY }}>
+                Mostrando <span className="font-semibold">{baseFilteredRows.length}</span> de{" "}
+                <span className="font-semibold">{visibleRows.length}</span> leads
               </div>
             )}
           </div>
@@ -822,50 +825,78 @@ export default function LeadsPage() {
 
         {/* TABS */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <div className="border-b border-slate-200">
-            <TabsList className="bg-transparent border-b-0 gap-8 p-0">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <TabsTrigger
-                    value="general"
-                    className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:bg-transparent rounded-none px-0 pb-3"
-                  >
-                    <span className="text-sm font-medium">General</span>
-                  </TabsTrigger>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  Vista general de todos los leads
-                </TooltipContent>
-              </Tooltip>
+          <div className="flex flex-wrap gap-3 sm:gap-4">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setActiveTab("general")}
+                  className={`
+                    rounded-lg px-3 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-medium 
+                    transition-all duration-200 cursor-pointer
+                    ${activeTab === "general"
+                      ? "text-white shadow-lg scale-105"
+                      : "text-white hover:opacity-90"
+                    }
+                  `}
+                  style={{
+                    backgroundColor: activeTab === "general" ? BRAND_PRIMARY : BRAND_SECONDARY,
+                  }}
+                >
+                  General
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                Vista general de todos los leads
+              </TooltipContent>
+            </Tooltip>
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <TabsTrigger
-                    value="vista_usuarios"
-                    className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:bg-transparent rounded-none px-0 pb-3"
-                  >
-                    <span className="text-sm font-medium">Tablero</span>
-                  </TabsTrigger>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  Tablero por usuarios asignados
-                </TooltipContent>
-              </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setActiveTab("vista_usuarios")}
+                  className={`
+                    rounded-lg px-3 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-medium 
+                    transition-all duration-200 cursor-pointer
+                    ${activeTab === "vista_usuarios"
+                      ? "text-white shadow-lg scale-105"
+                      : "text-white hover:opacity-90"
+                    }
+                  `}
+                  style={{
+                    backgroundColor: activeTab === "vista_usuarios" ? BRAND_PRIMARY : BRAND_SECONDARY,
+                  }}
+                >
+                  Tablero
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                Tablero por usuarios asignados
+              </TooltipContent>
+            </Tooltip>
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <TabsTrigger
-                    value="vista_etapas"
-                    className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:bg-transparent rounded-none px-0 pb-3"
-                  >
-                    <span className="text-sm font-medium">Kanban</span>
-                  </TabsTrigger>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  Vista Kanban por etapas
-                </TooltipContent>
-              </Tooltip>
-            </TabsList>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setActiveTab("vista_etapas")}
+                  className={`
+                    rounded-lg px-3 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-medium 
+                    transition-all duration-200 cursor-pointer
+                    ${activeTab === "vista_etapas"
+                      ? "text-white shadow-lg scale-105"
+                      : "text-white hover:opacity-90"
+                    }
+                  `}
+                  style={{
+                    backgroundColor: activeTab === "vista_etapas" ? BRAND_PRIMARY : BRAND_SECONDARY,
+                  }}
+                >
+                  Kanban
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                Vista Kanban por etapas
+              </TooltipContent>
+            </Tooltip>
           </div>
 
           <TabsContent value="general" className="space-y-0">
@@ -886,9 +917,11 @@ export default function LeadsPage() {
           </TabsContent>
 
           <TabsContent value="vista_usuarios">
-            <Card className="overflow-hidden shadow-sm border-slate-200">
-              <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
-                <CardTitle className="text-xl">Tablero por Usuarios</CardTitle>
+            <Card className="overflow-hidden shadow-sm border-2" style={{ borderColor: `${BRAND_PRIMARY}30` }}>
+              <CardHeader className="border-b" style={{ backgroundColor: `${BRAND_PRIMARY}08`, borderColor: `${BRAND_PRIMARY}20` }}>
+                <CardTitle className="text-lg sm:text-xl" style={{ color: BRAND_PRIMARY }}>
+                  Tablero por Usuarios
+                </CardTitle>
               </CardHeader>
               <CardContent className="overflow-hidden p-0">
                 <VistaPorUsuarios
@@ -904,9 +937,11 @@ export default function LeadsPage() {
           </TabsContent>
 
           <TabsContent value="vista_etapas">
-            <Card className="overflow-hidden shadow-sm border-slate-200">
-              <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
-                <CardTitle className="text-xl">Kanban de Etapas</CardTitle>
+            <Card className="overflow-hidden shadow-sm border-2" style={{ borderColor: `${BRAND_PRIMARY}30` }}>
+              <CardHeader className="border-b" style={{ backgroundColor: `${BRAND_PRIMARY}08`, borderColor: `${BRAND_PRIMARY}20` }}>
+                <CardTitle className="text-lg sm:text-xl" style={{ color: BRAND_PRIMARY }}>
+                  Kanban de Etapas
+                </CardTitle>
               </CardHeader>
               <CardContent className="overflow-hidden p-0">
                 <VistaPorEtapas

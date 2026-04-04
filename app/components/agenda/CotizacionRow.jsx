@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, Edit, Eye, FileText, Link, MoreVertical, Send, Trash2, Loader2 } from "lucide-react";
+import { Copy, Edit, Eye, FileText, Link, MoreVertical, Send, Trash2, Loader2, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -16,13 +16,15 @@ import {
 } from "@/components/ui/tooltip";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import { useUserScope } from "@/hooks/useUserScope";
 
 function getRowBgColor(estado) {
   if (estado === "aceptada") {
     return "bg-green-50 hover:bg-green-100";
   } else if (estado === "cancelado") {
     return "bg-red-50 hover:bg-red-100";
-  } else if (estado === "enviada") {
+  } else if (estado === "enviada" || estado === "reservada") {
     return "bg-green-100 hover:bg-green-200";
   }
   return "bg-white hover:bg-blue-50";
@@ -39,8 +41,11 @@ export default function CotizacionRow({
   saving,
   onOpenHistorialDialog,
 }) {
+  const router = useRouter();
+  const { userId, loading: userScopeLoading } = useUserScope();
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
+  const [creatingReserva, setCreatingReserva] = useState(false);
 
   async function generatePDF() {
     try {
@@ -120,25 +125,20 @@ export default function CotizacionRow({
 
       const enlaceUrl = `${window.location.origin}/cotizacion-publica/${data.token}`;
 
-      // Copiar al portapapeles de forma segura
       if (navigator.clipboard && navigator.clipboard.writeText) {
         try {
           await navigator.clipboard.writeText(enlaceUrl);
           toast.success("Enlace copiado al portapapeles");
         } catch (clipboardError) {
           console.warn("Error con clipboard API:", clipboardError);
-          // Fallback: copiar usando método antiguo
           copyToClipboardFallback(enlaceUrl);
         }
       } else {
-        // Fallback para navegadores sin soporte
         copyToClipboardFallback(enlaceUrl);
       }
 
-      // Abrir enlace en nueva pestaña
       window.open(enlaceUrl, "_blank", "noopener,noreferrer");
 
-      // Recargar la página después de 1 segundo para mostrar el enlace
       setTimeout(() => {
         window.location.reload();
       }, 1000);
@@ -187,6 +187,132 @@ export default function CotizacionRow({
     }
   }
 
+  // ✅ CREAR RESERVA - CAMBIAR ESTADO A "RESERVADA"
+  async function handleCrearReserva() {
+    try {
+      if (!cot.oportunidad_id) {
+        toast.error("No se encontró la oportunidad");
+        return;
+      }
+
+      if (!userId) {
+        toast.error("Usuario no identificado");
+        return;
+      }
+
+      setCreatingReserva(true);
+
+      // 1️⃣ Cambiar estado a "reservada"
+      await onChangeStatus(cot, "reservada");
+
+      // 2️⃣ Crear reserva
+      const resReserva = await fetch("/api/reservas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          oportunidad_id: cot.oportunidad_id,
+          created_by: userId,
+        }),
+      });
+
+      if (!resReserva.ok) {
+        const errorData = await resReserva.json();
+        throw new Error(errorData.message || "Error creando reserva");
+      }
+
+      const dataReserva = await resReserva.json();
+      
+      // 3️⃣ Cambiar etapa de oportunidad a "Reserva" (etapa 8)
+      try {
+        await fetch(`/api/oportunidades-oportunidades/${cot.oportunidad_id}/etapa`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            etapasconversion_id: 8,
+            created_by: userId,
+          }),
+        });
+      } catch (etapaError) {
+        console.warn("Advertencia al cambiar etapa:", etapaError);
+      }
+
+      toast.success("Reserva creada correctamente");
+      
+      // ✅ REFRESH AUTOMÁTICO después de 1 segundo
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (error) {
+      console.error("Error creando reserva:", error);
+      toast.error("Error: " + error.message);
+    } finally {
+      setCreatingReserva(false);
+    }
+  }
+
+  // ✅ ENVIAR NOTA DE PEDIDO - CAMBIAR ESTADO A "ENVIADA" Y CREAR RESERVA
+  async function handleEnviarNotaPedido() {
+    try {
+      if (!cot.oportunidad_id) {
+        toast.error("No se encontró la oportunidad");
+        return;
+      }
+
+      if (!userId) {
+        toast.error("Usuario no identificado");
+        return;
+      }
+
+      setCreatingReserva(true);
+
+      // 1️⃣ Cambiar estado a "enviada"
+      await onChangeStatus(cot, "enviada");
+
+      // 2️⃣ Crear reserva
+      const resReserva = await fetch("/api/reservas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          oportunidad_id: cot.oportunidad_id,
+          created_by: userId,
+        }),
+      });
+
+      if (!resReserva.ok) {
+        const errorData = await resReserva.json();
+        throw new Error(errorData.message || "Error creando reserva");
+      }
+
+      const dataReserva = await resReserva.json();
+      
+      // 3️⃣ Cambiar etapa de oportunidad a "Reserva" (etapa 8)
+      try {
+        await fetch(`/api/oportunidades-oportunidades/${cot.oportunidad_id}/etapa`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            etapasconversion_id: 8,
+            created_by: userId,
+          }),
+        });
+      } catch (etapaError) {
+        console.warn("Advertencia al cambiar etapa:", etapaError);
+      }
+
+      toast.success("Nota de pedido enviada y reserva creada");
+      
+      // 4️⃣ Redirigir a la reserva después de 1.5 segundos
+      setTimeout(() => {
+        router.push(`/reservas/${dataReserva.id}`);
+      }, 1500);
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error: " + error.message);
+    } finally {
+      setCreatingReserva(false);
+    }
+  }
+
   return (
     <tr
       className={`border-b transition-colors ${getRowBgColor(cot.estado)} ${
@@ -210,6 +336,8 @@ export default function CotizacionRow({
               ? "bg-green-100 text-green-700 border border-green-300"
               : cot.estado === "enviada"
               ? "bg-green-200 text-green-800 border border-green-400 animate-pulse"
+              : cot.estado === "reservada"
+              ? "bg-green-200 text-green-800 border border-green-400 animate-pulse"
               : cot.estado === "cancelado"
               ? "bg-red-100 text-red-700 border border-red-300"
               : "bg-gray-100 text-gray-700 border border-gray-300"
@@ -221,6 +349,8 @@ export default function CotizacionRow({
             ? "✓ Enviado"
             : cot.estado === "aceptada"
             ? "✓ Aceptado"
+            : cot.estado === "reservada"
+            ? "✓ Reservada"
             : cot.estado === "cancelado"
             ? "✗ Cancelado"
             : cot.estado}
@@ -303,7 +433,7 @@ export default function CotizacionRow({
                 size="icon"
                 variant="outline"
                 className="h-8 w-8"
-                disabled={saving}
+                disabled={saving || creatingReserva || userScopeLoading}
               >
                 <MoreVertical size={16} />
               </Button>
@@ -319,13 +449,39 @@ export default function CotizacionRow({
 
               <DropdownMenuSeparator />
 
-              <DropdownMenuItem
-                onClick={() => onChangeStatus(cot, "enviada")}
-                disabled={saving}
-              >
-                <Send size={14} className="mr-2" />
-                Enviar pedido
-              </DropdownMenuItem>
+              {/* ✅ ENVIAR NOTA DE PEDIDO */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuItem
+                    onClick={handleEnviarNotaPedido}
+                    disabled={saving || creatingReserva || userScopeLoading}
+                    className="cursor-help"
+                  >
+                    <Send size={14} className="mr-2" />
+                    {creatingReserva ? "Procesando..." : "Enviar Nota de Pedido"}
+                  </DropdownMenuItem>
+                </TooltipTrigger>
+                <TooltipContent side="left">
+                  Cambia estado a "Enviada" + crea reserva + cambia etapa
+                </TooltipContent>
+              </Tooltip>
+
+              {/* ✅ CREAR RESERVA */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuItem
+                    onClick={handleCrearReserva}
+                    disabled={saving || creatingReserva || userScopeLoading}
+                    className="cursor-help"
+                  >
+                    <CheckCircle size={14} className="mr-2" />
+                    {creatingReserva ? "Procesando..." : "Crear Reserva"}
+                  </DropdownMenuItem>
+                </TooltipTrigger>
+                <TooltipContent side="left">
+                  Cambia estado a "Reservada" + crea reserva + cambia etapa
+                </TooltipContent>
+              </Tooltip>
 
               <DropdownMenuSeparator />
 

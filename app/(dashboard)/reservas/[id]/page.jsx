@@ -178,7 +178,7 @@ export default function ReservaDetailPage() {
       // Cargar oportunidad
       if (data.oportunidad_id || data.id) {
         const opId = data.oportunidad_id;
-        const resOp = await fetch(`/api/oportunidades/${opId}`, {
+        const resOp = await fetch(`/api/oportunidades-oportunidades/${opId}`, {
           cache: "no-store",
         });
         const dataOp = await resOp.json();
@@ -381,11 +381,11 @@ export default function ReservaDetailPage() {
               </div>
               <div>
                 <p className="text-xs text-gray-600">Etapa</p>
-                <p className="font-medium">{oportunidad?.etapa_name}</p>
+                <p className="font-medium">{oportunidad?.etapa_nombre}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-600">Origen</p>
-                <p className="font-medium">{oportunidad?.origen_name}</p>
+                <p className="font-medium">{oportunidad?.origen_nombre}</p>
               </div>
             </CardContent>
           </Card>

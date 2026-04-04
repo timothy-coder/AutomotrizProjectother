@@ -29,21 +29,24 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
-import { useRequirePerm } from "@/hooks/useRequirePerm";
 import { useAuth } from "@/context/AuthContext";
 
+import { hasPermission } from "@/lib/permissions";
 import OportunidadDialog from "@/app/components/oportunidades/OportunidadDialog";
 import AssignmentDialog from "@/app/components/oportunidades/AssignmentDialog";
 import OportunidadesTable from "@/app/components/oportunidades/OportunidadesTable";
 import VistaPorUsuarios from "@/app/components/oportunidades/VistaporUsuarios";
 import VistaPorEtapas from "@/app/components/oportunidades/VistaporEtapas";
-import { hasPermission } from "@/lib/permissions";
 
 const FILTER_ALL_CREATED = "__all_created__";
 const FILTER_ALL = "__all__";
+const FILTER_SIN_ASIGNAR = "__sin_asignar__";
 const FILTER_TODAY = "hoy";
 const FILTER_THIS_WEEK = "esta_semana";
 const FILTER_THIS_MONTH = "este_mes";
+
+const BRAND_PRIMARY = "#5d16ec";
+const BRAND_SECONDARY = "#81929c";
 
 // Componente FilterCombobox mejorado
 function FilterCombobox({
@@ -57,7 +60,6 @@ function FilterCombobox({
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 
-  // Filtrar items según búsqueda
   const filteredItems = useMemo(() => {
     if (!searchValue.trim()) return items;
     
@@ -88,10 +90,10 @@ function FilterCombobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between h-9 text-sm"
+          className="w-full justify-between h-8 sm:h-9 text-xs sm:text-sm"
         >
-          {selectedLabel}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <span className="truncate">{selectedLabel}</span>
+          <ChevronsUpDown className="ml-2 h-3 sm:h-4 w-3 sm:w-4 shrink-0 opacity-50 flex-shrink-0" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[200px] p-0" align="start">
@@ -100,21 +102,21 @@ function FilterCombobox({
             placeholder={placeholder}
             value={searchValue}
             onValueChange={setSearchValue}
-            className="h-9"
+            className="h-8 sm:h-9 text-xs sm:text-sm"
           />
           <CommandList>
             {filteredItems.length === 0 ? (
-              <CommandEmpty>{emptyText}</CommandEmpty>
+              <CommandEmpty className="text-xs">{emptyText}</CommandEmpty>
             ) : (
               <CommandGroup>
                 <CommandItem
                   value="__all__"
                   onSelect={() => handleSelect(FILTER_ALL)}
-                  className="cursor-pointer"
+                  className="cursor-pointer text-xs sm:text-sm"
                 >
                   <Check
                     className={cn(
-                      "mr-2 h-4 w-4",
+                      "mr-2 h-3 sm:h-4 w-3 sm:w-4",
                       value === FILTER_ALL || value === FILTER_ALL_CREATED
                         ? "opacity-100"
                         : "opacity-0"
@@ -127,11 +129,11 @@ function FilterCombobox({
                     key={item.id}
                     value={String(item.id)}
                     onSelect={() => handleSelect(String(item.id))}
-                    className="cursor-pointer"
+                    className="cursor-pointer text-xs sm:text-sm"
                   >
                     <Check
                       className={cn(
-                        "mr-2 h-4 w-4",
+                        "mr-2 h-3 sm:h-4 w-3 sm:w-4",
                         value === String(item.id) ? "opacity-100" : "opacity-0"
                       )}
                     />
@@ -148,14 +150,23 @@ function FilterCombobox({
 }
 
 export default function OportunidadesPage() {
-  const canView = useRequirePerm("oportunidades", "view");
   const { user, permissions } = useAuth();
 
+  // ==================== PERMISOS ====================
+  // ✅ PERMITE ACCESO CON "view" O "viewall"
+  const canView = hasPermission(permissions, "oportunidades", "view") || 
+                  hasPermission(permissions, "oportunidades", "viewall");
+  
   const canCreate = hasPermission(permissions, "oportunidades", "create");
   const canEdit = hasPermission(permissions, "oportunidades", "edit");
+  
+  // ✅ SOLO CON "viewall" PUEDE VER TODAS LAS OPORTUNIDADES
+  // ✅ CON SOLO "view" SOLO VE LAS SUYAS
   const canViewAll = hasPermission(permissions, "oportunidades", "viewall");
+  
   const canAssign = hasPermission(permissions, "oportunidades", "asignar");
 
+  // ==================== ESTADOS ====================
   const [rows, setRows] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
   const [etapas, setEtapas] = useState([]);
@@ -164,7 +175,7 @@ export default function OportunidadesPage() {
   const [estadosTiempo, setEstadosTiempo] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Estados de filtros
+  // Filtros
   const [filterCliente, setFilterCliente] = useState(FILTER_ALL);
   const [filterOrigen, setFilterOrigen] = useState(FILTER_ALL);
   const [filterEtapa, setFilterEtapa] = useState(FILTER_ALL);
@@ -197,7 +208,6 @@ export default function OportunidadesPage() {
     };
   }
 
-  // ✅ FILTRAR SOLO OPORTUNIDADES CON PREFIJO "OPO-"
   function filtrarOportunidadesOPO(oportunidades) {
     return oportunidades.filter((opp) => {
       const prefijo = opp.oportunidad_id?.substring(0, 3);
@@ -270,7 +280,6 @@ export default function OportunidadesPage() {
           ? opData.data
           : [];
 
-      // ✅ FILTRAR SOLO OPORTUNIDADES CON PREFIJO "OPO-"
       oportunidades = filtrarOportunidadesOPO(oportunidades);
 
       const oportunidadesEnriquecidas =
@@ -300,14 +309,29 @@ export default function OportunidadesPage() {
     if (canView) loadData();
   }, [canView]);
 
+  // ==================== LÓGICA DE PERMISOS ====================
+  // ✅ CON "view": Solo ve sus oportunidades (asignadas a él)
+  // ✅ CON "viewall": Ve TODAS las oportunidades
   const visibleRows = useMemo(() => {
+    console.log("👁️ Calculando visibleRows:", {
+      userId: user?.id,
+      canViewAll,
+      totalRows: rows.length,
+    });
+
     if (!user?.id) return rows;
-    if (canViewAll) return rows;
-    return rows.filter(
+    if (canViewAll) return rows; // Ve TODO
+    
+    // Solo ve sus oportunidades
+    const filtered = rows.filter(
       (row) => String(row?.asignado_a ?? "") === String(user.id)
     );
+    
+    console.log("🔽 Sin viewall - Solo oportunidades asignadas a ti:", filtered.length);
+    return filtered;
   }, [rows, canViewAll, user]);
 
+  // ==================== FILTROS ====================
   const baseFilteredRows = useMemo(() => {
     const fechas = getFechaFiltros();
 
@@ -328,9 +352,19 @@ export default function OportunidadesPage() {
         filterEtapa === FILTER_ALL ||
         String(row?.etapasconversion_id ?? "") === filterEtapa;
 
-      const matchesAsignado =
-        filterAsignado === FILTER_ALL ||
-        String(row?.asignado_a ?? "") === filterAsignado;
+      // ✅ FILTRO "ASIGNADO A" - SOLO VISIBLE SI TIENE "viewall"
+      let matchesAsignado = true;
+      if (canViewAll) {
+        // Solo aplicar filtro si tiene viewall
+        matchesAsignado = filterAsignado === FILTER_ALL;
+        if (!matchesAsignado) {
+          if (filterAsignado === FILTER_SIN_ASIGNAR) {
+            matchesAsignado = !row.asignado_a;
+          } else {
+            matchesAsignado = String(row?.asignado_a ?? "") === filterAsignado;
+          }
+        }
+      }
 
       let matchesFecha = filterFecha === FILTER_ALL;
       if (!matchesFecha && row.fecha_ultima_agenda) {
@@ -371,6 +405,7 @@ export default function OportunidadesPage() {
     filterEtapa,
     filterAsignado,
     filterFecha,
+    canViewAll,
   ]);
 
   function handleOpenEdit(row) {
@@ -392,7 +427,9 @@ export default function OportunidadesPage() {
     setFilterCliente(FILTER_ALL);
     setFilterOrigen(FILTER_ALL);
     setFilterEtapa(FILTER_ALL);
-    setFilterAsignado(FILTER_ALL);
+    if (canViewAll) {
+      setFilterAsignado(FILTER_ALL);
+    }
     setCreatedByFilter(FILTER_ALL_CREATED);
     setFilterFecha(FILTER_ALL);
   }
@@ -401,27 +438,39 @@ export default function OportunidadesPage() {
     filterCliente !== FILTER_ALL ||
     filterOrigen !== FILTER_ALL ||
     filterEtapa !== FILTER_ALL ||
-    filterAsignado !== FILTER_ALL ||
+    (canViewAll && filterAsignado !== FILTER_ALL) ||
     createdByFilter !== FILTER_ALL_CREATED ||
     filterFecha !== FILTER_ALL;
 
-  if (!canView) return null;
+  // ==================== VALIDACIÓN ====================
+  if (!canView) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <p className="text-sm" style={{ color: BRAND_SECONDARY }}>
+          No tienes permiso para acceder a esta página
+        </p>
+      </div>
+    );
+  }
 
   return (
     <TooltipProvider>
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
+        
         {/* ENCABEZADO */}
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: BRAND_PRIMARY }}>
               Oportunidades
             </h1>
-            <p className="text-sm text-slate-600 mt-1">
+            <p className="text-xs sm:text-sm mt-1" style={{ color: BRAND_SECONDARY }}>
               Gestiona todas tus oportunidades de negocio (OPO)
+              {!canViewAll && " • Solo tus asignaciones"}
+              {canViewAll && " • Vista completa"}
             </p>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 w-full sm:w-auto">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -429,13 +478,15 @@ export default function OportunidadesPage() {
                   disabled={loading}
                   variant="outline"
                   size="sm"
-                  className="gap-2"
+                  className="gap-2 text-xs sm:text-sm h-8 sm:h-9 flex-1 sm:flex-none"
                 >
-                  <RefreshCw className="h-4 w-4" />
+                  <RefreshCw className="h-3 sm:h-4 w-3 sm:w-4" />
                   Actualizar
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="top">Recargar datos</TooltipContent>
+              <TooltipContent side="top" className="text-xs">
+                Recargar datos
+              </TooltipContent>
             </Tooltip>
 
             {canCreate && (
@@ -446,13 +497,14 @@ export default function OportunidadesPage() {
                       setSelectedOportunidad(null);
                       setDialogOpen(true);
                     }}
-                    className="gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
+                    className="gap-2 text-white text-xs sm:text-sm h-8 sm:h-9 flex-1 sm:flex-none"
+                    style={{ backgroundColor: BRAND_PRIMARY }}
                   >
-                    <Plus className="h-4 w-4" />
-                    Agregar oportunidad
+                    <Plus className="h-3 sm:h-4 w-3 sm:w-4" />
+                    <span>Agregar oportunidad</span>
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="top">
+                <TooltipContent side="top" className="text-xs">
                   Crear nueva oportunidad
                 </TooltipContent>
               </Tooltip>
@@ -462,9 +514,11 @@ export default function OportunidadesPage() {
 
         {/* FILTROS */}
         {activeTab === "general" && (
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-4">
+          <div className="bg-gradient-to-br border-2 rounded-lg p-3 sm:p-4 space-y-3 sm:space-y-4" style={{ backgroundColor: `${BRAND_PRIMARY}08`, borderColor: `${BRAND_PRIMARY}30` }}>
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-900">Filtros</h3>
+              <h3 className="text-sm font-semibold" style={{ color: BRAND_PRIMARY }}>
+                Filtros
+              </h3>
               {hasActiveFilters && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -472,22 +526,22 @@ export default function OportunidadesPage() {
                       onClick={clearFilters}
                       variant="ghost"
                       size="sm"
-                      className="gap-1 text-xs"
+                      className="gap-1 text-xs h-7 sm:h-8 px-2"
                     >
                       <X className="h-3 w-3" />
-                      Limpiar filtros
+                      Limpiar
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent side="left">
+                  <TooltipContent side="left" className="text-xs">
                     Eliminar todos los filtros
                   </TooltipContent>
                 </Tooltip>
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-6 gap-2 sm:gap-3">
               <div>
-                <label className="text-xs font-medium text-slate-600 block mb-2">
+                <label className="text-xs font-medium block mb-1" style={{ color: BRAND_SECONDARY }}>
                   Cliente
                 </label>
                 <FilterCombobox
@@ -501,7 +555,7 @@ export default function OportunidadesPage() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-600 block mb-2">
+                <label className="text-xs font-medium block mb-1" style={{ color: BRAND_SECONDARY }}>
                   Origen
                 </label>
                 <FilterCombobox
@@ -515,7 +569,7 @@ export default function OportunidadesPage() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-600 block mb-2">
+                <label className="text-xs font-medium block mb-1" style={{ color: BRAND_SECONDARY }}>
                   Etapa
                 </label>
                 <FilterCombobox
@@ -528,24 +582,92 @@ export default function OportunidadesPage() {
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-medium text-slate-600 block mb-2">
-                  Asignado a
-                </label>
-                <FilterCombobox
-                  value={filterAsignado}
-                  onChange={setFilterAsignado}
-                  items={usuarios}
-                  placeholder="Buscar usuario..."
-                  emptyText="No hay usuarios"
-                  getLabel={(item) =>
-                    item.fullname || item.username || `Usuario ${item.id}`
-                  }
-                />
-              </div>
+              {/* ✅ SOLO MOSTRAR FILTRO "ASIGNADO A" SI TIENE viewall */}
+              {canViewAll && (
+                <div>
+                  <label className="text-xs font-medium block mb-1" style={{ color: BRAND_SECONDARY }}>
+                    Asignado a
+                  </label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-between h-8 sm:h-9 text-xs sm:text-sm"
+                      >
+                        <span className="truncate">
+                          {filterAsignado === FILTER_ALL
+                            ? "Todos"
+                            : filterAsignado === FILTER_SIN_ASIGNAR
+                            ? "Sin asignar"
+                            : usuarios.find(u => String(u.id) === filterAsignado)?.fullname || `Usuario ${filterAsignado}`}
+                        </span>
+                        <ChevronsUpDown className="ml-2 h-3 sm:h-4 w-3 sm:w-4 shrink-0 opacity-50 flex-shrink-0" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[200px] p-0" align="start">
+                      <Command>
+                        <CommandList>
+                          <CommandGroup>
+                            <CommandItem
+                              value={FILTER_ALL}
+                              onSelect={() => setFilterAsignado(FILTER_ALL)}
+                              className="cursor-pointer text-xs sm:text-sm"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-3 sm:h-4 w-3 sm:w-4",
+                                  filterAsignado === FILTER_ALL
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                                )}
+                              />
+                              Todos
+                            </CommandItem>
+
+                            <CommandItem
+                              value={FILTER_SIN_ASIGNAR}
+                              onSelect={() => setFilterAsignado(FILTER_SIN_ASIGNAR)}
+                              className="cursor-pointer text-xs sm:text-sm"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-3 sm:h-4 w-3 sm:w-4",
+                                  filterAsignado === FILTER_SIN_ASIGNAR
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                                )}
+                              />
+                              Sin asignar
+                            </CommandItem>
+
+                            {usuarios.map((usuario) => (
+                              <CommandItem
+                                key={usuario.id}
+                                value={String(usuario.id)}
+                                onSelect={() => setFilterAsignado(String(usuario.id))}
+                                className="cursor-pointer text-xs sm:text-sm"
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-3 sm:h-4 w-3 sm:w-4",
+                                    filterAsignado === String(usuario.id)
+                                      ? "opacity-100"
+                                      : "opacity-0"
+                                  )}
+                                />
+                                {usuario.fullname || usuario.username}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
 
               <div>
-                <label className="text-xs font-medium text-slate-600 block mb-2">
+                <label className="text-xs font-medium block mb-1" style={{ color: BRAND_SECONDARY }}>
                   Creado por
                 </label>
                 <FilterCombobox
@@ -561,23 +683,25 @@ export default function OportunidadesPage() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-600 block mb-2">
+                <label className="text-xs font-medium block mb-1" style={{ color: BRAND_SECONDARY }}>
                   Fecha Agenda
                 </label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className="w-full justify-between h-9 text-sm"
+                      className="w-full justify-between h-8 sm:h-9 text-xs sm:text-sm"
                     >
-                      {filterFecha === FILTER_ALL
-                        ? "Todas"
-                        : filterFecha === FILTER_TODAY
-                          ? "Hoy"
-                          : filterFecha === FILTER_THIS_WEEK
-                            ? "Esta semana"
-                            : "Este mes"}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      <span className="truncate">
+                        {filterFecha === FILTER_ALL
+                          ? "Todas"
+                          : filterFecha === FILTER_TODAY
+                            ? "Hoy"
+                            : filterFecha === FILTER_THIS_WEEK
+                              ? "Esta semana"
+                              : "Este mes"}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-3 sm:h-4 w-3 sm:w-4 shrink-0 opacity-50 flex-shrink-0" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[200px] p-0" align="start">
@@ -587,11 +711,11 @@ export default function OportunidadesPage() {
                           <CommandItem
                             value={FILTER_ALL}
                             onSelect={() => setFilterFecha(FILTER_ALL)}
-                            className="cursor-pointer"
+                            className="cursor-pointer text-xs sm:text-sm"
                           >
                             <Check
                               className={cn(
-                                "mr-2 h-4 w-4",
+                                "mr-2 h-3 sm:h-4 w-3 sm:w-4",
                                 filterFecha === FILTER_ALL
                                   ? "opacity-100"
                                   : "opacity-0"
@@ -602,11 +726,11 @@ export default function OportunidadesPage() {
                           <CommandItem
                             value={FILTER_TODAY}
                             onSelect={() => setFilterFecha(FILTER_TODAY)}
-                            className="cursor-pointer"
+                            className="cursor-pointer text-xs sm:text-sm"
                           >
                             <Check
                               className={cn(
-                                "mr-2 h-4 w-4",
+                                "mr-2 h-3 sm:h-4 w-3 sm:w-4",
                                 filterFecha === FILTER_TODAY
                                   ? "opacity-100"
                                   : "opacity-0"
@@ -617,11 +741,11 @@ export default function OportunidadesPage() {
                           <CommandItem
                             value={FILTER_THIS_WEEK}
                             onSelect={() => setFilterFecha(FILTER_THIS_WEEK)}
-                            className="cursor-pointer"
+                            className="cursor-pointer text-xs sm:text-sm"
                           >
                             <Check
                               className={cn(
-                                "mr-2 h-4 w-4",
+                                "mr-2 h-3 sm:h-4 w-3 sm:w-4",
                                 filterFecha === FILTER_THIS_WEEK
                                   ? "opacity-100"
                                   : "opacity-0"
@@ -632,11 +756,11 @@ export default function OportunidadesPage() {
                           <CommandItem
                             value={FILTER_THIS_MONTH}
                             onSelect={() => setFilterFecha(FILTER_THIS_MONTH)}
-                            className="cursor-pointer"
+                            className="cursor-pointer text-xs sm:text-sm"
                           >
                             <Check
                               className={cn(
-                                "mr-2 h-4 w-4",
+                                "mr-2 h-3 sm:h-4 w-3 sm:w-4",
                                 filterFecha === FILTER_THIS_MONTH
                                   ? "opacity-100"
                                   : "opacity-0"
@@ -653,9 +777,9 @@ export default function OportunidadesPage() {
             </div>
 
             {hasActiveFilters && (
-              <div className="text-xs text-slate-600">
-                Mostrando {baseFilteredRows.length} de {visibleRows.length}{" "}
-                oportunidades
+              <div className="text-xs" style={{ color: BRAND_SECONDARY }}>
+                Mostrando <span className="font-semibold">{baseFilteredRows.length}</span> de{" "}
+                <span className="font-semibold">{visibleRows.length}</span> oportunidades
               </div>
             )}
           </div>
@@ -663,50 +787,78 @@ export default function OportunidadesPage() {
 
         {/* TABS */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <div className="border-b border-slate-200">
-            <TabsList className="bg-transparent border-b-0 gap-8 p-0">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <TabsTrigger
-                    value="general"
-                    className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:bg-transparent rounded-none px-0 pb-3"
-                  >
-                    <span className="text-sm font-medium">General</span>
-                  </TabsTrigger>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  Vista general de todas las oportunidades
-                </TooltipContent>
-              </Tooltip>
+          <div className="flex flex-wrap gap-3 sm:gap-4">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setActiveTab("general")}
+                  className={`
+                    rounded-lg px-1 sm:px-3 text-xs sm:text-sm font-medium 
+                    transition-all duration-200 cursor-pointer
+                    ${activeTab === "general"
+                      ? "text-white shadow-lg scale-105"
+                      : "text-white hover:opacity-90"
+                    }
+                  `}
+                  style={{
+                    backgroundColor: activeTab === "general" ? BRAND_PRIMARY : BRAND_SECONDARY,
+                  }}
+                >
+                General
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                Vista general de todas las oportunidades
+              </TooltipContent>
+            </Tooltip>
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <TabsTrigger
-                    value="vista_usuarios"
-                    className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:bg-transparent rounded-none px-0 pb-3"
-                  >
-                    <span className="text-sm font-medium">Tablero</span>
-                  </TabsTrigger>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  Tablero por usuarios asignados
-                </TooltipContent>
-              </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setActiveTab("vista_usuarios")}
+                  className={`
+                    rounded-lg px-3 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-medium 
+                    transition-all duration-200 cursor-pointer
+                    ${activeTab === "vista_usuarios"
+                      ? "text-white shadow-lg scale-105"
+                      : "text-white hover:opacity-90"
+                    }
+                  `}
+                  style={{
+                    backgroundColor: activeTab === "vista_usuarios" ? BRAND_PRIMARY : BRAND_SECONDARY,
+                  }}
+                >
+                  Tablero
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                Tablero por usuarios asignados
+              </TooltipContent>
+            </Tooltip>
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <TabsTrigger
-                    value="vista_etapas"
-                    className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:bg-transparent rounded-none px-0 pb-3"
-                  >
-                    <span className="text-sm font-medium">Kanban</span>
-                  </TabsTrigger>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  Vista Kanban por etapas
-                </TooltipContent>
-              </Tooltip>
-            </TabsList>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setActiveTab("vista_etapas")}
+                  className={`
+                    rounded-lg px-3 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-medium 
+                    transition-all duration-200 cursor-pointer
+                    ${activeTab === "vista_etapas"
+                      ? "text-white shadow-lg scale-105"
+                      : "text-white hover:opacity-90"
+                    }
+                  `}
+                  style={{
+                    backgroundColor: activeTab === "vista_etapas" ? BRAND_PRIMARY : BRAND_SECONDARY,
+                  }}
+                >
+                  Kanban
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                Vista Kanban por etapas
+              </TooltipContent>
+            </Tooltip>
           </div>
 
           <TabsContent value="general" className="space-y-0">
@@ -727,9 +879,11 @@ export default function OportunidadesPage() {
           </TabsContent>
 
           <TabsContent value="vista_usuarios">
-            <Card className="overflow-hidden shadow-sm border-slate-200">
-              <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
-                <CardTitle className="text-xl">Tablero por Usuarios</CardTitle>
+            <Card className="overflow-hidden shadow-sm border-2" style={{ borderColor: `${BRAND_PRIMARY}30` }}>
+              <CardHeader className="border-b" style={{ backgroundColor: `${BRAND_PRIMARY}08`, borderColor: `${BRAND_PRIMARY}20` }}>
+                <CardTitle className="text-lg sm:text-xl" style={{ color: BRAND_PRIMARY }}>
+                  Tablero por Usuarios
+                </CardTitle>
               </CardHeader>
               <CardContent className="overflow-hidden p-0">
                 <VistaPorUsuarios
@@ -745,9 +899,11 @@ export default function OportunidadesPage() {
           </TabsContent>
 
           <TabsContent value="vista_etapas">
-            <Card className="overflow-hidden shadow-sm border-slate-200">
-              <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
-                <CardTitle className="text-xl">Kanban de Etapas</CardTitle>
+            <Card className="overflow-hidden shadow-sm border-2" style={{ borderColor: `${BRAND_PRIMARY}30` }}>
+              <CardHeader className="border-b" style={{ backgroundColor: `${BRAND_PRIMARY}08`, borderColor: `${BRAND_PRIMARY}20` }}>
+                <CardTitle className="text-lg sm:text-xl" style={{ color: BRAND_PRIMARY }}>
+                  Kanban de Etapas
+                </CardTitle>
               </CardHeader>
               <CardContent className="overflow-hidden p-0">
                 <VistaPorEtapas
