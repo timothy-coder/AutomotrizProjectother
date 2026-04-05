@@ -8,9 +8,9 @@ export async function GET(req) {
 
   const { searchParams } = new URL(req.url);
   const statusParam = searchParams.get("status") || "open";
-  const inboxId = searchParams.get("inbox_id") || undefined;
-  const teamId = searchParams.get("team_id") || undefined;
-  const page = searchParams.get("page") || 1;
+  const inboxId = searchParams.get("inbox_id") ?? undefined;
+  const teamId = searchParams.get("team_id") ?? undefined;
+  const page = parseInt(searchParams.get("page") || "1", 10);
 
   // Validate status param
   const allowed = ["open", "resolved", "pending", "snoozed"];
