@@ -18,12 +18,19 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { AlertCircle, User, Clock, Lock, MapPin, Palette } from "lucide-react";
+import { AlertCircle, User, Clock, Lock, MapPin, Palette, Loader2 } from "lucide-react";
 import { SECTIONS, ACTIONS } from "./constants";
 
 const DAYS = [
@@ -41,7 +48,7 @@ const EMPTY_FORM = {
   username: "",
   email: "",
   phone: "",
-  role: "",
+  role_id: null,
   color: "#5e17eb",
   password: "",
   password2: "",
@@ -106,12 +113,44 @@ export default function UserDialog({
 
   const [form, setForm] = useState(EMPTY_FORM);
 
+  const [rolesOptions, setRolesOptions] = useState([]);
+  const [loadingRoles, setLoadingRoles] = useState(false);
+
   const [centrosOptions, setCentrosOptions] = useState([]);
   const [talleresOptions, setTalleresOptions] = useState([]);
   const [mostradoresOptions, setMostradoresOptions] = useState([]);
 
   const [loadingCentros, setLoadingCentros] = useState(false);
   const [loadingDependientes, setLoadingDependientes] = useState(false);
+
+  // ✅ Cargar roles
+  useEffect(() => {
+    if (!open) return;
+
+    let active = true;
+
+    async function loadRoles() {
+      try {
+        setLoadingRoles(true);
+        const res = await fetch("/api/roles", { cache: "no-store" });
+        const data = await res.json();
+
+        if (!active) return;
+        setRolesOptions(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error("Error cargando roles:", error);
+        if (active) setRolesOptions([]);
+      } finally {
+        if (active) setLoadingRoles(false);
+      }
+    }
+
+    loadRoles();
+
+    return () => {
+      active = false;
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -149,6 +188,7 @@ export default function UserDialog({
         password: "",
         password2: "",
         color: user.color || "#5e17eb",
+        role_id: user.role_id || null,
       });
     } else {
       setForm(EMPTY_FORM);
@@ -342,7 +382,7 @@ export default function UserDialog({
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="sticky top-0 bg-white border-b pb-4 z-10">
             <div className="flex items-center gap-2">
-              <User size={24} className="text-[#5d16ec] " />
+              <User size={24} className="text-[#5d16ec]" />
               <div>
                 <DialogTitle className="text-xl text-[#5d16ec]">
                   {isView ? "Ver usuario" : isEdit ? "Editar usuario" : "Nuevo usuario"}
@@ -486,9 +526,9 @@ export default function UserDialog({
                   />
                 </div>
 
-                {/* Rol */}
+                {/* ✅ Rol - Select */}
                 <div className="space-y-2">
-                  <Label className="text-[#5d16ec]">
+                  <Label className="flex items-center gap-1 text-[#5d16ec]">
                     Rol
                     <span className="text-red-500">*</span>
                     <Tooltip>
@@ -496,17 +536,43 @@ export default function UserDialog({
                         <AlertCircle size={14} className="text-gray-400 cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent side="top">
-                        Rol del usuario
+                        Selecciona el rol del usuario
                       </TooltipContent>
                     </Tooltip>
                   </Label>
-                  <Input
-                    disabled={isView}
-                    value={form.role || ""}
-                    onChange={(e) => updateField("role", e.target.value)}
-                    placeholder="Ej: Gerente"
-                    className="h-9"
-                  />
+                  <Select
+                    value={form.role_id ? String(form.role_id) : "null"}
+                    onValueChange={(v) => updateField("role_id", v === "null" ? null : Number(v))}
+                    disabled={isView || loadingRoles}
+                  >
+                    <SelectTrigger className="h-9">
+                      {loadingRoles ? (
+                        <div className="flex items-center gap-2">
+                          <Loader2 size={16} className="animate-spin" />
+                          <span>Cargando roles...</span>
+                        </div>
+                      ) : (
+                        <SelectValue placeholder="Seleccionar rol..." />
+                      )}
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="null">
+                        <span className="text-gray-500">Sin rol</span>
+                      </SelectItem>
+                      {rolesOptions.map((rol) => (
+                        <SelectItem key={rol.id} value={String(rol.id)}>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{rol.name}</span>
+                            {rol.description && (
+                              <span className="text-xs text-gray-500">
+                                ({rol.description})
+                              </span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* Color */}
@@ -571,7 +637,7 @@ export default function UserDialog({
                             <AlertCircle size={14} className="text-gray-400 cursor-help" />
                           </TooltipTrigger>
                           <TooltipContent side="top">
-                            Mínimo 8 caracteres
+                            Mínimo 6 caracteres
                           </TooltipContent>
                         </Tooltip>
                       </Label>
@@ -585,7 +651,9 @@ export default function UserDialog({
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="flex items-center gap-1 text-[#5d16ec]">Confirmar contraseña</Label>
+                      <Label className="flex items-center gap-1 text-[#5d16ec]">
+                        Confirmar contraseña
+                      </Label>
                       <Input
                         type="password"
                         value={form.password2 || ""}

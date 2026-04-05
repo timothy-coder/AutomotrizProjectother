@@ -8,7 +8,7 @@ function normalizarIds(arr) {
 }
 
 /* =========================
-   GET: obtener usuario por id
+   GET: obtener usuario por id con roles
 ========================= */
 export async function GET(req, { params }) {
   try {
@@ -22,7 +22,9 @@ export async function GET(req, { params }) {
         u.username,
         u.email,
         u.phone,
-        u.role,
+        u.role_id,
+        r.name as role_name,
+        r.description as role_description,
         u.is_active,
         u.permissions,
         u.work_schedule,
@@ -48,6 +50,7 @@ export async function GET(req, { params }) {
         ) AS talleres
 
       FROM usuarios u
+      LEFT JOIN roles r ON u.role_id = r.id
       WHERE u.id = ?
       LIMIT 1
       `,
@@ -55,7 +58,7 @@ export async function GET(req, { params }) {
     );
 
     if (!rows.length) {
-      return NextResponse.json({ message: "No existe" }, { status: 404 });
+      return NextResponse.json({ message: "Usuario no encontrado" }, { status: 404 });
     }
 
     const row = rows[0];
@@ -68,12 +71,12 @@ export async function GET(req, { params }) {
     });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ message: "Error" }, { status: 500 });
+    return NextResponse.json({ message: "Error al obtener usuario" }, { status: 500 });
   }
 }
 
 /* =========================
-   PUT: actualizar usuario + relaciones
+   PUT: actualizar usuario + relaciones + role_id
 ========================= */
 export async function PUT(req, { params }) {
   let connection;
@@ -86,8 +89,8 @@ export async function PUT(req, { params }) {
     const username = (body.username || "").trim();
     const email = (body.email || "").trim();
     const phone = (body.phone || "").trim();
-    const role = body.role || "user";
-    const color = body.color ?? null;
+    const role_id = body.role_id || null;
+    const color = body.color ?? "#5e17eb";
     const is_active = body.is_active ?? 1;
     const password = body.password || "";
 
@@ -109,6 +112,9 @@ export async function PUT(req, { params }) {
         ? body.work_schedule
         : JSON.stringify(body.work_schedule);
 
+    /* =========================
+       VALIDACIONES
+    ========================= */
     if (!fullname || !username) {
       return NextResponse.json(
         { message: "Nombre y usuario son obligatorios" },
@@ -123,9 +129,19 @@ export async function PUT(req, { params }) {
       );
     }
 
+    if (email && !email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+      return NextResponse.json(
+        { message: "Email inválido" },
+        { status: 400 }
+      );
+    }
+
     connection = await db.getConnection();
     await connection.beginTransaction();
 
+    /* =========================
+       Verificar que el usuario existe
+    ========================= */
     const [exists] = await connection.query(
       `SELECT id FROM usuarios WHERE id = ? LIMIT 1`,
       [id]
@@ -133,9 +149,15 @@ export async function PUT(req, { params }) {
 
     if (!exists.length) {
       await connection.rollback();
-      return NextResponse.json({ message: "No existe" }, { status: 404 });
+      return NextResponse.json(
+        { message: "Usuario no encontrado" },
+        { status: 404 }
+      );
     }
 
+    /* =========================
+       Verificar duplicados de username y email
+    ========================= */
     const [dup] = await connection.query(
       `
       SELECT id
@@ -155,19 +177,43 @@ export async function PUT(req, { params }) {
       );
     }
 
+    /* =========================
+       Validar que role_id existe (si se proporciona)
+    ========================= */
+    if (role_id) {
+      const [roleExists] = await connection.query(
+        `SELECT id FROM roles WHERE id = ?`,
+        [role_id]
+      );
+
+      if (roleExists.length === 0) {
+        await connection.rollback();
+        return NextResponse.json(
+          { message: "El rol especificado no existe" },
+          { status: 400 }
+        );
+      }
+    }
+
+    /* =========================
+       Hashear contraseña si se proporciona
+    ========================= */
     let password_hash = null;
     if (password && String(password).trim().length > 0) {
       password_hash = await bcrypt.hash(password, 10);
     }
 
+    /* =========================
+       UPDATE USUARIO
+    ========================= */
     await connection.query(
       `
       UPDATE usuarios SET
+        role_id = ?,
         fullname = ?,
         username = ?,
         email = ?,
         phone = ?,
-        role = ?,
         is_active = ?,
         permissions = ?,
         work_schedule = ?,
@@ -176,11 +222,11 @@ export async function PUT(req, { params }) {
       WHERE id = ?
       `,
       [
+        role_id,
         fullname,
         username,
         email || null,
         phone || null,
-        role,
         is_active ? 1 : 0,
         permissions,
         work_schedule,
@@ -192,10 +238,19 @@ export async function PUT(req, { params }) {
 
     /* =========================
        REEMPLAZAR RELACIONES
-    ========================== */
-    await connection.query(`DELETE FROM usuario_mostradores WHERE usuario_id = ?`, [id]);
-    await connection.query(`DELETE FROM usuario_centros WHERE usuario_id = ?`, [id]);
-    await connection.query(`DELETE FROM usuario_talleres WHERE usuario_id = ?`, [id]);
+    ========================= */
+    await connection.query(
+      `DELETE FROM usuario_mostradores WHERE usuario_id = ?`,
+      [id]
+    );
+    await connection.query(
+      `DELETE FROM usuario_centros WHERE usuario_id = ?`,
+      [id]
+    );
+    await connection.query(
+      `DELETE FROM usuario_talleres WHERE usuario_id = ?`,
+      [id]
+    );
 
     for (const mostrador_id of mostradores) {
       await connection.query(
@@ -229,7 +284,10 @@ export async function PUT(req, { params }) {
 
     await connection.commit();
 
-    return NextResponse.json({ message: "Actualizado" });
+    return NextResponse.json(
+      { message: "✓ Usuario actualizado exitosamente", id: parseInt(id) },
+      { status: 200 }
+    );
   } catch (error) {
     console.error(error);
 
@@ -245,7 +303,7 @@ export async function PUT(req, { params }) {
     }
 
     return NextResponse.json(
-      { message: "Error al actualizar" },
+      { message: "Error al actualizar usuario" },
       { status: 500 }
     );
   } finally {
@@ -254,27 +312,75 @@ export async function PUT(req, { params }) {
 }
 
 /* =========================
-   DELETE: eliminar usuario
+   DELETE: eliminar usuario con transacción
 ========================= */
 export async function DELETE(req, { params }) {
+  let connection;
+
   try {
     const { id } = await params;
 
-    const [exists] = await db.query(
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    /* =========================
+       Verificar que el usuario existe
+    ========================= */
+    const [exists] = await connection.query(
       `SELECT id FROM usuarios WHERE id = ? LIMIT 1`,
       [id]
     );
 
     if (!exists.length) {
-      return NextResponse.json({ message: "No existe" }, { status: 404 });
+      await connection.rollback();
+      return NextResponse.json(
+        { message: "Usuario no encontrado" },
+        { status: 404 }
+      );
     }
 
-    await db.query(`DELETE FROM usuarios WHERE id = ?`, [id]);
+    /* =========================
+       Eliminar relaciones (por seguridad, aunque hay ON DELETE CASCADE)
+    ========================= */
+    await connection.query(
+      `DELETE FROM usuario_mostradores WHERE usuario_id = ?`,
+      [id]
+    );
+    await connection.query(
+      `DELETE FROM usuario_centros WHERE usuario_id = ?`,
+      [id]
+    );
+    await connection.query(
+      `DELETE FROM usuario_talleres WHERE usuario_id = ?`,
+      [id]
+    );
 
-    // Las relaciones se borran solas por ON DELETE CASCADE
-    return NextResponse.json({ message: "Eliminado" });
+    /* =========================
+       Eliminar usuario
+    ========================= */
+    await connection.query(
+      `DELETE FROM usuarios WHERE id = ?`,
+      [id]
+    );
+
+    await connection.commit();
+
+    return NextResponse.json(
+      { message: "✓ Usuario eliminado exitosamente" },
+      { status: 200 }
+    );
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ message: "Error" }, { status: 500 });
+
+    if (connection) {
+      await connection.rollback();
+    }
+
+    return NextResponse.json(
+      { message: "Error al eliminar usuario" },
+      { status: 500 }
+    );
+  } finally {
+    if (connection) connection.release();
   }
 }

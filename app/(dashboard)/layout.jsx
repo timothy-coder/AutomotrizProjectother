@@ -1,39 +1,30 @@
 "use client";
 
-import { useState } from "react";
-
+import { useAuth } from "@/context/AuthContext";
 import SidebarDesktop from "../components/SidebarDesktop";
 import Header from "../components/Header";
 
-import { useAuth } from "@/context/AuthContext";
-
 export default function DashboardLayout({ children }) {
-
   const { user, loading } = useAuth();
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-
-  // Avoid hydration mismatch: wait until client has loaded user from localStorage
   if (loading) {
     return null;
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
-
-      {/* SIDEBAR PC */}
-      <SidebarDesktop open={sidebarOpen} />
+    <div className="flex h-screen overflow-hidden bg-gray-50">
+      {/* SIDEBAR DESKTOP - Visible solo en MD y arriba */}
+      <SidebarDesktop />
 
       <div className="flex-1 flex flex-col min-w-0">
+        {/* HEADER - Solo visible en mobile */}
+        <Header />
 
-        
         {/* CONTENT */}
-        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 md:p-6">
+        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 md:p-6">
           {children}
         </main>
-
       </div>
-
     </div>
   );
 }

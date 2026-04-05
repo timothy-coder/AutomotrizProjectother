@@ -8,7 +8,7 @@ function normalizarIds(arr) {
 }
 
 /* =========================
-   GET: listar usuarios
+   GET: listar usuarios con roles
 =========================*/
 export async function GET() {
   try {
@@ -19,7 +19,9 @@ export async function GET() {
         u.username,
         u.email,
         u.phone,
-        u.role,
+        u.role_id,
+        r.name as role_name,
+        r.description as role_description,
         u.is_active,
         u.permissions,
         u.work_schedule,
@@ -45,6 +47,7 @@ export async function GET() {
         ) AS talleres
 
       FROM usuarios u
+      LEFT JOIN roles r ON u.role_id = r.id
       ORDER BY u.id DESC
     `);
 
@@ -69,7 +72,7 @@ export async function GET() {
 }
 
 /* =========================
-   POST: crear usuario
+   POST: crear usuario con role_id
 =========================*/
 export async function POST(req) {
   let connection;
@@ -81,8 +84,8 @@ export async function POST(req) {
     const username = (body.username || "").trim();
     const email = (body.email || "").trim();
     const phone = (body.phone || "").trim();
-    const role = body.role || "user";
-    const color = body.color ?? null;
+    const role_id = body.role_id || null;
+    const color = body.color ?? "#5e17eb";
     const is_active = body.is_active ?? 1;
     const password = body.password || "";
 
@@ -121,9 +124,17 @@ export async function POST(req) {
       );
     }
 
+    if (email && email.trim() === "") {
+      return NextResponse.json(
+        { message: "Email inválido" },
+        { status: 400 }
+      );
+    }
+
     connection = await db.getConnection();
     await connection.beginTransaction();
 
+    // ✅ Verificar si usuario o email ya existen
     const [dup] = await connection.query(
       `SELECT id FROM usuarios WHERE username = ? OR (email IS NOT NULL AND email = ?) LIMIT 1`,
       [username, email || null]
@@ -137,6 +148,22 @@ export async function POST(req) {
       );
     }
 
+    // ✅ Validar que role_id existe (si se proporciona)
+    if (role_id) {
+      const [roleExists] = await connection.query(
+        `SELECT id FROM roles WHERE id = ?`,
+        [role_id]
+      );
+
+      if (roleExists.length === 0) {
+        await connection.rollback();
+        return NextResponse.json(
+          { message: "El rol especificado no existe" },
+          { status: 400 }
+        );
+      }
+    }
+
     /* =========================
        HASH PASSWORD
     ==========================*/
@@ -148,15 +175,15 @@ export async function POST(req) {
     const [result] = await connection.query(
       `
       INSERT INTO usuarios
-      (fullname, username, email, phone, role, password_hash, is_active, permissions, work_schedule, color)
+      (role_id, fullname, username, email, phone, password_hash, is_active, permissions, work_schedule, color)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
+        role_id,
         fullname,
         username,
         email || null,
         phone || null,
-        role,
         hashedPassword,
         is_active ? 1 : 0,
         permissions,
@@ -204,7 +231,7 @@ export async function POST(req) {
 
     return NextResponse.json(
       {
-        message: "Usuario creado",
+        message: "✓ Usuario creado exitosamente",
         id: usuarioId,
       },
       { status: 201 }
