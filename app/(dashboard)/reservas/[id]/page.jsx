@@ -15,36 +15,38 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import {
   Loader2,
-  Eye,
   ArrowLeft,
   Building2,
   FileText,
   Download,
   Share2,
   CheckCircle,
+  ChevronsUpDown,
+  Check,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
 
 export default function ReservaDetailPage() {
   const router = useRouter();
@@ -53,242 +55,367 @@ export default function ReservaDetailPage() {
   const permitSignar = useRequirePerm("reservas", "firm");
 
   const [reserva, setReserva] = useState(null);
-  const [oportunidad, setOportunidad] = useState(null);
+  const [detalles, setDetalles] = useState(null);
+  const [accesorios, setAccesorios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [autoSaveIndicator, setAutoSaveIndicator] = useState(false);
 
-  const [selectedTab, setSelectedTab] = useState("nota-pedido");
+  // Estados para ubicaciones
+  const [departamentos, setDepartamentos] = useState([]);
+  const [provincias, setProvincias] = useState([]);
+  const [distritos, setDistritos] = useState([]);
+  const [filteredProvincias, setFilteredProvincias] = useState([]);
+  const [filteredDistritos, setFilteredDistritos] = useState([]);
 
-  // Form states - Nota de Pedido
-  const [notaPedido, setNotaPedido] = useState({
+  // Estados para los popovers
+  const [openDep, setOpenDep] = useState(false);
+  const [openProv, setOpenProv] = useState(false);
+  const [openDist, setOpenDist] = useState(false);
+
+  // Form states
+  const [formData, setFormData] = useState({
     tipo_comprobante: "",
-    cliente_rfc_legal: "",
-    dni_ruc: "",
     fecha_nacimiento: "",
     ocupacion: "",
-    provincia: "",
-    correo: "",
-    correo_copia: "",
-    modelo: "",
-    version: "",
-    año_modelo: "",
-    tipo_vehiculo: "",
-    nper: "",
-    bono_retoma: "",
-    tarjeta_placa: "",
-    flete: "",
-    total: "",
-    observaciones: "",
-    aceptacion: "",
-  });
-
-  // Form states - Carta de Características
-  const [cartaCaracteristicas, setCartaCaracteristicas] = useState({
-    senores: "",
-    presentante: "",
-    referencia_cliente: "",
-    estimados_senores: "",
-    marca: "",
-    modelo: "",
-    ano_modelo: "",
-    numero_chasis: "",
+    domicilio: "",
+    departamento_id: "",
+    provincia_id: "",
+    distrito_id: "",
+    nombreconyugue: "",
+    dniconyugue: "",
+    vin: "",
+    usovehiculo: "",
     numero_motor: "",
-    color: "",
-    clase: "",
-    carroceria: "",
+    dsctocredinissan: "",
+    dsctotienda: "",
+    dsctobonoretoma: "",
+    dsctonper: "",
+    cantidad: "",
+    flete: "",
+    tarjetaplaca: "",
+    glp: "",
+    tc_referencial: "",
+    total: "",
+    color_externo: "",
+    color_interno: "",
     valores_tc_ref: "",
-    valor_vehiculo: "",
     cuota_inicial: "",
     monto_aprobado: "",
     observaciones: "",
+    identificacion_fiscal: "",
+    nombre_comercial: "",
+    email: "",
+    celular: "",
+    marca_nombre: "",
+    modelo_nombre: "",
+    clase_nombre: "",
+    anio: "",
+    precio_base: "",
+    subtotal: "",
   });
 
-  // ✅ Auto-save mejorado
-  const autoSaveDelay = useCallback(
-    async (data, type) => {
+  // ✅ Cargar ubicaciones PRIMERO
+  useEffect(() => {
+    async function loadUbicaciones() {
+      try {
+        const [depRes, provRes, distRes] = await Promise.all([
+          fetch("/api/departamentos"),
+          fetch("/api/provincias"),
+          fetch("/api/distritos"),
+        ]);
+
+        let deps = await depRes.json();
+        let provs = await provRes.json();
+        let dists = await distRes.json();
+
+        console.log("Departamentos cargados:", deps);
+        console.log("Provincias cargadas:", provs);
+        console.log("Distritos cargados:", dists);
+
+        // ✅ Si los datos vienen dentro de una propiedad, extraerlos
+        deps = deps.data || (Array.isArray(deps) ? deps : []);
+        provs = provs.data || (Array.isArray(provs) ? provs : []);
+        dists = dists.data || (Array.isArray(dists) ? dists : []);
+
+        setDepartamentos(Array.isArray(deps) ? deps : []);
+        setProvincias(Array.isArray(provs) ? provs : []);
+        setDistritos(Array.isArray(dists) ? dists : []);
+
+        // ✅ Después de cargar ubicaciones, cargar reserva
+        loadReservaDetail(Array.isArray(provs) ? provs : [], Array.isArray(dists) ? dists : []);
+      } catch (error) {
+        console.error("Error cargando ubicaciones:", error);
+        setDepartamentos([]);
+        setProvincias([]);
+        setDistritos([]);
+        setLoading(false);
+      }
+    }
+
+    loadUbicaciones();
+  }, [params.id]);
+
+  // ✅ Filtrar provincias cuando cambia departamento
+  useEffect(() => {
+    if (formData.departamento_id) {
+      const depId = parseInt(formData.departamento_id);
+      const filtered = Array.isArray(provincias)
+        ? provincias.filter(p => p.departamento_id === depId)
+        : [];
+      console.log(`Filtrando provincias para departamento ${depId}:`, filtered);
+      setFilteredProvincias(filtered);
+      setFilteredDistritos([]);
+    } else {
+      setFilteredProvincias([]);
+      setFilteredDistritos([]);
+    }
+  }, [formData.departamento_id, provincias]);
+
+  // ✅ Filtrar distritos cuando cambia provincia
+  useEffect(() => {
+    if (formData.provincia_id) {
+      const provId = parseInt(formData.provincia_id);
+      const filtered = Array.isArray(distritos)
+        ? distritos.filter(d => d.provincia_id === provId)
+        : [];
+      console.log(`Filtrando distritos para provincia ${provId}:`, filtered);
+      setFilteredDistritos(filtered);
+    } else {
+      setFilteredDistritos([]);
+    }
+  }, [formData.provincia_id, distritos]);
+
+  // ✅ Auto-save para reserva_detalles
+  const autoSaveDetalles = useCallback(
+    async (data) => {
+      if (!detalles?.detalle_id) return;
+
       setSaving(true);
       setAutoSaveIndicator(true);
 
       try {
-        // Guardar en la BD
-        const response = await fetch(`/api/reservas/${params.id}`, {
+        const editableFields = [
+          "tipo_comprobante",
+          "fecha_nacimiento",
+          "ocupacion",
+          "domicilio",
+          "departamento_id",
+          "provincia_id",
+          "distrito_id",
+          "nombreconyugue",
+          "dniconyugue",
+          "vin",
+          "usovehiculo",
+          "numero_motor",
+          "dsctocredinissan",
+          "dsctotienda",
+          "dsctobonoretoma",
+          "dsctonper",
+          "cantidad",
+          "flete",
+          "tarjetaplaca",
+          "glp",
+          "tc_referencial",
+          "total",
+          "color_externo",
+          "color_interno",
+          "valores_tc_ref",
+          "cuota_inicial",
+          "monto_aprobado",
+          "observaciones",
+        ];
+
+        const cleanData = {};
+        editableFields.forEach(key => {
+          if (key in data) {
+            cleanData[key] = data[key] === "" ? null : data[key];
+          }
+        });
+
+        const response = await fetch(`/api/reserva-detalles/${detalles.detalle_id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            [type]: JSON.stringify(data),
-          }),
+          body: JSON.stringify(cleanData),
         });
 
         if (!response.ok) {
-          throw new Error("Error guardando");
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Error guardando");
         }
 
-        // Esperar un poco para mostrar el indicador
         await new Promise((resolve) => setTimeout(resolve, 300));
         setAutoSaveIndicator(false);
         toast.success("Guardado automáticamente");
       } catch (error) {
         console.error(error);
-        toast.error("Error guardando cambios");
+        toast.error("Error guardando cambios: " + error.message);
         setAutoSaveIndicator(false);
       } finally {
         setSaving(false);
       }
     },
-    [params.id]
+    [detalles?.detalle_id]
   );
 
-  // Auto-save con debounce - Nota de Pedido
+  // Auto-save con debounce
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (reserva && Object.values(notaPedido).some((v) => v !== "")) {
-        autoSaveDelay(notaPedido, "nota_pedido");
+      if (detalles && Object.values(formData).some((v) => v !== "")) {
+        autoSaveDetalles(formData);
       }
     }, 1500);
 
     return () => clearTimeout(timer);
-  }, [notaPedido]);
+  }, [formData, autoSaveDetalles, detalles]);
 
-  // Auto-save con debounce - Carta de Características
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (
-        reserva &&
-        Object.values(cartaCaracteristicas).some((v) => v !== "")
-      ) {
-        autoSaveDelay(cartaCaracteristicas, "carta_caracteristicas");
-      }
-    }, 1500);
-
-    return () => clearTimeout(timer);
-  }, [cartaCaracteristicas]);
-
-  async function loadReservaDetail() {
+  // ✅ Cargar detalles de reserva
+  async function loadReservaDetail(provList = [], distList = []) {
     try {
-      setLoading(true);
       const res = await fetch(`/api/reservas/${params.id}`, {
         cache: "no-store",
       });
       const data = await res.json();
       setReserva(data);
+      setDetalles(data.detalles);
+      setAccesorios(data.accesorios || []);
 
-      console.log("Reserva cargada:", data);
+      console.log("Reserva completa cargada:", data);
 
-      // Cargar oportunidad
-      if (data.oportunidad_id || data.id) {
-        const opId = data.oportunidad_id;
-        const resOp = await fetch(`/api/oportunidades-oportunidades/${opId}`, {
-          cache: "no-store",
-        });
-        const dataOp = await resOp.json();
-        setOportunidad(dataOp);
+      // ✅ Pre-llenar formulario
+      if (data.detalles) {
+        // ✅ Obtener IDs - buscar primero en detalles, luego en datos adicionales
+        const depId = (data.detalles.departamento_id || data.departamento_id)?.toString() || "";
+        const provId = (data.detalles.provincia_id || data.provincia_id)?.toString() || "";
+        const distId = (data.detalles.distrito_id || data.distrito_id)?.toString() || "";
 
-        console.log("Oportunidad cargada:", dataOp);
-      }
+        console.log("IDs cargados:", { depId, provId, distId });
+        console.log("Detalles completos:", data.detalles);
 
-      // ✅ Inicializar forms con datos existentes de la reserva
-      if (data.nota_pedido) {
-        try {
-          const notaParsed = JSON.parse(data.nota_pedido);
-          setNotaPedido(notaParsed);
-        } catch {
-          // Si no es JSON válido, dejarlo como está
+        // ✅ Si no hay IDs en detalles, intentar buscar en provincias/distritos por nombre
+        let finalDepId = depId;
+        let finalProvId = provId;
+        let finalDistId = distId;
+
+        // Si tenemos nombre de departamento pero no ID, buscarlo
+        if (!finalDepId && data.detalles.departamento_nombre && Array.isArray(departamentos)) {
+          const foundDep = departamentos.find(d => d.nombre === data.detalles.departamento_nombre);
+          if (foundDep) {
+            finalDepId = foundDep.id.toString();
+          }
         }
-      } else if (data.detalles && data.detalles.length > 0) {
-        const detalle = data.detalles[0];
-        setNotaPedido({
-          tipo_comprobante: "",
-          cliente_rfc_legal: "",
-          dni_ruc: data.cliente_id?.toString() || "",
-          fecha_nacimiento: "",
-          ocupacion: "",
-          provincia: "",
-          correo: "",
-          correo_copia: "",
-          modelo: detalle.modelo_nombre || "",
-          version: "",
-          año_modelo: detalle.anio || "",
-          tipo_vehiculo: "",
-          nper: "",
-          bono_retoma: "",
-          tarjeta_placa: "",
-          flete: "",
-          total: detalle.subtotal?.toString() || "",
-          observaciones: "",
-          aceptacion: "",
-        });
-      }
 
-      // ✅ Inicializar Carta de Características
-      if (data.carta_caracteristicas) {
-        try {
-          const cartaParsed = JSON.parse(data.carta_caracteristicas);
-          setCartaCaracteristicas(cartaParsed);
-        } catch {
-          // Si no es JSON válido, dejarlo como está
+        // Si tenemos nombre de provincia pero no ID, buscarlo
+        if (!finalProvId && data.detalles.provincia_nombre && Array.isArray(provList)) {
+          const foundProv = provList.find(p => p.nombre?.trim() === data.detalles.provincia_nombre?.trim());
+          if (foundProv) {
+            finalProvId = foundProv.id.toString();
+          }
         }
-      } else if (data.detalles && data.detalles.length > 0) {
-        const detalle = data.detalles[0];
-        setCartaCaracteristicas({
-          senores: "",
-          presentante: "",
-          referencia_cliente: "",
-          estimados_senores: "",
-          marca: detalle.marca_nombre || "",
-          modelo: detalle.modelo_nombre || "",
-          ano_modelo: detalle.anio?.toString() || "",
-          numero_chasis: detalle.vin || "",
-          numero_motor: "",
-          color: "",
-          clase: "",
-          carroceria: "",
-          valores_tc_ref: "",
-          valor_vehiculo: "",
+
+        // Si tenemos nombre de distrito pero no ID, buscarlo
+        if (!finalDistId && data.detalles.distrito_nombre && Array.isArray(distList)) {
+          const foundDist = distList.find(d => d.nombre === data.detalles.distrito_nombre);
+          if (foundDist) {
+            finalDistId = foundDist.id.toString();
+          }
+        }
+
+        setFormData(prev => ({
+          ...prev,
+          tipo_comprobante: data.detalles.tipo_comprobante || "",
+          fecha_nacimiento: data.detalles.fecha_nacimiento 
+            ? data.detalles.fecha_nacimiento.split('T')[0] 
+            : "",
+          ocupacion: data.detalles.ocupacion || "",
+          domicilio: data.detalles.domicilio || "",
+          departamento_id: finalDepId,
+          provincia_id: finalProvId,
+          distrito_id: finalDistId,
+          nombreconyugue: data.detalles.nombreconyugue || "",
+          dniconyugue: data.detalles.dniconyugue || "",
+          vin: data.detalles.vin || "",
+          usovehiculo: data.detalles.usovehiculo || "",
+          numero_motor: data.detalles.numero_motor || "",
+          dsctocredinissan: data.detalles.dsctocredinissan?.toString() || "",
+          dsctotienda: data.detalles.dsctotienda?.toString() || "",
+          dsctobonoretoma: data.detalles.dsctobonoretoma?.toString() || "",
+          dsctonper: data.detalles.dsctonper?.toString() || "",
+          cantidad: data.detalles.cantidad?.toString() || "",
+          flete: data.detalles.flete?.toString() || "",
+          tarjetaplaca: data.detalles.tarjetaplaca?.toString() || "",
+          glp: data.detalles.glp?.toString() || "",
+          tc_referencial: data.detalles.tc_referencial?.toString() || "",
+          total: data.detalles.total?.toString() || "",
+          color_externo: data.detalles.color_externo || "",
+          color_interno: data.detalles.color_interno || "",
+          valores_tc_ref: data.detalles.tc_referencial?.toString() || "",
           cuota_inicial: "",
-          monto_aprobado: "",
+          monto_aprobado: data.detalles.total?.toString() || "",
           observaciones: "",
-        });
+          identificacion_fiscal: data.detalles.identificacion_fiscal || "",
+          nombre_comercial: data.detalles.nombre_comercial || "",
+          email: data.detalles.email || "",
+          celular: data.detalles.celular || "",
+          marca_nombre: data.detalles.marca_nombre || "",
+          modelo_nombre: data.detalles.modelo_nombre || "",
+          clase_nombre: data.detalles.clase_nombre || "",
+          anio: data.detalles.anio?.toString() || "",
+          precio_base: data.detalles.precio_base?.toString() || "",
+          subtotal: data.detalles.subtotal?.toString() || "",
+        }));
+
+        // ✅ Filtrar provincias si hay departamento
+        if (finalDepId && Array.isArray(provList)) {
+          const depIdNum = parseInt(finalDepId);
+          const filtered = provList.filter(p => p.departamento_id === depIdNum);
+          console.log("Provincias filtradas:", filtered);
+          setFilteredProvincias(filtered);
+        }
+
+        // ✅ Filtrar distritos si hay provincia
+        if (finalProvId && Array.isArray(distList)) {
+          const provIdNum = parseInt(finalProvId);
+          const filtered = distList.filter(d => d.provincia_id === provIdNum);
+          console.log("Distritos filtrados:", filtered);
+          setFilteredDistritos(filtered);
+        }
       }
+
+      setLoading(false);
     } catch (error) {
       console.error(error);
       toast.error("Error cargando reserva");
-    } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => {
-    loadReservaDetail();
-  }, [params.id]);
+  const handleFieldChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
 
-  const getEstadoBadge = (estado) => {
-    const config = {
-      borrador: { bg: "bg-gray-100", text: "text-gray-700", label: "Borrador" },
-      enviado_firma: {
-        bg: "bg-blue-100",
-        text: "text-blue-700",
-        label: "Enviado a Firma",
-      },
-      observado: {
-        bg: "bg-yellow-100",
-        text: "text-yellow-700",
-        label: "Observado",
-      },
-      subasando: {
-        bg: "bg-purple-100",
-        text: "text-purple-700",
-        label: "Subasando",
-      },
-      firmado: {
-        bg: "bg-green-100",
-        text: "text-green-700",
-        label: "Firmado",
-      },
-    };
+  // ✅ Obtener nombre del departamento seleccionado
+  const getDepartamentoNombre = () => {
+    if (!formData.departamento_id || !Array.isArray(departamentos)) return "Seleccionar departamento";
+    const dep = departamentos.find(d => d.id.toString() === formData.departamento_id);
+    return dep ? dep.nombre : "Seleccionar departamento";
+  };
 
-    const cfg = config[estado] || config.borrador;
-    return <Badge className={`${cfg.bg} ${cfg.text}`}>{cfg.label}</Badge>;
+  // ✅ Obtener nombre de la provincia seleccionada
+  const getProvinciaNombre = () => {
+    if (!formData.provincia_id || !Array.isArray(provincias)) return "Seleccionar provincia";
+    const prov = provincias.find(p => p.id.toString() === formData.provincia_id);
+    return prov ? prov.nombre : "Seleccionar provincia";
+  };
+
+  // ✅ Obtener nombre del distrito seleccionado
+  const getDistritoNombre = () => {
+    if (!formData.distrito_id || !Array.isArray(distritos)) return "Seleccionar distrito";
+    const dist = distritos.find(d => d.id.toString() === formData.distrito_id);
+    return dist ? dist.nombre : "Seleccionar distrito";
   };
 
   if (loading) {
@@ -301,7 +428,7 @@ export default function ReservaDetailPage() {
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="space-y-6 py-8 px-4 max-w-6xl mx-auto">
+      <div className="space-y-6 py-8 px-4 max-w-7xl mx-auto">
         {/* HEADER */}
         <div className="flex items-center justify-between border-b pb-6">
           <div className="flex items-center gap-4">
@@ -324,7 +451,7 @@ export default function ReservaDetailPage() {
               <p className="text-gray-600 mt-1">
                 {reserva?.oportunidad_id && (
                   <>
-                    Oportunidad #{reserva.oportunidad_id} • Cliente:{" "}
+                    Oportunidad #{reserva.oportunidad_codigo} • Cliente:{" "}
                     <span className="font-semibold">{reserva?.cliente_nombre}</span>
                   </>
                 )}
@@ -340,76 +467,78 @@ export default function ReservaDetailPage() {
                 </span>
               </div>
             )}
-            {reserva && getEstadoBadge(reserva.estado)}
           </div>
         </div>
 
-        {/* INFORMACIÓN DEL CLIENTE Y OPORTUNIDAD */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* INFORMACIÓN PRINCIPAL */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Información del Cliente</CardTitle>
+              <CardTitle className="text-sm">Cliente</CardTitle>
             </CardHeader>
             <CardContent className="text-sm space-y-2">
-              <div>
-                <p className="text-xs text-gray-600">Nombre</p>
-                <p className="font-semibold">{reserva?.cliente_nombre}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-600">Creado por</p>
-                <p className="font-medium">{reserva?.created_by_name}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-600">Fecha de Creación</p>
-                <p className="font-medium">
-                  {new Date(reserva?.created_at).toLocaleDateString("es-ES")}
-                </p>
-              </div>
+              <p className="font-semibold">{reserva?.cliente_nombre}</p>
+              <p className="text-xs text-gray-600">{formData.email}</p>
+              <p className="text-xs text-gray-600">{formData.celular}</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Información de Oportunidad</CardTitle>
+              <CardTitle className="text-sm">Vehículo</CardTitle>
             </CardHeader>
             <CardContent className="text-sm space-y-2">
-              <div>
-                <p className="text-xs text-gray-600">Código</p>
-                <p className="font-semibold font-mono">
-                  {oportunidad?.oportunidad_id}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-600">Etapa</p>
-                <p className="font-medium">{oportunidad?.etapa_nombre}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-600">Origen</p>
-                <p className="font-medium">{oportunidad?.origen_nombre}</p>
-              </div>
+              <p className="font-semibold">{formData.marca_nombre} {formData.modelo_nombre}</p>
+              <p className="text-xs text-gray-600">A��o: {formData.anio}</p>
+              <p className="text-xs text-gray-600">VIN: {formData.vin}</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Información del Vehículo</CardTitle>
+              <CardTitle className="text-sm">Ubicación</CardTitle>
             </CardHeader>
             <CardContent className="text-sm space-y-2">
-              <div>
-                <p className="text-xs text-gray-600">Marca</p>
-                <p className="font-semibold">{oportunidad?.marca_nombre}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-600">Modelo</p>
-                <p className="font-medium">{oportunidad?.modelo_nombre}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-600">Año</p>
-                <p className="font-medium">{oportunidad?.anio}</p>
-              </div>
+              <p className="font-semibold">{getProvinciaNombre()}</p>
+              <p className="text-xs text-gray-600">{getDistritoNombre()}</p>
+              <p className="text-xs text-gray-600">{getDepartamentoNombre()}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Total</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm space-y-2">
+              <p className="text-2xl font-bold text-blue-600">
+                ${parseFloat(formData.total || 0).toFixed(2)}
+              </p>
+              <p className="text-xs text-gray-600">TC: {formData.tc_referencial}</p>
             </CardContent>
           </Card>
         </div>
+
+        {/* ACCESORIOS */}
+        {accesorios.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Accesorios</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {accesorios.map((acc, idx) => (
+                  <div key={idx} className="flex justify-between p-2 bg-gray-50 rounded">
+                    <div className="text-sm">
+                      <p className="font-medium">{acc.detalle}</p>
+                      <p className="text-xs text-gray-600">{acc.numero_parte}</p>
+                    </div>
+                    <p className="font-semibold">{acc.moneda_simbolo} {acc.precio}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* BOTONES DE ACCIÓN */}
         <div className="flex gap-2 flex-wrap">
@@ -451,7 +580,7 @@ export default function ReservaDetailPage() {
             <TooltipContent side="top">Compartir reserva</TooltipContent>
           </Tooltip>
 
-          {permitSignar && reserva?.estado === "enviado_firma" && (
+          {permitSignar && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button className="gap-2 bg-green-600 hover:bg-green-700">
@@ -464,635 +593,575 @@ export default function ReservaDetailPage() {
           )}
         </div>
 
-        {/* TABS */}
-        <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="nota-pedido">Nota de Pedido</TabsTrigger>
-            <TabsTrigger value="carta-caracteristicas">
-              Carta de Características
-            </TabsTrigger>
-          </TabsList>
+        {/* FORMULARIO ÚNICO */}
+        <Card>
+          <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100">
+            <CardTitle className="flex items-center gap-2">
+              <FileText size={18} />
+              NOTA DE PEDIDO Y CARTA DE CARACTERÍSTICAS
+            </CardTitle>
+          </CardHeader>
 
-          {/* TAB 1: NOTA DE PEDIDO */}
-          <TabsContent value="nota-pedido" className="space-y-4">
-            <Card>
-              <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText size={18} />
-                    NOTA DE PEDIDO
-                  </CardTitle>
-                  <div className="text-sm text-gray-600">
-                    SANTA CECILIA S.A. - Nissan
-                  </div>
-                </div>
-              </CardHeader>
-
-              <CardContent className="pt-6 space-y-6">
-                {/* DATOS DEL CLIENTE */}
-                <div className="border-b pb-6">
-                  <h3 className="font-semibold text-gray-900 mb-4">
-                    DATOS DEL CLIENTE
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Tipo de Comprobante
-                      </label>
-                      <Input
-                        value={notaPedido.tipo_comprobante}
-                        onChange={(e) =>
-                          setNotaPedido({
-                            ...notaPedido,
-                            tipo_comprobante: e.target.value,
-                          })
-                        }
-                        placeholder="Boleta/Factura"
-                        className="text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        DNI/RUC
-                      </label>
-                      <Input
-                        value={notaPedido.dni_ruc}
-                        onChange={(e) =>
-                          setNotaPedido({
-                            ...notaPedido,
-                            dni_ruc: e.target.value,
-                          })
-                        }
-                        placeholder="12345678"
-                        className="text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Correo
-                      </label>
-                      <Input
-                        value={notaPedido.correo}
-                        onChange={(e) =>
-                          setNotaPedido({
-                            ...notaPedido,
-                            correo: e.target.value,
-                          })
-                        }
-                        placeholder="cliente@email.com"
-                        type="email"
-                        className="text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Correo Copia
-                      </label>
-                      <Input
-                        value={notaPedido.correo_copia}
-                        onChange={(e) =>
-                          setNotaPedido({
-                            ...notaPedido,
-                            correo_copia: e.target.value,
-                          })
-                        }
-                        placeholder="copia@email.com"
-                        type="email"
-                        className="text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Ocupación
-                      </label>
-                      <Input
-                        value={notaPedido.ocupacion}
-                        onChange={(e) =>
-                          setNotaPedido({
-                            ...notaPedido,
-                            ocupacion: e.target.value,
-                          })
-                        }
-                        placeholder="Profesión"
-                        className="text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Provincia
-                      </label>
-                      <Input
-                        value={notaPedido.provincia}
-                        onChange={(e) =>
-                          setNotaPedido({
-                            ...notaPedido,
-                            provincia: e.target.value,
-                          })
-                        }
-                        placeholder="Provincia"
-                        className="text-sm"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* DATOS DEL VEHÍCULO */}
-                <div className="border-b pb-6">
-                  <h3 className="font-semibold text-gray-900 mb-4">
-                    DATOS DEL VEHÍCULO
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Modelo
-                      </label>
-                      <Input
-                        value={notaPedido.modelo}
-                        onChange={(e) =>
-                          setNotaPedido({
-                            ...notaPedido,
-                            modelo: e.target.value,
-                          })
-                        }
-                        placeholder="FRONTIER"
-                        className="text-sm"
-                        disabled
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Versión
-                      </label>
-                      <Input
-                        value={notaPedido.version}
-                        onChange={(e) =>
-                          setNotaPedido({
-                            ...notaPedido,
-                            version: e.target.value,
-                          })
-                        }
-                        placeholder="NUEVA 4WD X-E MT"
-                        className="text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Año Modelo
-                      </label>
-                      <Input
-                        value={notaPedido.año_modelo}
-                        onChange={(e) =>
-                          setNotaPedido({
-                            ...notaPedido,
-                            año_modelo: e.target.value,
-                          })
-                        }
-                        placeholder="2026"
-                        className="text-sm"
-                        disabled
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Tipo de Vehículo
-                      </label>
-                      <Input
-                        value={notaPedido.tipo_vehiculo}
-                        onChange={(e) =>
-                          setNotaPedido({
-                            ...notaPedido,
-                            tipo_vehiculo: e.target.value,
-                          })
-                        }
-                        placeholder="PARTICULAR"
-                        className="text-sm"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* DESCUENTOS Y ADICIONALES */}
-                <div className="border-b pb-6">
-                  <h3 className="font-semibold text-gray-900 mb-4">
-                    DESCUENTOS Y ADICIONALES
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Bono Retoma
-                      </label>
-                      <Input
-                        type="number"
-                        value={notaPedido.bono_retoma}
-                        onChange={(e) =>
-                          setNotaPedido({
-                            ...notaPedido,
-                            bono_retoma: e.target.value,
-                          })
-                        }
-                        placeholder="0.00"
-                        className="text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Tarjeta Placa
-                      </label>
-                      <Input
-                        type="number"
-                        value={notaPedido.tarjeta_placa}
-                        onChange={(e) =>
-                          setNotaPedido({
-                            ...notaPedido,
-                            tarjeta_placa: e.target.value,
-                          })
-                        }
-                        placeholder="0.00"
-                        className="text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Flete
-                      </label>
-                      <Input
-                        type="number"
-                        value={notaPedido.flete}
-                        onChange={(e) =>
-                          setNotaPedido({
-                            ...notaPedido,
-                            flete: e.target.value,
-                          })
-                        }
-                        placeholder="0.00"
-                        className="text-sm"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* TOTAL */}
-                <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded border border-blue-200">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-gray-900">
-                      TOTAL:
-                    </span>
-                    <span className="text-2xl font-bold text-blue-600">
-                      ${parseFloat(notaPedido.total || 0).toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* OBSERVACIONES */}
+          <CardContent className="pt-6 space-y-6">
+            {/* DATOS DEL CLIENTE */}
+            <div className="border-b pb-6">
+              <h3 className="font-semibold text-gray-900 mb-4">
+                DATOS DEL CLIENTE
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-medium text-gray-600 block mb-2">
-                    Observaciones
+                    Tipo de Comprobante *
                   </label>
-                  <Textarea
-                    value={notaPedido.observaciones}
-                    onChange={(e) =>
-                      setNotaPedido({
-                        ...notaPedido,
-                        observaciones: e.target.value,
-                      })
-                    }
-                    placeholder="Observaciones adicionales..."
-                    rows={4}
-                    className="text-sm"
+                  <Input
+                    value={formData.tipo_comprobante}
+                    onChange={(e) => handleFieldChange("tipo_comprobante", e.target.value)}
+                    placeholder="Boleta/Factura"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Identificación Fiscal
+                  </label>
+                  <Input
+                    value={formData.identificacion_fiscal}
+                    disabled
+                    className="bg-gray-100"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Nombre Comercial
+                  </label>
+                  <Input
+                    value={formData.nombre_comercial}
+                    disabled
+                    className="bg-gray-100"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Fecha Nacimiento *
+                  </label>
+                  <Input
+                    type="date"
+                    value={formData.fecha_nacimiento}
+                    onChange={(e) => handleFieldChange("fecha_nacimiento", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Ocupación *
+                  </label>
+                  <Input
+                    value={formData.ocupacion}
+                    onChange={(e) => handleFieldChange("ocupacion", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Domicilio *
+                  </label>
+                  <Input
+                    value={formData.domicilio}
+                    onChange={(e) => handleFieldChange("domicilio", e.target.value)}
                   />
                 </div>
 
-                {/* ACEPTACIÓN */}
-                <div className="border-t pt-6">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={notaPedido.aceptacion === "si"}
-                      onChange={(e) =>
-                        setNotaPedido({
-                          ...notaPedido,
-                          aceptacion: e.target.checked ? "si" : "no",
-                        })
-                      }
-                      className="w-5 h-5"
-                    />
-                    <span className="text-sm text-gray-700">
-                      Acepto los términos y condiciones
-                    </span>
-                  </label>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* TAB 2: CARTA DE CARACTERÍSTICAS */}
-          <TabsContent value="carta-caracteristicas" className="space-y-4">
-            <Card>
-              <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText size={18} />
-                    CARTA DE CARACTERÍSTICAS
-                  </CardTitle>
-                  <div className="text-sm text-gray-600">
-                    SANTA CECILIA S.A.
-                  </div>
-                </div>
-              </CardHeader>
-
-              <CardContent className="pt-6 space-y-6">
-                {/* ENCABEZADO */}
-                <div className="border-b pb-6">
-                  <h3 className="font-semibold text-gray-900 mb-4">DATOS</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Señores
-                      </label>
-                      <Input
-                        value={cartaCaracteristicas.senores}
-                        onChange={(e) =>
-                          setCartaCaracteristicas({
-                            ...cartaCaracteristicas,
-                            senores: e.target.value,
-                          })
-                        }
-                        placeholder="MI BANCO S.A."
-                        className="text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Presentante
-                      </label>
-                      <Input
-                        value={cartaCaracteristicas.presentante}
-                        onChange={(e) =>
-                          setCartaCaracteristicas({
-                            ...cartaCaracteristicas,
-                            presentante: e.target.value,
-                          })
-                        }
-                        placeholder="Presentante"
-                        className="text-sm"
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Referencia Cliente
-                      </label>
-                      <Input
-                        value={cartaCaracteristicas.referencia_cliente}
-                        onChange={(e) =>
-                          setCartaCaracteristicas({
-                            ...cartaCaracteristicas,
-                            referencia_cliente: e.target.value,
-                          })
-                        }
-                        placeholder="Referencia"
-                        className="text-sm"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* VEHÍCULO */}
-                <div className="border-b pb-6">
-                  <h3 className="font-semibold text-gray-900 mb-4">
-                    INFORMACIÓN DEL VEHÍCULO
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Marca
-                      </label>
-                      <Input
-                        value={cartaCaracteristicas.marca}
-                        onChange={(e) =>
-                          setCartaCaracteristicas({
-                            ...cartaCaracteristicas,
-                            marca: e.target.value,
-                          })
-                        }
-                        placeholder="NISSAN"
-                        className="text-sm"
-                        disabled
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Modelo
-                      </label>
-                      <Input
-                        value={cartaCaracteristicas.modelo}
-                        onChange={(e) =>
-                          setCartaCaracteristicas({
-                            ...cartaCaracteristicas,
-                            modelo: e.target.value,
-                          })
-                        }
-                        placeholder="FRONTIER"
-                        className="text-sm"
-                        disabled
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Año Modelo
-                      </label>
-                      <Input
-                        value={cartaCaracteristicas.ano_modelo}
-                        onChange={(e) =>
-                          setCartaCaracteristicas({
-                            ...cartaCaracteristicas,
-                            ano_modelo: e.target.value,
-                          })
-                        }
-                        placeholder="2026"
-                        className="text-sm"
-                        disabled
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Número de Chasis / VIN
-                      </label>
-                      <Input
-                        value={cartaCaracteristicas.numero_chasis}
-                        onChange={(e) =>
-                          setCartaCaracteristicas({
-                            ...cartaCaracteristicas,
-                            numero_chasis: e.target.value,
-                          })
-                        }
-                        placeholder="VIN"
-                        className="text-sm"
-                        disabled
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Número de Motor
-                      </label>
-                      <Input
-                        value={cartaCaracteristicas.numero_motor}
-                        onChange={(e) =>
-                          setCartaCaracteristicas({
-                            ...cartaCaracteristicas,
-                            numero_motor: e.target.value,
-                          })
-                        }
-                        placeholder="Motor"
-                        className="text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Color
-                      </label>
-                      <Input
-                        value={cartaCaracteristicas.color}
-                        onChange={(e) =>
-                          setCartaCaracteristicas({
-                            ...cartaCaracteristicas,
-                            color: e.target.value,
-                          })
-                        }
-                        placeholder="Color"
-                        className="text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Clase
-                      </label>
-                      <Input
-                        value={cartaCaracteristicas.clase}
-                        onChange={(e) =>
-                          setCartaCaracteristicas({
-                            ...cartaCaracteristicas,
-                            clase: e.target.value,
-                          })
-                        }
-                        placeholder="Clase"
-                        className="text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Carrocería
-                      </label>
-                      <Input
-                        value={cartaCaracteristicas.carroceria}
-                        onChange={(e) =>
-                          setCartaCaracteristicas({
-                            ...cartaCaracteristicas,
-                            carroceria: e.target.value,
-                          })
-                        }
-                        placeholder="Carrocería"
-                        className="text-sm"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* VALORES */}
-                <div className="border-b pb-6">
-                  <h3 className="font-semibold text-gray-900 mb-4">VALORES</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        T.C. Ref.
-                      </label>
-                      <Input
-                        value={cartaCaracteristicas.valores_tc_ref}
-                        onChange={(e) =>
-                          setCartaCaracteristicas({
-                            ...cartaCaracteristicas,
-                            valores_tc_ref: e.target.value,
-                          })
-                        }
-                        placeholder="3.4500"
-                        className="text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Valor del Vehículo
-                      </label>
-                      <Input
-                        type="number"
-                        value={cartaCaracteristicas.valor_vehiculo}
-                        onChange={(e) =>
-                          setCartaCaracteristicas({
-                            ...cartaCaracteristicas,
-                            valor_vehiculo: e.target.value,
-                          })
-                        }
-                        placeholder="15000.00"
-                        className="text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Cuota Inicial
-                      </label>
-                      <Input
-                        type="number"
-                        value={cartaCaracteristicas.cuota_inicial}
-                        onChange={(e) =>
-                          setCartaCaracteristicas({
-                            ...cartaCaracteristicas,
-                            cuota_inicial: e.target.value,
-                          })
-                        }
-                        placeholder="3000.00"
-                        className="text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 block mb-2">
-                        Monto Aprobado
-                      </label>
-                      <Input
-                        type="number"
-                        value={cartaCaracteristicas.monto_aprobado}
-                        onChange={(e) =>
-                          setCartaCaracteristicas({
-                            ...cartaCaracteristicas,
-                            monto_aprobado: e.target.value,
-                          })
-                        }
-                        placeholder="12000.00"
-                        className="text-sm"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* OBSERVACIONES */}
+                {/* DEPARTAMENTO */}
                 <div>
                   <label className="text-xs font-medium text-gray-600 block mb-2">
-                    Observaciones
+                    Departamento *
                   </label>
-                  <Textarea
-                    value={cartaCaracteristicas.observaciones}
-                    onChange={(e) =>
-                      setCartaCaracteristicas({
-                        ...cartaCaracteristicas,
-                        observaciones: e.target.value,
-                      })
-                    }
-                    placeholder="Observaciones adicionales..."
-                    rows={4}
-                    className="text-sm"
+                  <Popover open={openDep} onOpenChange={setOpenDep}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={openDep}
+                        className="w-full justify-between"
+                      >
+                        <span className="truncate">{getDepartamentoNombre()}</span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0">
+                      <Command>
+                        <CommandInput placeholder="Buscar departamento..." />
+                        <CommandEmpty>No hay departamento.</CommandEmpty>
+                        <CommandList>
+                          <CommandGroup>
+                            {Array.isArray(departamentos) && departamentos.length > 0 ? (
+                              departamentos.map((dep) => (
+                                <CommandItem
+                                  key={dep.id}
+                                  value={dep.nombre}
+                                  onSelect={() => {
+                                    handleFieldChange("departamento_id", dep.id.toString());
+                                    setOpenDep(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      formData.departamento_id === dep.id.toString()
+                                        ? "opacity-100"
+                                        : "opacity-0"
+                                    )}
+                                  />
+                                  {dep.nombre}
+                                </CommandItem>
+                              ))
+                            ) : (
+                              <CommandEmpty>No hay departamentos disponibles</CommandEmpty>
+                            )}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* PROVINCIA */}
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Provincia *
+                  </label>
+                  <Popover open={openProv} onOpenChange={setOpenProv}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={openProv}
+                        className="w-full justify-between"
+                        disabled={!formData.departamento_id}
+                      >
+                        <span className="truncate">{getProvinciaNombre()}</span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0">
+                      <Command>
+                        <CommandInput placeholder="Buscar provincia..." />
+                        <CommandEmpty>No hay provincia.</CommandEmpty>
+                        <CommandList>
+                          <CommandGroup>
+                            {Array.isArray(filteredProvincias) && filteredProvincias.length > 0 ? (
+                              filteredProvincias.map((prov) => (
+                                <CommandItem
+                                  key={prov.id}
+                                  value={prov.nombre}
+                                  onSelect={() => {
+                                    handleFieldChange("provincia_id", prov.id.toString());
+                                    setOpenProv(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      formData.provincia_id === prov.id.toString()
+                                        ? "opacity-100"
+                                        : "opacity-0"
+                                    )}
+                                  />
+                                  {prov.nombre}
+                                </CommandItem>
+                              ))
+                            ) : (
+                              <CommandEmpty>No hay provincia para este departamento</CommandEmpty>
+                            )}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* DISTRITO */}
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Distrito *
+                  </label>
+                  <Popover open={openDist} onOpenChange={setOpenDist}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={openDist}
+                        className="w-full justify-between"
+                        disabled={!formData.provincia_id}
+                      >
+                        <span className="truncate">{getDistritoNombre()}</span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0">
+                      <Command>
+                        <CommandInput placeholder="Buscar distrito..." />
+                        <CommandEmpty>No hay distrito.</CommandEmpty>
+                        <CommandList>
+                          <CommandGroup>
+                            {Array.isArray(filteredDistritos) && filteredDistritos.length > 0 ? (
+                              filteredDistritos.map((dist) => (
+                                <CommandItem
+                                  key={dist.id}
+                                  value={dist.nombre}
+                                  onSelect={() => {
+                                    handleFieldChange("distrito_id", dist.id.toString());
+                                    setOpenDist(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      formData.distrito_id === dist.id.toString()
+                                        ? "opacity-100"
+                                        : "opacity-0"
+                                    )}
+                                  />
+                                  {dist.nombre}
+                                </CommandItem>
+                              ))
+                            ) : (
+                              <CommandEmpty>No hay distrito para esta provincia</CommandEmpty>
+                            )}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Email
+                  </label>
+                  <Input
+                    type="email"
+                    value={formData.email}
+                    disabled
+                    className="bg-gray-100"
                   />
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Celular
+                  </label>
+                  <Input
+                    value={formData.celular}
+                    disabled
+                    className="bg-gray-100"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Nombre del Cónyuge *
+                  </label>
+                  <Input
+                    value={formData.nombreconyugue}
+                    onChange={(e) => handleFieldChange("nombreconyugue", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    DNI Cónyuge *
+                  </label>
+                  <Input
+                    value={formData.dniconyugue}
+                    onChange={(e) => handleFieldChange("dniconyugue", e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* DATOS DEL VEHÍCULO */}
+            <div className="border-b pb-6">
+              <h3 className="font-semibold text-gray-900 mb-4">
+                DATOS DEL VEHÍCULO
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    VIN *
+                  </label>
+                  <Input
+                    value={formData.vin}
+                    onChange={(e) => handleFieldChange("vin", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Uso del Vehículo *
+                  </label>
+                  <Input
+                    value={formData.usovehiculo}
+                    onChange={(e) => handleFieldChange("usovehiculo", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Marca
+                  </label>
+                  <Input
+                    value={formData.marca_nombre}
+                    disabled
+                    className="bg-gray-100"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Modelo
+                  </label>
+                  <Input
+                    value={formData.modelo_nombre}
+                    disabled
+                    className="bg-gray-100"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Clase
+                  </label>
+                  <Input
+                    value={formData.clase_nombre}
+                    disabled
+                    className="bg-gray-100"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Año
+                  </label>
+                  <Input
+                    value={formData.anio}
+                    disabled
+                    className="bg-gray-100"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Color Externo *
+                  </label>
+                  <Input
+                    value={formData.color_externo}
+                    onChange={(e) => handleFieldChange("color_externo", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Color Interno *
+                  </label>
+                  <Input
+                    value={formData.color_interno}
+                    onChange={(e) => handleFieldChange("color_interno", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Número de Motor *
+                  </label>
+                  <Input
+                    value={formData.numero_motor}
+                    onChange={(e) => handleFieldChange("numero_motor", e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* DESCUENTOS Y MONTOS */}
+            <div className="border-b pb-6">
+              <h3 className="font-semibold text-gray-900 mb-4">
+                DESCUENTOS Y MONTOS
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Descuento Crédito Nissan *
+                  </label>
+                  <Input
+                    type="number"
+                    value={formData.dsctocredinissan}
+                    onChange={(e) => handleFieldChange("dsctocredinissan", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Descuento Tienda *
+                  </label>
+                  <Input
+                    type="number"
+                    value={formData.dsctotienda}
+                    onChange={(e) => handleFieldChange("dsctotienda", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Bono Retoma *
+                  </label>
+                  <Input
+                    type="number"
+                    value={formData.dsctobonoretoma}
+                    onChange={(e) => handleFieldChange("dsctobonoretoma", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Descuento NPER *
+                  </label>
+                  <Input
+                    type="number"
+                    value={formData.dsctonper}
+                    onChange={(e) => handleFieldChange("dsctonper", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Cantidad *
+                  </label>
+                  <Input
+                    type="number"
+                    value={formData.cantidad}
+                    onChange={(e) => handleFieldChange("cantidad", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Precio Base
+                  </label>
+                  <Input
+                    type="number"
+                    value={formData.precio_base}
+                    disabled
+                    className="bg-gray-100"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Subtotal
+                  </label>
+                  <Input
+                    type="number"
+                    value={formData.subtotal}
+                    disabled
+                    className="bg-gray-100"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Flete *
+                  </label>
+                  <Input
+                    type="number"
+                    value={formData.flete}
+                    onChange={(e) => handleFieldChange("flete", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Tarjeta Placa *
+                  </label>
+                  <Input
+                    type="number"
+                    value={formData.tarjetaplaca}
+                    onChange={(e) => handleFieldChange("tarjetaplaca", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    GLP *
+                  </label>
+                  <Input
+                    type="number"
+                    value={formData.glp}
+                    onChange={(e) => handleFieldChange("glp", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    T.C. Referencial *
+                  </label>
+                  <Input
+                    type="number"
+                    value={formData.tc_referencial}
+                    onChange={(e) => handleFieldChange("tc_referencial", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    TOTAL *
+                  </label>
+                  <Input
+                    type="number"
+                    value={formData.total}
+                    onChange={(e) => handleFieldChange("total", e.target.value)}
+                    className="font-bold text-lg"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* VALORES - CARTA */}
+            <div className="border-b pb-6">
+              <h3 className="font-semibold text-gray-900 mb-4">VALORES - CARTA DE CARACTERÍSTICAS</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    T.C. Ref. *
+                  </label>
+                  <Input
+                    type="number"
+                    value={formData.valores_tc_ref}
+                    onChange={(e) => handleFieldChange("valores_tc_ref", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Cuota Inicial *
+                  </label>
+                  <Input
+                    type="number"
+                    value={formData.cuota_inicial}
+                    onChange={(e) => handleFieldChange("cuota_inicial", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 block mb-2">
+                    Monto Aprobado *
+                  </label>
+                  <Input
+                    type="number"
+                    value={formData.monto_aprobado}
+                    onChange={(e) => handleFieldChange("monto_aprobado", e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* OBSERVACIONES */}
+            <div>
+              <label className="text-xs font-medium text-gray-600 block mb-2">
+                Observaciones
+              </label>
+              <Textarea
+                value={formData.observaciones}
+                onChange={(e) => handleFieldChange("observaciones", e.target.value)}
+                placeholder="Observaciones adicionales..."
+                rows={4}
+                className="text-sm"
+              />
+            </div>
+
+            {/* TOTAL FINAL */}
+            <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded border border-blue-200">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-gray-900">TOTAL FINAL:</span>
+                <span className="text-2xl font-bold text-blue-600">
+                  ${parseFloat(formData.total || 0).toFixed(2)}
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* INFO */}
         <Card className="bg-blue-50 border-blue-200">
@@ -1105,7 +1174,8 @@ export default function ReservaDetailPage() {
                 </p>
                 <p className="text-xs text-blue-700">
                   Los cambios se guardan automáticamente mientras escribes (después de 1.5
-                  segundos sin escribir). No necesitas hacer clic en un botón de guardar.
+                  segundos sin escribir). Los campos en gris son datos de referencia y no
+                  pueden editarse.
                 </p>
               </div>
             </div>

@@ -50,7 +50,6 @@ import {
 export default function ReservasPage() {
   const router = useRouter();
   const { userId, permissions, loading: authLoading } = useAuth();
-  const permitSignar = hasPermission(permissions, "reservas", "sign");
 
   const [reservas, setReservas] = useState([]);
   const [loading, setLoading] = useState(true);

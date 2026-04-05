@@ -37,5 +37,5 @@ export const SECTIONS = [
   { key: "oportunidades", label: "Oportunidades", actions: ["view", "create", "edit", "asignar","viewall"] },
   { key: "configinventario", label: "Configuración de Inventario", actions: ["view", "create", "edit", "delete"] },
   { key: "configcotizacion", label: "Configuración de Cotización", actions: ["view", "create", "edit", "delete"] },
-  { key: "reservas", label: "Reservas", actions: ["view", "create", "edit", "firm"] },
+  { key: "reservas", label: "Reservas", actions: ["view", "create", "edit", "viewall"] },
 ];
