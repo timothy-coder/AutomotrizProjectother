@@ -9,7 +9,9 @@ function verifySignature(body, signature) {
   const secret = process.env.CONVERSATIONS_WEBHOOK_SECRET;
   if (!secret) return false; // no secret configured → reject all (fail closed)
   const hmac = crypto.createHmac("sha256", secret).update(body).digest("hex");
-  return hmac === signature;
+  // Timing-safe comparison to prevent timing attacks
+  if (hmac.length !== signature.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(signature));
 }
 
 export async function POST(req) {
@@ -32,7 +34,8 @@ export async function POST(req) {
   const eventType = event.event;
 
   // Emitir al frontend via SSE
-  if (eventType === "message_created" && event.message_type === "incoming") {
+  // message_type: 0 = incoming, 1 = outgoing (integer, not string)
+  if (eventType === "message_created" && event.message_type === 0) {
     broadcastSseEvent("new_message", {
       conversation_id: event.conversation?.id,
       inbox_id: event.inbox_id,
@@ -55,6 +58,10 @@ export async function POST(req) {
       conversation_id: event.id,
       status: event.status,
     });
+  }
+
+  if (!["message_created", "conversation_created", "conversation_status_changed"].includes(eventType)) {
+    console.error("Chatwoot webhook: evento no manejado:", eventType);
   }
 
   return NextResponse.json({ message: "ok" });

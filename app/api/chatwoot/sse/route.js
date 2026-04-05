@@ -22,10 +22,8 @@ export async function GET(req) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  let controller;
   const stream = new ReadableStream({
     start(ctrl) {
-      controller = ctrl;
       addSseClient(ctrl);
       // keepalive cada 25s para evitar que el proxy cierre la conexión
       const interval = setInterval(() => {
@@ -48,6 +46,7 @@ export async function GET(req) {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
     },
   });
 }
