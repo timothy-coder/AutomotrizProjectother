@@ -113,25 +113,9 @@ export default function ConversationWorkspace({
   const lastMessageIdRef = useRef(null);
 
 
-  async function markAsRead(lastMessageId) {
-    if (!sess?.session_id || !lastMessageId) return;
-    if (lastMarkedRef.current >= lastMessageId) return;
-
-    try {
-      const res = await fetch("/api/conversations/mark-read", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          session_id: sess.session_id,
-          last_message_id: lastMessageId,
-        }),
-      });
-      if (!res.ok) throw new Error(`mark-read failed: ${res.status}`);
-      lastMarkedRef.current = lastMessageId;
-      if (onConversationUpdated) onConversationUpdated();
-    } catch (e) {
-      console.error("Error marcando leído:", e);
-    }
+  async function markAsRead(/* lastMessageId */) {
+    // TODO: implement via Chatwoot API POST /conversations/:id/update_last_seen
+    // Legacy /api/conversations/mark-read removed — was writing to MySQL with wrong IDs
   }
 
   async function loadTimeline() {
@@ -156,7 +140,7 @@ export default function ConversationWorkspace({
       const parsed = raw.map((msg) => ({
         id: msg.id,
         pregunta: msg.message_type === 0 ? msg.content : null,
-        respuesta: msg.message_type !== 0 ? msg.content : null,
+        respuesta: (msg.message_type === 1 || msg.message_type === 3) ? msg.content : null,
         message_direction: msg.message_type === 0 ? "inbound" : "outbound",
         source_channel: sess.source_channel || "whatsapp",
         created_at: msg.created_at
@@ -167,7 +151,8 @@ export default function ConversationWorkspace({
         message_status: msg.status || "sent",
         sender_name: msg.sender?.name || "",
         resumen: null,
-      }));
+      }))
+        .filter((m) => m.pregunta !== null || m.respuesta !== null);
       setMessages(parsed);
 
       const latestInbound = [...parsed]
