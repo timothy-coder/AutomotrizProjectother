@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronsUpDown } from "lucide-react";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, format, addDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -90,23 +90,17 @@ export default function VistaPorUsuarios({
     return base.filter((u) => String(u?.id) === String(currentUserId));
   }, [usuarios, canViewAll, currentUserId]);
 
-  useEffect(() => {
-    if (!usuariosActivos.length) {
-      setSelectedUsers([]);
-      return;
+  const effectiveSelectedUsers = useMemo(() => {
+    if (!canViewAll) {
+      return currentUserId != null ? [String(currentUserId)] : [];
     }
 
-    if (canViewAll) {
-      if (selectedUsers.length === 0) {
-        setSelectedUsers(usuariosActivos.map((u) => String(u.id)));
-      }
-      return;
+    if (selectedUsers.length) {
+      return selectedUsers;
     }
 
-    setSelectedUsers(
-      currentUserId != null ? [String(currentUserId)] : []
-    );
-  }, [usuariosActivos, canViewAll, currentUserId]);
+    return usuariosActivos.map((u) => String(u.id));
+  }, [canViewAll, currentUserId, selectedUsers, usuariosActivos]);
 
   // Obtener días de la semana actual
   const diasSemana = useMemo(() => {
@@ -116,13 +110,13 @@ export default function VistaPorUsuarios({
 
   const usuariosFiltrados = useMemo(() => {
     if (!canViewAll) return usuariosActivos;
-    if (!selectedUsers.length) return usuariosActivos;
+    if (!effectiveSelectedUsers.length) return usuariosActivos;
 
-    return usuariosActivos.filter((u) => selectedUsers.includes(String(u.id)));
-  }, [usuariosActivos, selectedUsers, canViewAll]);
+    return usuariosActivos.filter((u) => effectiveSelectedUsers.includes(String(u.id)));
+  }, [usuariosActivos, effectiveSelectedUsers, canViewAll]);
 
   // Función para obtener rango de fechas
-  function getRangoFechas() {
+  const getRangoFechas = useCallback(() => {
     const ahora = new Date();
     
     switch (filtroRango) {
@@ -147,7 +141,7 @@ export default function VistaPorUsuarios({
           fin: endOfDay(ahora),
         };
     }
-  }
+  }, [filtroRango]);
 
   const visibleRows = useMemo(() => {
     const { inicio, fin } = getRangoFechas();
@@ -174,7 +168,7 @@ export default function VistaPorUsuarios({
         return false;
       }
     });
-  }, [rows, canViewAll, currentUserId, filtroRango]);
+  }, [rows, canViewAll, currentUserId, getRangoFechas]);
 
   const oportunidadesAsignadas = useMemo(() => {
     return visibleRows.filter(
@@ -213,7 +207,7 @@ export default function VistaPorUsuarios({
   }
 
   // Función para obtener el estado de tiempo
-  function getEstadoTiempo(minutosRestantes, etapasconversion_id) {
+  const getEstadoTiempo = useCallback((minutosRestantes, etapasconversion_id) => {
     // Solo lógica dinámica si es "Nuevo" (etapasconversion_id === 1)
     if (etapasconversion_id !== 1) {
       return "suficiente";
@@ -235,7 +229,7 @@ export default function VistaPorUsuarios({
     }
 
     return null;
-  }
+  }, [estadosTiempo]);
 
   // Función para obtener color hexadecimal del estado
   function getColorEstado(minutosRestantes, etapasconversion_id) {
@@ -293,15 +287,18 @@ export default function VistaPorUsuarios({
     });
 
     return resumen;
-  }, [oportunidadesAsignadas, estadosTiempo]);
+  }, [oportunidadesAsignadas, getEstadoTiempo]);
 
   function toggleUser(id) {
     if (!canViewAll) return;
 
     const key = String(id);
-    setSelectedUsers((prev) =>
-      prev.includes(key) ? prev.filter((x) => x !== key) : [...prev, key]
-    );
+    setSelectedUsers((prev) => {
+      const base = prev.length ? prev : usuariosActivos.map((u) => String(u.id));
+      return base.includes(key)
+        ? base.filter((x) => x !== key)
+        : [...base, key];
+    });
   }
 
   return (
@@ -326,14 +323,14 @@ export default function VistaPorUsuarios({
             <Popover open={openUsers} onOpenChange={setOpenUsers}>
               <PopoverTrigger asChild>
                 <Button variant="outline" className="rounded-full">
-                  Asesores +{selectedUsers.length}
+                  Asesores +{effectiveSelectedUsers.length}
                   <ChevronsUpDown className="ml-2 h-4 w-4" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[280px] p-2">
                 <div className="space-y-2 max-h-[300px] overflow-auto">
                   {usuariosActivos.map((u) => {
-                    const checked = selectedUsers.includes(String(u.id));
+                    const checked = effectiveSelectedUsers.includes(String(u.id));
                     return (
                       <button
                         key={u.id}

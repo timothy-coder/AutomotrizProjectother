@@ -26,6 +26,39 @@ import { useAuth } from "@/context/AuthContext";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+function channelFromInbox(channelType) {
+  if (!channelType) return "whatsapp";
+  if (channelType.includes("Whatsapp")) return "whatsapp";
+  if (channelType.includes("Instagram")) return "instagram";
+  if (channelType.includes("FacebookPage") || channelType.includes("Page")) return "facebook";
+  return "whatsapp";
+}
+
+function mapSession(session) {
+  if (!session) return null;
+  const sid = session.session_id ?? session.id;
+  if (!sid) return null;
+  // Support both old CRM format and new Chatwoot format
+  return {
+    session_id: sid,
+    client_name: session.client_name ?? session.meta?.sender?.name ?? "Cliente",
+    cliente_nombre: session.cliente_nombre ?? session.client_name ?? session.meta?.sender?.name ?? "Cliente",
+    phone: session.phone ?? session.celular ?? session.meta?.sender?.phone_number ?? "",
+    celular: session.celular ?? session.phone ?? session.meta?.sender?.phone_number ?? "",
+    source_channel: session.source_channel ?? channelFromInbox(session.meta?.channel ?? session.channel ?? session.inbox?.channel_type),
+    assignment_status: session.assignment_status ?? session.status ?? "open",
+    resumen: session.resumen ?? "",
+  };
+}
+
+function getAuthToken() {
+  if (typeof document === "undefined") return "";
+  const match = document.cookie.match(/(?:^|;\s*)token=([^;]+)/);
+  const token = match ? match[1] : "";
+  if (!token) console.warn("ConversationWorkspace: no auth token found in cookies");
+  return token;
+}
+
 function getInitials(name) {
   if (!name) return "?";
   return name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
@@ -62,6 +95,9 @@ export default function ConversationWorkspace({
 }) {
   const { user } = useAuth();
 
+  // ── Normalizar session prop (soporta CRM viejo y Chatwoot) ──
+  const sess = mapSession(session);
+
   // ── Mensajes / timeline ──────────────────────────────────────
   const [messages, setMessages] = useState([]);
   const [timelineLoading, setTimelineLoading] = useState(false);
@@ -77,46 +113,51 @@ export default function ConversationWorkspace({
   const lastMessageIdRef = useRef(null);
 
 
-  async function markAsRead(lastMessageId) {
-    if (!session?.session_id || !lastMessageId) return;
-    if (lastMarkedRef.current >= lastMessageId) return;
-
-    try {
-      const res = await fetch("/api/conversations/mark-read", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          session_id: session.session_id,
-          last_message_id: lastMessageId,
-        }),
-      });
-      if (!res.ok) throw new Error(`mark-read failed: ${res.status}`);
-      lastMarkedRef.current = lastMessageId;
-      if (onConversationUpdated) onConversationUpdated();
-    } catch (e) {
-      console.error("Error marcando leído:", e);
-    }
+  async function markAsRead(/* lastMessageId */) {
+    // TODO: implement via Chatwoot API POST /conversations/:id/update_last_seen
+    // Legacy /api/conversations/mark-read removed — was writing to MySQL with wrong IDs
   }
 
   async function loadTimeline() {
-    if (!session?.session_id) return;
+    if (!sess?.session_id) return;
 
     setTimelineLoading(true);
     try {
+      const token = getAuthToken();
       const res = await fetch(
-        `/api/conversations/timeline?session_id=${session.session_id}`,
-        { cache: "no-store" }
+        `/api/chatwoot/conversations/${sess.session_id}/messages`,
+        {
+          cache: "no-store",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }
       );
       if (!res.ok) {
         throw new Error(`Error ${res.status} cargando timeline`);
       }
       const data = await res.json();
-      const parsed = Array.isArray(data) ? data : [];
+      // Chatwoot returns { payload: [...messages] }
+      const raw = Array.isArray(data) ? data : (data.payload || []);
+      const parsed = raw.map((msg) => ({
+        id: msg.id,
+        pregunta: msg.message_type === 0 ? msg.content : null,
+        respuesta: (msg.message_type === 1 || msg.message_type === 3) ? msg.content : null,
+        message_direction: msg.message_type === 0 ? "inbound" : "outbound",
+        source_channel: sess.source_channel || "whatsapp",
+        created_at: msg.created_at
+          ? (typeof msg.created_at === "number"
+            ? new Date(msg.created_at * 1000).toISOString()
+            : new Date(msg.created_at).toISOString())
+          : null,
+        message_status: msg.status || "sent",
+        sender_name: msg.sender?.name || "",
+        resumen: null,
+      }))
+        .filter((m) => m.pregunta !== null || m.respuesta !== null);
       setMessages(parsed);
 
       const latestInbound = [...parsed]
         .reverse()
-        .find((m) => (m?.message_direction || "") === "inbound" || Boolean(m?.pregunta));
+        .find((m) => m?.message_direction === "inbound");
 
       if (latestInbound?.id) {
         await markAsRead(latestInbound.id);
@@ -136,37 +177,33 @@ export default function ConversationWorkspace({
 
   async function handleSendMessage() {
     const text = newMessage.trim();
-    if (!text || !session?.session_id || sending) return;
+    if (!text || !sess?.session_id || sending) return;
 
     setSending(true);
     setError("");
 
-    const fullText = quotedMessage
+    const content = quotedMessage
       ? `> ${quotedMessage}\n\n${text}`
       : text;
 
     try {
-      const res = await fetch("/api/conversations/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          session_id: session.session_id,
-          text: fullText,
-          direction: "outbound",
-          source: "manual_ui",
-          source_channel: channelToSend,
-        }),
-      });
+      const token = getAuthToken();
+      const res = await fetch(
+        `/api/chatwoot/conversations/${sess.session_id}/messages`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ content }),
+        }
+      );
 
       const data = await res.json();
 
       if (!res.ok) {
         throw new Error(data?.message || "No se pudo enviar el mensaje");
-      }
-
-      // Advertir si el mensaje se registró pero no llegó al proveedor de mensajería
-      if (data?.message_status === "failed" || data?.n8n?.forwarded === false) {
-        setError("Mensaje guardado, pero no se pudo entregar al cliente. Verificá la configuración del servidor de envío.");
       }
 
       setNewMessage("");
@@ -185,22 +222,22 @@ export default function ConversationWorkspace({
   // ─────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!session?.session_id) return;
+    if (!sess?.session_id) return;
     lastMarkedRef.current = 0;
     lastMessageIdRef.current = null;
     stickToBottomRef.current = true;
     loadTimeline();
-  }, [session]);
+  }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!session?.session_id) return;
+    if (!sess?.session_id) return;
 
     const timer = setInterval(() => {
       loadTimeline();
     }, 5000);
 
     return () => clearInterval(timer);
-  }, [session]);
+  }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -235,7 +272,7 @@ export default function ConversationWorkspace({
   }, [messages]);
 
   useEffect(() => {
-    if (!session?.session_id) return;
+    if (!sess?.session_id) return;
     if (!focusComposerSignal) return;
 
     const node = composerRef.current;
@@ -244,7 +281,7 @@ export default function ConversationWorkspace({
     node.focus();
     const end = node.value?.length || 0;
     node.setSelectionRange(end, end);
-  }, [focusComposerSignal, session?.session_id]);
+  }, [focusComposerSignal, sess?.session_id]);
 
   // ─────────────────────────────────────────────────────────────
   // Canal automático: detectar del último mensaje entrante
@@ -254,8 +291,8 @@ export default function ConversationWorkspace({
     const lastInbound = [...messages].reverse().find(
       (m) => (m?.message_direction || "") === "inbound" || Boolean(m?.pregunta)
     );
-    return (lastInbound?.source_channel || session?.source_channel || "whatsapp").toLowerCase();
-  }, [messages, session]);
+    return (lastInbound?.source_channel || sess?.source_channel || "whatsapp").toLowerCase();
+  }, [messages, sess]);
 
   // ─────────────────────────────────────────────────────────────
   // Resumen desde el timeline
@@ -267,14 +304,14 @@ export default function ConversationWorkspace({
       const lastWithResumen = [...messages].reverse().find((m) => m?.resumen && String(m.resumen).trim());
       if (lastWithResumen?.resumen) return String(lastWithResumen.resumen).trim();
     }
-    return session?.resumen || "Sin resumen disponible.";
-  }, [messages, session]);
+    return sess?.resumen || "Sin resumen disponible.";
+  }, [messages, sess]);
 
   // ─────────────────────────────────────────────────────────────
   // Render vacío
   // ─────────────────────────────────────────────────────────────
 
-  if (!session?.session_id) {
+  if (!sess?.session_id) {
     return (
       <div className="h-full border rounded-xl bg-white shadow flex items-center justify-center text-sm text-gray-500">
         Selecciona una conversación para comenzar.
@@ -299,14 +336,14 @@ export default function ConversationWorkspace({
           {/* Avatar + info */}
           <div className="flex items-center gap-2.5 flex-1 min-w-0">
             <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm flex-shrink-0">
-              {getInitials(session?.cliente_nombre)}
+              {getInitials(sess?.cliente_nombre)}
             </div>
             <div className="min-w-0">
               <p className="font-semibold text-sm text-gray-900 truncate">
-                {session?.cliente_nombre || "Conversación"}
+                {sess?.cliente_nombre || "Conversación"}
               </p>
               <div className="flex items-center gap-1.5">
-                <span className="text-xs text-gray-500">{session?.celular || session?.phone}</span>
+                <span className="text-xs text-gray-500">{sess?.celular || sess?.phone}</span>
                 {channelToSend && (
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
                     channelToSend === "instagram" ? "bg-pink-100 text-pink-700" :
@@ -355,7 +392,7 @@ export default function ConversationWorkspace({
               {m.pregunta && (
                 <div className="flex items-end gap-2 max-w-[80%] group/msg">
                   <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600 flex-shrink-0">
-                    {getInitials(session?.cliente_nombre)}
+                    {getInitials(sess?.cliente_nombre)}
                   </div>
                   <div>
                     <div className="bg-white border border-gray-100 shadow-sm rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-sm text-gray-800">

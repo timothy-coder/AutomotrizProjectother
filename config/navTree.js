@@ -1,8 +1,7 @@
 import {
-  Users, Milestone, DollarSign, UserRound, Package, Boxes, Settings,Car,
-  CalendarCheck, ClipboardList, Receipt, SquareDashedMousePointer, FileText, Home, CarFront, Columns2, Wrench, Coins, Calendar, MessageCircle, ShoppingCart, BookOpen, SlidersHorizontal,
-  CalendarDays,
-  CalendarRange
+  Users, DollarSign, UserRound, Package, Boxes, Settings, Car,
+  CalendarCheck, ClipboardList, Receipt, SquareDashedMousePointer, FileText, Home, Wrench, Coins, Calendar, MessageCircle, ShoppingCart, BookOpen, SlidersHorizontal,
+  CalendarDays, CalendarRange
 } from "lucide-react";
 export const HOME_ITEM = { to: "/home", label: "Panel de Control", icon: Home, perm: ["home", "view"] };
 export const NAV_TREE = [
@@ -31,7 +30,7 @@ export const NAV_TREE = [
     items: [
       { to: "/carros", label: "Precios de Carros", icon: DollarSign, perm: ["inventariocarros", "view"] },
       { to: "/accesorios", label: "Precios de Accesorios", icon: Boxes, perm: ["inventariocarros", "view"] },
-      { to: "/ventas/catalogo", label: "Catálogo", icon: BookOpen, perm: ["mensajs", "view"] },
+      { to: "/ventas/catalogo", label: "Catálogo", icon: BookOpen, perm: ["mensajes", "view"] },
     ],
   },
   {
@@ -62,8 +61,9 @@ export const NAV_TREE = [
     label: "Mensajes",
     items: [
       { to: "/mensajes", label: "Mensajes", icon: MessageCircle, perm: ["mensajes", "view"] },
+      { to: "/followups", label: "Follow-up 3-3-3", icon: MessageCircle, perm: ["mensajes", "view"] },
       { to: "/enviosmasivos", label: "Envíos masivos", icon: MessageCircle, perm: ["mensajes", "view"] },
-      { to: "/ventas/leads", label: "Leads / Cotizaciones", icon: ShoppingCart, perm: ["mensajes", "view"] },
+      { to: "/ventas/leads", label: "Leads Capturados", icon: ShoppingCart, perm: ["mensajes", "view"] },
     ],
   },
   {
@@ -99,6 +99,8 @@ export const NAV_TREE = [
       { to: "/configcotizacion", label: "Configuración de Citas", icon: Settings, perm: ["configcotizacion", "view"] },
       { to: "/configinventario", label: "Configuración de Inventario", icon: Settings, perm: ["configinventario", "view"] },
       { to: "/ventas/configuracion", label: "Configuración del agente", icon: SlidersHorizontal, perm: ["mensajes", "view"] },
+      { to: "/alertas-config", label: "Alertas IA", icon: SlidersHorizontal, perm: ["mensajes", "view"] },
+      { to: "/roles-chatwoot", label: "Roles ↔ Chatwoot", icon: SlidersHorizontal, perm: ["configuracion", "view"] },
       
     ],
   }

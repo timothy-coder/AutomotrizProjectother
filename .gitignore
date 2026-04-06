@@ -52,6 +52,10 @@ bd.sql
 
 # embedded repo that must stay outside this project
 /engram/
+/.agents/
+
+# agent-generated lock file
+skills-lock.json
 
 # local tooling and external repos not part of this project
 /.atl/

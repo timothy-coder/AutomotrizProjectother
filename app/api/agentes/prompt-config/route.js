@@ -44,7 +44,7 @@ export async function GET(req) {
     try {
       const [[rows], [instrRows]] = await Promise.all([
         db.query(
-          "SELECT agent_name, taller_name, dealer_name FROM agent_prompt_config WHERE agent_key = ? AND is_active = 1 LIMIT 1",
+          "SELECT agent_name, taller_name, dealer_name, tone_preset, sinonimos_json, followup_interval_days FROM agent_prompt_config WHERE agent_key = ? AND is_active = 1 LIMIT 1",
           [agentKey]
         ),
         db.query(
@@ -60,9 +60,12 @@ export async function GET(req) {
         ? instrRows.map((r) => `- ${r.texto}`).join("\n")
         : null;
       return NextResponse.json({
-        agent_name:      row.agent_name  || null,
-        taller_name:     row.taller_name || null,
-        dealer_name:     row.dealer_name || null,
+        agent_name:             row.agent_name    || null,
+        taller_name:            row.taller_name   || null,
+        dealer_name:            row.dealer_name   || null,
+        tone_preset:            row.tone_preset   || "neutro",
+        sinonimos_json:         row.sinonimos_json ? JSON.parse(row.sinonimos_json) : null,
+        followup_interval_days: row.followup_interval_days ?? 3,
         consideraciones,
       });
     } catch (err) {
@@ -81,14 +84,14 @@ export async function GET(req) {
         return NextResponse.json({ message: "agent_key inválido" }, { status: 400 });
       }
       const [rows] = await db.query(
-        "SELECT agent_key, display_name, agent_name, taller_name, dealer_name, consideraciones, is_active, updated_at, updated_by FROM agent_prompt_config WHERE agent_key = ? LIMIT 1",
+        "SELECT agent_key, display_name, agent_name, taller_name, dealer_name, tone_preset, sinonimos_json, followup_interval_days, consideraciones, is_active, updated_at, updated_by FROM agent_prompt_config WHERE agent_key = ? LIMIT 1",
         [agentKey]
       );
       return NextResponse.json({ agente: rows[0] || null });
     }
 
     const [rows] = await db.query(
-      "SELECT agent_key, display_name, agent_name, taller_name, dealer_name, consideraciones, is_active, updated_at, updated_by FROM agent_prompt_config ORDER BY id ASC"
+      "SELECT agent_key, display_name, agent_name, taller_name, dealer_name, tone_preset, sinonimos_json, followup_interval_days, consideraciones, is_active, updated_at, updated_by FROM agent_prompt_config ORDER BY id ASC"
     );
     return NextResponse.json({ agentes: rows });
   } catch (err) {
@@ -102,7 +105,7 @@ export async function PUT(req) {
   if (!auth.ok) return auth.response;
 
   const body = await req.json().catch(() => ({}));
-  const { agent_key, agent_name, taller_name, dealer_name, consideraciones } = body;
+  const { agent_key, agent_name, taller_name, dealer_name, consideraciones, tone_preset, sinonimos_json, followup_interval_days } = body;
 
   if (!agent_key || !AGENT_KEYS_VALIDOS.includes(agent_key)) {
     return NextResponse.json({ message: "agent_key inválido" }, { status: 400 });
@@ -129,19 +132,29 @@ export async function PUT(req) {
   const updatedBy = auth.user?.email || auth.user?.username || "crm_user";
 
   try {
+    const intervalDays = Number.isInteger(followup_interval_days) && followup_interval_days >= 1 && followup_interval_days <= 30
+      ? followup_interval_days
+      : null;
+
     await db.query(
       `UPDATE agent_prompt_config
-       SET consideraciones = ?,
-           agent_name      = COALESCE(?, agent_name),
-           taller_name     = COALESCE(?, taller_name),
-           dealer_name     = COALESCE(?, dealer_name),
-           updated_by      = ?
+       SET consideraciones         = ?,
+           agent_name              = COALESCE(?, agent_name),
+           taller_name             = COALESCE(?, taller_name),
+           dealer_name             = COALESCE(?, dealer_name),
+           tone_preset             = COALESCE(?, tone_preset),
+           sinonimos_json          = COALESCE(?, sinonimos_json),
+           followup_interval_days  = COALESCE(?, followup_interval_days),
+           updated_by              = ?
        WHERE agent_key = ?`,
       [
         typeof consideraciones === "string" ? consideraciones.trim() || null : null,
-        typeof agent_name   === "string" ? agent_name.trim()   || null : null,
-        typeof taller_name  === "string" ? taller_name.trim()  || null : null,
-        typeof dealer_name  === "string" ? dealer_name.trim()  || null : null,
+        typeof agent_name    === "string" ? agent_name.trim()    || null : null,
+        typeof taller_name   === "string" ? taller_name.trim()   || null : null,
+        typeof dealer_name   === "string" ? dealer_name.trim()   || null : null,
+        typeof tone_preset   === "string" ? tone_preset.trim()   || null : null,
+        sinonimos_json !== undefined ? JSON.stringify(sinonimos_json) : null,
+        intervalDays,
         updatedBy,
         agent_key,
       ]

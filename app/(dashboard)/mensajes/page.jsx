@@ -25,6 +25,67 @@ import NotificationPanel from "@/app/components/conversations/NotificationPanel"
 import { useAuth } from "@/context/AuthContext";
 
 
+// ── Auth token desde cookie (mismo patrón que ConversationWorkspace) ─────────
+
+function getAuthToken() {
+  if (typeof document === "undefined") return "";
+  const match = document.cookie.match(/(?:^|;\s*)token=([^;]+)/);
+  return match ? match[1] : "";
+}
+
+// ── Chatwoot: helpers de fetch ────────────────────────────────────────────────
+
+function channelFromInbox(channelType) {
+  if (!channelType) return "whatsapp";
+  if (channelType.includes("Whatsapp")) return "whatsapp";
+  if (channelType.includes("Instagram")) return "instagram";
+  if (channelType.includes("FacebookPage") || channelType.includes("Page")) return "facebook";
+  return "whatsapp";
+}
+
+async function fetchConversations(status = "open") {
+  const token = getAuthToken();
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const res = await fetch(`/api/chatwoot/conversations?status=${status}`, {
+    cache: "no-store",
+    headers,
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  // Chatwoot returns { data: { payload: [...] } }
+  const payload = data?.data?.payload || [];
+  return payload.map((conv) => ({
+    session_id: conv.id,
+    client_name: conv.meta?.sender?.name || "Cliente",
+    cliente_nombre: conv.meta?.sender?.name || "Cliente",
+    phone: conv.meta?.sender?.phone_number || "",
+    celular: conv.meta?.sender?.phone_number || "",
+    source_channel: channelFromInbox(conv.meta?.channel),
+    assignment_status: conv.status,
+    unread_count: conv.unread_count || 0,
+    last_activity_at: conv.last_activity_at
+      ? new Date(conv.last_activity_at * 1000).toISOString()
+      : null,
+    last_message_at: conv.last_activity_at
+      ? new Date(conv.last_activity_at * 1000).toISOString()
+      : null,
+    last_message: conv.last_non_activity_message?.content || "",
+    ultimomensaje: conv.last_non_activity_message?.content || "",
+    sla_due_at: null,
+    assigned_agent_name: conv.meta?.assignee?.name || null,
+    assigned_agent_id: conv.meta?.assignee?.id || null,
+    team_name: conv.meta?.team?.name || null,
+    is_overdue: 0,
+    priority_level: "normal",
+    created_at: conv.created_at
+      ? new Date(conv.created_at * 1000).toISOString()
+      : null,
+    updated_at: conv.updated_at
+      ? new Date(conv.updated_at * 1000).toISOString()
+      : null,
+  }));
+}
+
 // ── Helpers globales ─────────────────────────────────────────────────────────
 
 function getInitials(name) {
@@ -284,6 +345,7 @@ export default function ConversationsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [focusComposerSignal, setFocusComposerSignal] = useState(0);
   const [avgInteractionMin, setAvgInteractionMin] = useState(null);
+  const [agents, setAgents] = useState([]);
   const prevUrgentCountRef = useRef(0);
   const prevUnreadTotalRef = useRef(0);
 
@@ -292,37 +354,43 @@ export default function ConversationsPage() {
     try {
       setPageError("");
 
-      const [sessionsRes, metricsRes, interactionRes] = await Promise.all([
-        fetch("/api/conversations/clients", { cache: "no-store" }),
+      const token = getAuthToken();
+      const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+
+      const [newSessions, metricsRes, interactionRes, agentsRes] = await Promise.all([
+        fetchConversations("open"),
         fetch(`/api/conversations/metrics?user_id=${user?.id || 0}`, { cache: "no-store" }),
         fetch("/api/conversations/interaction-metrics", { cache: "no-store" }),
+        fetch("/api/chatwoot/agents", { cache: "no-store", headers: authHeaders }),
       ]);
 
-      if (sessionsRes.status === 401 || metricsRes.status === 401) {
+      if (metricsRes.status === 401) {
         localStorage.removeItem("user");
         setPageError("Tu sesión expiró. Redirigiendo a login...");
         router.push("/login");
         return;
       }
 
-      if (!sessionsRes.ok || !metricsRes.ok) {
-        throw new Error("No se pudo cargar la bandeja de mensajes");
+      setSessions(newSessions);
+
+      if (metricsRes.ok) {
+        const metricsData = await metricsRes.json();
+        setMetrics((prev) => ({
+          ...prev,
+          ...(metricsData && typeof metricsData === "object" ? metricsData : {}),
+        }));
       }
-
-      const sessionsData = await sessionsRes.json();
-      const metricsData = await metricsRes.json();
-
-      setSessions(Array.isArray(sessionsData) ? sessionsData : []);
-      setMetrics((prev) => ({
-        ...prev,
-        ...(metricsData && typeof metricsData === "object" ? metricsData : {}),
-      }));
 
       if (interactionRes.ok) {
         const interactionData = await interactionRes.json();
         setAvgInteractionMin(interactionData?.avg_interaction_minutes ?? null);
       } else {
         console.error("interaction-metrics failed:", interactionRes.status);
+      }
+
+      if (agentsRes.ok) {
+        const agentsData = await agentsRes.json();
+        setAgents(Array.isArray(agentsData) ? agentsData : []);
       }
     } catch (error) {
       console.error("Error cargando conversaciones:", error);
@@ -337,14 +405,33 @@ export default function ConversationsPage() {
     load();
   }, [user?.id]);
 
-  // ── Polling: actualizar lista de sesiones cada 15 s ──────────
+  // ── SSE: actualizaciones en tiempo real (reemplaza polling de 15 s) ──────────
   useEffect(() => {
-    if (!user?.id) return;
-    const timer = setInterval(() => {
-      load();
-    }, 15000);
-    return () => clearInterval(timer);
-  }, [user?.id]);
+    const token = getAuthToken();
+    if (!token) return;
+
+    // Resolver el status de Chatwoot a partir del filtro activo
+    const chatwootStatuses = ["open", "pending", "resolved"];
+    const activeStatus = chatwootStatuses.includes(assignmentFilter) ? assignmentFilter : "open";
+
+    // SSE para actualizaciones en tiempo real
+    const evtSource = new EventSource(`/api/chatwoot/sse?token=${token}`);
+
+    evtSource.addEventListener("new_message", () => {
+      fetchConversations(activeStatus).then(setSessions).catch(console.error);
+    });
+    evtSource.addEventListener("new_conversation", () => {
+      fetchConversations(activeStatus).then(setSessions).catch(console.error);
+    });
+    evtSource.addEventListener("conversation_status", () => {
+      fetchConversations(activeStatus).then(setSessions).catch(console.error);
+    });
+    evtSource.onerror = () => {
+      console.warn("Chatwoot SSE: connection error — browser will auto-reconnect. readyState:", evtSource.readyState);
+    };
+
+    return () => evtSource.close();
+  }, [user?.id, assignmentFilter]);
 
   // ── Favicon + título con contador de no leídos ───────────────
   useEffect(() => {
@@ -395,10 +482,16 @@ export default function ConversationsPage() {
 
   async function handleQuickStatusChange(sessionId, nextStatus) {
     try {
-      const res = await fetch("/api/conversations/assign", {
+      const token = getAuthToken();
+      // Mapear "closed" → "resolved" para compatibilidad con Chatwoot
+      const chatwootStatus = nextStatus === "closed" ? "resolved" : nextStatus;
+      const res = await fetch(`/api/chatwoot/conversations/${sessionId}/status`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, assignment_status: nextStatus }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ status: chatwootStatus }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -408,6 +501,29 @@ export default function ConversationsPage() {
     } catch (err) {
       console.error("Error en quick-assign:", err);
       setPageError(err?.message || "No se pudo actualizar el estado");
+    }
+  }
+
+  async function handleQuickAgentAssign(sessionId, agentIdStr) {
+    const agentId = agentIdStr ? Number(agentIdStr) : null;
+    try {
+      const token = getAuthToken();
+      const res = await fetch(`/api/chatwoot/conversations/${sessionId}/assign`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ agent_id: agentId }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data?.message || "No se pudo asignar agente");
+      }
+      await load();
+    } catch (err) {
+      console.error("Error en asignación de agente:", err);
+      setPageError(err?.message || "No se pudo asignar agente");
     }
   }
 
@@ -493,7 +609,8 @@ export default function ConversationsPage() {
           setSummaryLoading(false);
           return;
         }
-      } catch {
+      } catch (err) {
+        console.error("Error parseando context_json del resumen:", err);
         if (rawContext.length > 0) {
           setSummaryText(rawContext);
           setSummaryLoading(false);
@@ -1055,7 +1172,7 @@ export default function ConversationsPage() {
                       </p>
 
                       <div className="flex items-center justify-between mt-1.5">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <ChannelPill channel={s.source_channel} />
                           {/* Quick-assign status */}
                           <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
@@ -1081,17 +1198,43 @@ export default function ConversationsPage() {
                           <span className="group-hover:hidden text-[10px] text-gray-400 capitalize">
                             {s.assignment_status || "sin asignar"}
                           </span>
+                          {/* Agente asignado — siempre visible si existe */}
+                          {s.assigned_agent_name && (
+                            <span className="text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-full px-1.5 py-0.5 truncate max-w-[80px]">
+                              {s.assigned_agent_name}
+                            </span>
+                          )}
                         </div>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenSummaryDialog(s);
-                          }}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100"
-                        >
-                          <Eye className="w-3.5 h-3.5 text-gray-400" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          {/* Quick-assign agente (hover) */}
+                          {agents.length > 0 && (
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                              <div className="relative flex items-center">
+                                <select
+                                  value={s.assigned_agent_id || ""}
+                                  onChange={(e) => handleQuickAgentAssign(s.session_id, e.target.value)}
+                                  className="appearance-none text-[10px] pr-4 pl-1.5 py-0.5 rounded-full border bg-indigo-50 border-indigo-200 text-indigo-700 font-medium cursor-pointer"
+                                >
+                                  <option value="">Asignar...</option>
+                                  {agents.map((a) => (
+                                    <option key={a.id} value={a.id}>{a.name}</option>
+                                  ))}
+                                </select>
+                                <ChevronDown className="absolute right-1 w-2.5 h-2.5 pointer-events-none text-indigo-500 opacity-60" />
+                              </div>
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenSummaryDialog(s);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-gray-400" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>

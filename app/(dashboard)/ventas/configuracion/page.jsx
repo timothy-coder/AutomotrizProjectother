@@ -455,6 +455,65 @@ function ServiciosForm({ data, onSave }) {
   );
 }
 
+// ─── Follow-up 3-3-3 ─────────────────────────────────────────────────────────
+
+function FollowupForm({ agentes }) {
+  const tallerAgent = (agentes || []).find((a) => a.agent_key === "taller");
+  const [days, setDays] = useState(tallerAgent?.followup_interval_days ?? 3);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    const val = Number(days);
+    if (!Number.isInteger(val) || val < 1 || val > 30) {
+      toast.error("El intervalo debe ser entre 1 y 30 días");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch("/api/agentes/prompt-config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agent_key: "taller", followup_interval_days: val }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Intervalo de follow-up guardado");
+    } catch {
+      toast.error("No se pudo guardar");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="max-w-lg space-y-4">
+      <p className="text-sm text-gray-500">
+        Cuando un lead no responde, el sistema le envía hasta 3 mensajes automáticos separados por este intervalo.
+        Al tercer mensaje sin respuesta, el seguimiento se cierra como <code className="text-xs bg-gray-100 px-1 rounded">sin_respuesta</code>.
+      </p>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">
+          Intervalo entre mensajes (días) <span className="text-gray-400">— mínimo 1, máximo 30</span>
+        </label>
+        <div className="flex items-center gap-3">
+          <Input
+            type="number"
+            min={1}
+            max={30}
+            value={days}
+            onChange={(e) => setDays(e.target.value)}
+            className="w-24"
+          />
+          <span className="text-sm text-gray-500">días</span>
+        </div>
+      </div>
+      <Button onClick={handleSave} disabled={saving}>
+        <Save className="w-4 h-4 mr-2" />
+        {saving ? "Guardando…" : "Guardar cambios"}
+      </Button>
+    </div>
+  );
+}
+
 // ─── Agentes IA ───────────────────────────────────────────────────────────────
 
 const PROMPTS_BASE = {
@@ -874,6 +933,7 @@ export default function VentasConfiguracionPage() {
             <TabButton label="Docs. Persona Jurídica" active={tab === "doc_juridico"} onClick={() => setTab("doc_juridico")} />
             <TabButton label="Garantías" active={tab === "garantias"} onClick={() => setTab("garantias")} />
             <TabButton label="Servicios adicionales" active={tab === "servicios"} onClick={() => setTab("servicios")} />
+            <TabButton label="Follow-up" active={tab === "followup"} onClick={() => setTab("followup")} />
             <TabButton label="Agentes IA" active={tab === "agentes"} onClick={() => setTab("agentes")} />
           </div>
 
@@ -910,6 +970,9 @@ export default function VentasConfiguracionPage() {
               data={config.servicios_adicionales}
               onSave={(c) => updateSection("servicios_adicionales", c)}
             />
+          )}
+          {tab === "followup" && (
+            <FollowupForm agentes={agentes} />
           )}
           {tab === "agentes" && (
             <AgentesIAForm agentes={agentes} />

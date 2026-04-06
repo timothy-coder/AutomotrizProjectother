@@ -149,16 +149,13 @@ function Combobox({
 
   const selectedItem = items.find((item) => String(item.id) === String(value));
 
-  // Filtrar items por nombre/label
-  const filteredItems = useMemo(() => {
-    if (!searchValue.trim()) return items;
-    
-    const lowerSearch = searchValue.toLowerCase();
-    return items.filter((item) => {
-      const label = getLabel(item).toLowerCase();
-      return label.includes(lowerSearch);
-    });
-  }, [items, searchValue]);
+  // Filtrar items por nombre/label.
+  const filteredItems = !searchValue.trim()
+    ? items
+    : items.filter((item) => {
+        const label = getLabel(item).toLowerCase();
+        return label.includes(searchValue.toLowerCase());
+      });
 
   const handleSelect = (itemId) => {
     onChange(itemId === value ? "" : itemId);
@@ -1284,7 +1281,7 @@ export default function LeadDialog({
                   {form.asignado_a &&
                     form.asignado_a !== "sin-asignar" && (
                       <p className="text-xs text-green-600 mt-1">
-                        ✓ La etapa cambiará a "Asignado" automáticamente
+                        ✓ La etapa cambiará a &quot;Asignado&quot; automáticamente
                       </p>
                     )}
                 </div>
