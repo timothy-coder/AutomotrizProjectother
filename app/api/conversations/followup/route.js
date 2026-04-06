@@ -2,6 +2,18 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { authorizeConversation } from "@/lib/conversationsAuth";
 
+async function getFollowupInterval() {
+  try {
+    const [[row]] = await db.query(
+      "SELECT followup_interval_days FROM agent_prompt_config WHERE agent_key = 'taller' AND is_active = 1 LIMIT 1"
+    );
+    const days = Number(row?.followup_interval_days);
+    return Number.isInteger(days) && days >= 1 && days <= 30 ? days : 3;
+  } catch {
+    return 3;
+  }
+}
+
 const VALID_CLOSURE_REASONS = [
   "sin_respuesta",
   "sin_informacion",
@@ -129,17 +141,18 @@ export async function POST(req) {
   }
 
   try {
+    const intervalDays = await getFollowupInterval();
     await db.query(
       `UPDATE conversation_sessions
          SET followup_count   = 0,
-             followup_next_at = DATE_ADD(NOW(), INTERVAL 3 DAY),
+             followup_next_at = DATE_ADD(NOW(), INTERVAL ? DAY),
              closure_reason   = NULL,
              updated_at       = NOW()
        WHERE REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') = ?
          AND (followup_next_at IS NULL OR closure_reason IS NOT NULL)`,
-      [phone]
+      [intervalDays, phone]
     );
-    return NextResponse.json({ ok: true, phone, followup_next_at: "+3 days" });
+    return NextResponse.json({ ok: true, phone, followup_next_at: `+${intervalDays} days` });
   } catch (err) {
     console.error("[followup POST] DB error:", err.message);
     return NextResponse.json({ message: "Error interno del servidor" }, { status: 500 });
@@ -217,15 +230,16 @@ export async function PUT(req) {
       return NextResponse.json({ ok: true, phone, followup_count: newCount, closed: true, closure_reason: "sin_respuesta" });
     }
 
+    const intervalDays = await getFollowupInterval();
     await db.query(
       `UPDATE conversation_sessions
          SET followup_count   = ?,
-             followup_next_at = DATE_ADD(NOW(), INTERVAL 3 DAY),
+             followup_next_at = DATE_ADD(NOW(), INTERVAL ? DAY),
              updated_at       = NOW()
        WHERE REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') = ?`,
-      [newCount, phone]
+      [newCount, intervalDays, phone]
     );
-    return NextResponse.json({ ok: true, phone, followup_count: newCount, next_followup: "+3 days" });
+    return NextResponse.json({ ok: true, phone, followup_count: newCount, next_followup: `+${intervalDays} days` });
   } catch (err) {
     console.error("[followup PUT] DB error:", err.message);
     return NextResponse.json({ message: "Error interno del servidor" }, { status: 500 });
