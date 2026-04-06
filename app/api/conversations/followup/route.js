@@ -48,7 +48,7 @@ export async function GET(req) {
           TRIM(CONCAT(COALESCE(c.nombre, ''), ' ', COALESCE(c.apellido, ''))) AS nombre_cliente
         FROM conversation_sessions cs
         LEFT JOIN clientes c
-          ON REPLACE(REPLACE(REPLACE(c.celular, '+', ''), ' ', ''), '-', '') = cs.phone
+          ON REPLACE(REPLACE(REPLACE(c.celular, '+', ''), ' ', ''), '-', '') = cs.phone COLLATE utf8mb4_unicode_ci
         WHERE cs.followup_next_at <= NOW()
           AND cs.followup_count < 3
           AND cs.closure_reason IS NULL
