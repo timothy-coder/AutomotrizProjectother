@@ -624,7 +624,7 @@ export default function DashboardPage() {
               <div className="flex items-center gap-2">
                 <Clock size={16} style={{ color: BRAND_PRIMARY }} />
                 <CardTitle className="text-sm" style={{ color: BRAND_PRIMARY }}>
-                  Agenda - {agendaHoy.length} registros
+                  Tareas del dia - {agendaHoy.length} registros
                 </CardTitle>
               </div>
               <Popover>

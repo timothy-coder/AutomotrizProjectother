@@ -50,7 +50,7 @@ export const NAV_TREE = [
     key: "agenda",
     label: "Ventas",
     items: [
-      { to: "/paneloportunidad", label: "Panel de Oportunidades ", icon: Calendar, perm: ["agenda", "view"] },
+      { to: "/paneloportunidad", label: "Panel de Ventas ", icon: Calendar, perm: ["agenda", "view"] },
       { to: "/agenda", label: "Agenda", icon: Calendar, perm: ["agenda", "view"] },
       { to: "/oportunidades", label: "Oportunidades", icon: CalendarDays, perm: ["agenda", "view"] },
       { to: "/leads", label: "Leads", icon: CalendarRange, perm: ["agenda", "view"]},
