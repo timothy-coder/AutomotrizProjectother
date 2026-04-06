@@ -104,6 +104,7 @@ export const NAV_TREE = [
       { to: "/configinventario", label: "Configuración de Inventario", icon: Settings, perm: ["configinventario", "view"] },
       { to: "/ventas/configuracion", label: "Configuración del agente", icon: SlidersHorizontal, perm: ["mensajes", "view"] },
       { to: "/alertas-config", label: "Alertas IA", icon: SlidersHorizontal, perm: ["mensajes", "view"] },
+      { to: "/roles-chatwoot", label: "Roles ↔ Chatwoot", icon: SlidersHorizontal, perm: ["configuracion", "view"] },
       
     ],
   }
