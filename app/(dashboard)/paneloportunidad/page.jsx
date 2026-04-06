@@ -152,24 +152,25 @@ export default function DashboardPage() {
     });
   }
 
-  function filterByCreatedPeriodo(items, periodo) {
+  function filterByAgendaPeriodoPorTipo(items, detalles, periodo) {
     const fechas = getFechaFiltros();
 
     return items.filter((item) => {
-      if (!item.created_at) return false;
+      const detalle = detalles[item.id];
+      if (!detalle || !detalle.fecha_agenda) return false;
 
-      const itemDate = new Date(item.created_at);
+      const agendaDate = new Date(detalle.fecha_agenda);
 
       switch (periodo) {
         case FILTER_TODAY:
-          return itemDate >= fechas.hoy && itemDate < fechas.finHoy;
+          return agendaDate >= fechas.hoy && agendaDate < fechas.finHoy;
         case FILTER_THIS_WEEK:
           return (
-            itemDate >= fechas.inicioSemana && itemDate <= fechas.finSemana
+            agendaDate >= fechas.inicioSemana && agendaDate <= fechas.finSemana
           );
         case FILTER_THIS_MONTH:
           return (
-            itemDate >= fechas.inicioMes && itemDate <= fechas.finMes
+            agendaDate >= fechas.inicioMes && agendaDate <= fechas.finMes
           );
         default:
           return true;
@@ -379,7 +380,7 @@ export default function DashboardPage() {
     user,
   ]);
 
-  // ==================== TABLA OPORTUNIDADES ====================
+  // ==================== TABLA OPORTUNIDADES - FILTRADA POR FECHA_AGENDA ====================
   const oportunidadesOrdenadas = useMemo(() => {
     let opoVisibles = canViewAllOportunidades
       ? rawData.oportunidades
@@ -389,15 +390,25 @@ export default function DashboardPage() {
             String(opp.created_by) === String(user?.id)
         );
 
-    // Aplicar filtro de período
-    opoVisibles = filterByCreatedPeriodo(opoVisibles, filterOposPeriodo);
-
-    return opoVisibles.sort(
-      (a, b) => new Date(b.created_at) - new Date(a.created_at)
+    // Aplicar filtro de período usando fecha_agenda del detalle
+    opoVisibles = filterByAgendaPeriodoPorTipo(
+      opoVisibles,
+      rawData.detallesOpo,
+      filterOposPeriodo
     );
-  }, [rawData.oportunidades, canViewAllOportunidades, user, filterOposPeriodo]);
 
-  // ==================== TABLA LEADS ====================
+    return opoVisibles.sort((a, b) => {
+      const fechaA = rawData.detallesOpo[a.id]?.fecha_agenda
+        ? new Date(rawData.detallesOpo[a.id].fecha_agenda)
+        : new Date(0);
+      const fechaB = rawData.detallesOpo[b.id]?.fecha_agenda
+        ? new Date(rawData.detallesOpo[b.id].fecha_agenda)
+        : new Date(0);
+      return fechaB - fechaA;
+    });
+  }, [rawData, canViewAllOportunidades, user, filterOposPeriodo]);
+
+  // ==================== TABLA LEADS - FILTRADA POR FECHA_AGENDA ====================
   const leadsOrdenados = useMemo(() => {
     let leadsVisibles = canViewAllLeads
       ? rawData.leads
@@ -407,13 +418,23 @@ export default function DashboardPage() {
             String(lead.created_by) === String(user?.id)
         );
 
-    // Aplicar filtro de período
-    leadsVisibles = filterByCreatedPeriodo(leadsVisibles, filterLeadsPeriodo);
-
-    return leadsVisibles.sort(
-      (a, b) => new Date(b.created_at) - new Date(a.created_at)
+    // Aplicar filtro de período usando fecha_agenda del detalle
+    leadsVisibles = filterByAgendaPeriodoPorTipo(
+      leadsVisibles,
+      rawData.detallesLeads,
+      filterLeadsPeriodo
     );
-  }, [rawData.leads, canViewAllLeads, user, filterLeadsPeriodo]);
+
+    return leadsVisibles.sort((a, b) => {
+      const fechaA = rawData.detallesLeads[a.id]?.fecha_agenda
+        ? new Date(rawData.detallesLeads[a.id].fecha_agenda)
+        : new Date(0);
+      const fechaB = rawData.detallesLeads[b.id]?.fecha_agenda
+        ? new Date(rawData.detallesLeads[b.id].fecha_agenda)
+        : new Date(0);
+      return fechaB - fechaA;
+    });
+  }, [rawData, canViewAllLeads, user, filterLeadsPeriodo]);
 
   // Paginación de Agenda
   const agendaPaginada = useMemo(() => {
@@ -681,8 +702,8 @@ export default function DashboardPage() {
                       <TableHead className="text-xs px-3 py-2">Código</TableHead>
                       <TableHead className="text-xs px-3 py-2">Cliente</TableHead>
                       <TableHead className="text-xs px-3 py-2">Asignado</TableHead>
-                      <TableHead className="text-xs px-3 py-2">Fecha</TableHead>
-                      <TableHead className="text-xs px-3 py-2">Hora</TableHead>
+                      <TableHead className="text-xs px-3 py-2">Fecha Agenda</TableHead>
+                      <TableHead className="text-xs px-3 py-2">Hora Agenda</TableHead>
                       <TableHead className="text-xs text-right px-3 py-2">
                         Acciones
                       </TableHead>
@@ -818,7 +839,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* TABLA OPORTUNIDADES - SIN DESPLEGAR */}
-        {oportunidadesOrdenadas.length > 0 && (
+        {stats.totalOportunidades > 0 && (
           <Card>
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
@@ -880,7 +901,9 @@ export default function DashboardPage() {
             <CardContent className="p-0 overflow-x-auto">
               {opoPaginada.length === 0 ? (
                 <div className="p-4 text-center text-xs text-gray-500">
-                  No hay oportunidades para este período
+                  {oportunidadesOrdenadas.length === 0
+                    ? "No hay oportunidades para este período"
+                    : "No hay registros en esta página"}
                 </div>
               ) : (
                 <>
@@ -900,7 +923,7 @@ export default function DashboardPage() {
                           Etapa
                         </TableHead>
                         <TableHead className="text-xs px-3 py-2">
-                          Creado
+                          Fecha Agenda
                         </TableHead>
                         <TableHead className="text-xs text-right px-3 py-2">
                           Acciones
@@ -918,9 +941,10 @@ export default function DashboardPage() {
                         const etapa = rawData.etapas.find(
                           (e) => e.id === item.etapasconversion_id
                         );
-                        const fecha = new Date(
-                          item.created_at
-                        ).toLocaleDateString();
+                        const detalle = rawData.detallesOpo[item.id];
+                        const fecha = detalle?.fecha_agenda
+                          ? new Date(detalle.fecha_agenda).toLocaleDateString()
+                          : "-";
 
                         return (
                           <TableRow key={item.id} className="hover:bg-gray-50">
@@ -1028,7 +1052,7 @@ export default function DashboardPage() {
         )}
 
         {/* TABLA LEADS - SIN DESPLEGAR */}
-        {leadsOrdenados.length > 0 && (
+        {stats.totalLeads > 0 && (
           <Card>
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
@@ -1090,7 +1114,9 @@ export default function DashboardPage() {
             <CardContent className="p-0 overflow-x-auto">
               {leadsPaginada.length === 0 ? (
                 <div className="p-4 text-center text-xs text-gray-500">
-                  No hay leads para este período
+                  {leadsOrdenados.length === 0
+                    ? "No hay leads para este período"
+                    : "No hay registros en esta página"}
                 </div>
               ) : (
                 <>
@@ -1110,7 +1136,7 @@ export default function DashboardPage() {
                           Etapa
                         </TableHead>
                         <TableHead className="text-xs px-3 py-2">
-                          Creado
+                          Fecha Agenda
                         </TableHead>
                         <TableHead className="text-xs text-right px-3 py-2">
                           Acciones
@@ -1123,14 +1149,15 @@ export default function DashboardPage() {
                           (u) => u.id === item.asignado_a
                         );
                         const cliente = rawData.usuarios.find(
-                          (c) => c.id === item.cliente_nombre
+                          (c) => c.id === item.cliente_id
                         );
                         const etapa = rawData.etapas.find(
                           (e) => e.id === item.etapasconversion_id
                         );
-                        const fecha = new Date(
-                          item.created_at
-                        ).toLocaleDateString();
+                        const detalle = rawData.detallesLeads[item.id];
+                        const fecha = detalle?.fecha_agenda
+                          ? new Date(detalle.fecha_agenda).toLocaleDateString()
+                          : "-";
 
                         return (
                           <TableRow key={item.id} className="hover:bg-gray-50">
@@ -1242,15 +1269,25 @@ export default function DashboardPage() {
                 <p className="font-semibold text-blue-900">Dashboard Info</p>
                 <ul className="text-blue-700 space-y-0.5">
                   <li>
-                    • <strong>Tablas Oportunidades y Leads:</strong> NO son desplegables, siempre visibles
+                    • <strong>Tarjetas Totales:</strong> OPO y Leads por
+                    separado
                   </li>
                   <li>
-                    • <strong>Sin registros:</strong> Muestra mensaje "No hay..." si el filtro no tiene resultados
+                    • <strong>Tarjetas Por Etapa:</strong> Suma de OPO + Leads
+                    con desglose
                   </li>
                   <li>
-                    • <strong>Tablas desaparecen:</strong> Si el total es 0 (sin filtrar), la tabla no se muestra
+                    • <strong>Tabla Agenda:</strong> Filtra por fecha_agenda
+                    (Hoy, Semana, Mes)
                   </li>
-                  <li>• Filtros independientes (Todos, Hoy, Semana, Mes)</li>
+                  <li>
+                    • <strong>Tablas OPO y Leads:</strong> Filtros independientes
+                    (Todos, Hoy, Semana, Mes) ordenadas por fecha_agenda
+                  </li>
+                  <li>
+                    • <strong>Mensaje "No hay":</strong> Se muestra cuando no hay
+                    registros en el filtro seleccionado
+                  </li>
                   <li>• 15 registros por página con paginación</li>
                 </ul>
               </div>
