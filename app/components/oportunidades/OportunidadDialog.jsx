@@ -1689,7 +1689,7 @@ export default function OportunidadDialog({
 
                   {(isNew || isEdit) && (
                     <div className="space-y-3">
-                      <div>
+                      <div className="hidden">
                         <label className="text-sm font-medium text-slate-700 block mb-2">
                           Próxima etapa (opcional)
                         </label>
@@ -1876,8 +1876,7 @@ export default function OportunidadDialog({
                   (isNew &&
                     form.asignado_a &&
                     form.asignado_a !== "sin-asignar" &&
-                    (detallesAMostrar.length === 0 ||
-                      actividadesAMostrar.length === 0))
+                    (detallesAMostrar.length === 0))
                 }
                 className="gap-2 bg-blue-600 hover:bg-blue-700"
               >

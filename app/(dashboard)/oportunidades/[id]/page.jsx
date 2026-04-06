@@ -1332,7 +1332,7 @@ export default function OportunidadDetailPage() {
                               {vehiculo.marca || "Sin marca"} {vehiculo.modelo || ""}
                             </p>
                             <p className="text-xs text-slate-600">
-                              {vehiculo.anio_interes || "Sin año"} • {vehiculo.source}
+                              {vehiculo.anio_interes || "Sin año"}
                             </p>
                           </div>
                           <div className="flex gap-2">
@@ -1450,7 +1450,7 @@ export default function OportunidadDetailPage() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
+                    <div className="hidden">
                       <label className="text-sm font-medium text-slate-700 block mb-2">
                         Etapa donde registrar (opcional)
                       </label>
@@ -1511,61 +1511,61 @@ export default function OportunidadDetailPage() {
                   </div>
 
                   {loadingActividades ? (
-                    <div className="text-center text-muted-foreground text-sm py-4 bg-slate-50 rounded">
-                      Cargando...
-                    </div>
-                  ) : actividades.length === 0 ? (
-                    <div className="text-center text-muted-foreground text-sm py-4 bg-slate-50 rounded border border-dashed border-slate-300">
-                      No hay actividades
-                    </div>
-                  ) : (
-                    <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2">
-                      {actividades.map((actividad) => {
-                        const etapaActividad = actividad.etapasconversion_id
-                          ? etapas.find(
-                            (e) => e.id === actividad.etapasconversion_id
-                          )
-                          : null;
+  <div className="text-center text-muted-foreground text-sm py-4 bg-slate-50 rounded">
+    Cargando...
+  </div>
+) : actividades.length === 0 ? (
+  <div className="text-center text-muted-foreground text-sm py-4 bg-slate-50 rounded border border-dashed border-slate-300">
+    No hay actividades
+  </div>
+) : (
+  <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2">
+    {actividades.map((actividad) => {
+      const etapaActividad = actividad.etapasconversion_id
+        ? etapas.find(
+            (e) => e.id === actividad.etapasconversion_id
+          )
+        : null;
 
-                        return (
-                          <div
-                            key={actividad.id}
-                            className="border border-slate-200 rounded p-3 bg-white text-xs space-y-2 hover:shadow-md hover:border-blue-300 transition-all"
-                          >
-                            <div className="flex justify-between items-start gap-2">
-                              <div>
-                                <p className="font-semibold text-slate-800">
-                                  {actividad.created_by_name ||
-                                    `ID ${actividad.created_by}`}
-                                </p>
-                              </div>
-                              <div className="text-right flex-shrink-0">
-                                <p className="text-slate-500">
-                                  {format(
-                                    new Date(actividad.created_at),
-                                    "dd/MM HH:mm",
-                                    { locale: es }
-                                  )}
-                                </p>
-                              </div>
-                            </div>
+      return (
+        <Tooltip key={actividad.id}>
+          <TooltipTrigger asChild>
+            <div
+              className="border border-slate-200 rounded p-3 bg-white text-xs space-y-2 hover:shadow-md hover:border-blue-300 transition-all cursor-help"
+            >
+              <p className="text-slate-700 line-clamp-2 leading-relaxed">
+                {actividad.detalle}
+              </p>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="max-w-xs">
+            <div className="space-y-2">
+              <div className="flex justify-between items-start gap-2">
+                <div>
+                  <p className="font-semibold text-white">
+                    {actividad.created_by_name ||
+                      `ID ${actividad.created_by}`}
+                  </p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="text-gray-300 text-xs">
+                    {format(
+                      new Date(actividad.created_at),
+                      "dd/MM HH:mm",
+                      { locale: es }
+                    )}
+                  </p>
+                </div>
+              </div>
 
-                            {etapaActividad && (
-                              <div>
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 rounded-full text-xs font-semibold border border-blue-200">
-                                  {getLabel(etapaActividad)}
-                                </span>
-                              </div>
-                            )}
-
-                            <p className="text-slate-700 line-clamp-3 leading-relaxed">
-                              {actividad.detalle}
-                            </p>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+            
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      );
+    })}
+  </div>
+)}
                 </div>
               </div>
 
@@ -2137,7 +2137,7 @@ export default function OportunidadDetailPage() {
                 />
               </div>
 
-              <div>
+              <div className="hidden">
                 <label className="text-sm font-medium text-slate-700 block mb-2">
                   Origen
                 </label>
