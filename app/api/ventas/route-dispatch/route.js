@@ -3,21 +3,21 @@ import { db } from "@/lib/db";
 import { normalizePhone } from "@/lib/phoneUtils";
 
 /**
- * PATCH /api/ventas/route-dispatch
+ * PUT /api/ventas/route-dispatch
  *
  * Limpia la sesión ventas_ia de un teléfono para que el siguiente mensaje
  * sea atendido por el taller (ruta default). Llamado por el flujo de ventas
  * cuando el agente devuelve redirect_taller.
  *
  * Body: { phone: "51912528990" }
- * Auth: x-ventas-webhook-secret
+ * Auth: x-conversations-webhook-secret
  */
-export async function PATCH(req) {
-  const secret = process.env.VENTAS_WEBHOOK_SECRET;
-  const provided = req.headers.get("x-ventas-webhook-secret") || "";
+export async function PUT(req) {
+  const secret = process.env.CONVERSATIONS_WEBHOOK_SECRET;
+  const provided = req.headers.get("x-conversations-webhook-secret") || "";
 
   if (!secret || provided !== secret) {
-    console.warn("[route-dispatch PATCH] Intento no autorizado — VENTAS_WEBHOOK_SECRET inválido o no seteado");
+    console.warn("[route-dispatch PUT] Intento no autorizado — CONVERSATIONS_WEBHOOK_SECRET inválido o no seteado");
     return NextResponse.json({ message: "No autorizado" }, { status: 401 });
   }
 
@@ -37,7 +37,7 @@ export async function PATCH(req) {
       [phone]
     );
   } catch (e) {
-    console.error("[route-dispatch PATCH] DB error:", e.message);
+    console.error("[route-dispatch PUT] DB error:", e.message);
     return NextResponse.json({ ok: false, message: "Error actualizando sesión" }, { status: 500 });
   }
 
@@ -146,8 +146,12 @@ export async function POST(req) {
     ? `¡Hola, ${clienteNombre}! 😊 ¡Qué gusto saludarte de nuevo!`
     : "¡Hola! 😊 ¡Bienvenido/a!";
 
+  const agentCfg = await getAgentMenuConfig();
+  const agentName = agentCfg.agent_name || "Carlos";
+  const dealerName = agentCfg.dealer_name || "Taller Automotriz";
+
   const defaultMenuBody =
-    `Soy *Carlos* 🤖, tu asesor virtual del *Taller Automotriz* 🔧🚗\n` +
+    `Soy *${agentName}* 🤖, tu asesor virtual de *${dealerName}* 🔧🚗\n` +
     `Estoy aquí para ayudarte con todo lo que necesites. ¿En qué te puedo ayudar hoy?\n\n` +
     `Por favor, elige una opción:\n\n` +
     `1️⃣ *Comprar un vehículo nuevo* 🚘\n` +
@@ -298,6 +302,19 @@ async function checkTallerActivo(phone) {
       }
     }
     throw e;
+  }
+}
+
+// ── Leer nombre del agente y concesionaria desde agent_prompt_config ──────
+async function getAgentMenuConfig() {
+  try {
+    const [rows] = await db.query(
+      "SELECT agent_name, dealer_name FROM agent_prompt_config WHERE agent_key = 'taller' AND is_active = 1 LIMIT 1"
+    );
+    return rows[0] || {};
+  } catch (err) {
+    console.error("[getAgentMenuConfig] DB error:", err);
+    return {};
   }
 }
 
