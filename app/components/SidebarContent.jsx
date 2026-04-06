@@ -325,7 +325,7 @@ export default function SidebarContent({ onNavigate, isMobile = false }) {
 
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>
-                  {user.rolename}
+                  {user.role_name}
                 </DropdownMenuLabel>
 
                 <DropdownMenuSeparator />
