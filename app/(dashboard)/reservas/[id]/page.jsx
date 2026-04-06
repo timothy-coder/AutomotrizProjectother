@@ -61,6 +61,7 @@ export default function ReservaDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [autoSaveIndicator, setAutoSaveIndicator] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   // Estados para ubicaciones
   const [departamentos, setDepartamentos] = useState([]);
@@ -437,6 +438,37 @@ export default function ReservaDetailPage() {
     }
   }
 
+  // ✅ DESCARGAR PDF
+  const handleDownloadPdf = async () => {
+    try {
+      setDownloadingPdf(true);
+      
+      const response = await fetch(`/api/reservas/${params.id}/pdf`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Error descargando PDF");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `reserva-${reserva?.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast.success("PDF descargado correctamente");
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Error descargando PDF: " + error.message);
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   const handleFieldChange = (field, value) => {
     setFormData((prev) => ({
       ...prev,
@@ -593,9 +625,18 @@ export default function ReservaDetailPage() {
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="outline" className="gap-2">
-                <Download size={16} />
-                Descargar PDF
+              <Button 
+                variant="outline" 
+                className="gap-2"
+                onClick={handleDownloadPdf}
+                disabled={downloadingPdf}
+              >
+                {downloadingPdf ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Download size={16} />
+                )}
+                {downloadingPdf ? "Descargando..." : "Descargar PDF"}
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top">Descargar como PDF</TooltipContent>
