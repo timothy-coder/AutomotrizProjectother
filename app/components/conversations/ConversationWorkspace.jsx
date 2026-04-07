@@ -5,8 +5,10 @@ import {
   ArrowLeft,
   FileText,
   CornerUpLeft,
+  Lock,
   MessageSquarePlus,
   Send,
+  Tag,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -149,12 +151,30 @@ export default function ConversationWorkspace({
   const [error, setError] = useState("");
   const [quotedMessage, setQuotedMessage] = useState(null);
   const [cannedOpen, setCannedOpen] = useState(false);
+  const [isPrivateNote, setIsPrivateNote] = useState(false);
+  const [labels, setLabels] = useState([]);
   const scrollRef = useRef(null);
   const composerRef = useRef(null);
   const lastMarkedRef = useRef(0);
   const stickToBottomRef = useRef(true);
   const lastMessageIdRef = useRef(null);
 
+
+  async function loadLabels() {
+    if (!sess?.session_id) return;
+    try {
+      const token = getAuthToken();
+      const res = await fetch(`/api/chatwoot/conversations/${sess.session_id}/labels`, {
+        cache: "no-store",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setLabels(data?.labels ?? []);
+    } catch (err) {
+      console.error("Error cargando labels:", err);
+    }
+  }
 
   async function markAsRead() {
     if (!sess?.session_id) return;
@@ -193,6 +213,7 @@ export default function ConversationWorkspace({
         pregunta: msg.message_type === 0 ? msg.content : null,
         respuesta: (msg.message_type === 1 || msg.message_type === 3) ? msg.content : null,
         message_direction: msg.message_type === 0 ? "inbound" : "outbound",
+        isPrivate: Boolean(msg.private),
         attachments: Array.isArray(msg.attachments) ? msg.attachments : [],
         source_channel: sess.source_channel || "whatsapp",
         created_at: msg.created_at
@@ -248,7 +269,7 @@ export default function ConversationWorkspace({
             "Content-Type": "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-          body: JSON.stringify({ content }),
+          body: JSON.stringify({ content, private: isPrivateNote }),
         }
       );
 
@@ -260,6 +281,7 @@ export default function ConversationWorkspace({
 
       setNewMessage("");
       setQuotedMessage(null);
+      setIsPrivateNote(false);
       await loadTimeline();
       if (onConversationUpdated) onConversationUpdated();
     } catch (e) {
@@ -279,6 +301,7 @@ export default function ConversationWorkspace({
     lastMessageIdRef.current = null;
     stickToBottomRef.current = true;
     loadTimeline();
+    loadLabels();
   }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -394,7 +417,7 @@ export default function ConversationWorkspace({
               <p className="font-semibold text-sm text-gray-900 truncate">
                 {sess?.cliente_nombre || "Conversación"}
               </p>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-xs text-gray-500">{sess?.celular || sess?.phone}</span>
                 {channelToSend && (
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
@@ -405,6 +428,12 @@ export default function ConversationWorkspace({
                     {channelToSend}
                   </span>
                 )}
+                {labels.map((label) => (
+                  <span key={label} className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-purple-100 text-purple-700">
+                    <Tag className="w-2.5 h-2.5" />
+                    {label}
+                  </span>
+                ))}
               </div>
             </div>
           </div>
@@ -474,15 +503,21 @@ export default function ConversationWorkspace({
               {/* Respuesta del agente — derecha */}
               {m.message_direction === "outbound" && (m.respuesta || m.attachments?.length > 0) && (
                 <div className="flex items-end gap-2 max-w-[80%] ml-auto flex-row-reverse group/msg">
-                  <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center text-[10px] font-bold text-indigo-600 flex-shrink-0">
-                    {getInitials(user?.fullname || "A")}
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${m.isPrivate ? "bg-amber-100 text-amber-700" : "bg-indigo-100 text-indigo-600"}`}>
+                    {m.isPrivate ? <Lock className="w-3 h-3" /> : getInitials(user?.fullname || "A")}
                   </div>
                   <div className="space-y-1">
+                    {m.isPrivate && (
+                      <div className="flex items-center gap-1 text-[10px] text-amber-600 font-medium justify-end">
+                        <Lock className="w-2.5 h-2.5" />
+                        Nota interna
+                      </div>
+                    )}
                     {m.attachments?.map((att) => (
                       <AttachmentBubble key={att.id} attachment={att} isOutbound={true} />
                     ))}
                     {m.respuesta && (
-                      <div className="bg-indigo-600 text-white shadow-sm rounded-2xl rounded-br-sm px-3.5 py-2.5 text-sm">
+                      <div className={`shadow-sm rounded-2xl rounded-br-sm px-3.5 py-2.5 text-sm ${m.isPrivate ? "bg-amber-50 border border-amber-200 text-amber-900" : "bg-indigo-600 text-white"}`}>
                         {m.respuesta}
                       </div>
                     )}
@@ -528,14 +563,33 @@ export default function ConversationWorkspace({
             </div>
           )}
 
+          {/* Toggle nota privada */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsPrivateNote((prev) => !prev)}
+              className={`flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border transition-colors ${
+                isPrivateNote
+                  ? "bg-amber-50 border-amber-300 text-amber-700"
+                  : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
+              }`}
+            >
+              <Lock className="w-3 h-3" />
+              {isPrivateNote ? "Nota interna" : "Nota interna"}
+            </button>
+            {isPrivateNote && (
+              <span className="text-[10px] text-amber-600">Solo visible para el equipo</span>
+            )}
+          </div>
+
           <div className="flex flex-col sm:flex-row gap-2 items-stretch">
             <div className="sm:flex-1 relative">
               <Textarea
                 ref={composerRef}
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Escribe un mensaje para el cliente..."
-                className="min-h-16 w-full rounded-xl pr-10"
+                placeholder={isPrivateNote ? "Escribe una nota interna (no visible para el cliente)..." : "Escribe un mensaje para el cliente..."}
+                className={`min-h-16 w-full rounded-xl pr-10 transition-colors ${isPrivateNote ? "bg-amber-50 border-amber-300 focus:border-amber-400" : ""}`}
                 disabled={sending}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
