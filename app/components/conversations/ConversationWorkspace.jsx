@@ -77,6 +77,49 @@ const STATUS_ICONS = {
   received: "",
 };
 
+function AttachmentBubble({ attachment, isOutbound }) {
+  const { file_type, data_url, thumb_url, extension } = attachment;
+
+  if (file_type === "image" || file_type === "sticker") {
+    return (
+      <a href={data_url} target="_blank" rel="noopener noreferrer">
+        <img
+          src={thumb_url || data_url}
+          alt="imagen"
+          className="max-w-[220px] max-h-[220px] rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
+        />
+      </a>
+    );
+  }
+
+  if (file_type === "audio") {
+    return <audio controls src={data_url} className="max-w-[240px] rounded-lg" />;
+  }
+
+  if (file_type === "video") {
+    return (
+      <video controls src={data_url} className="max-w-[240px] max-h-[180px] rounded-xl object-cover" />
+    );
+  }
+
+  const filename = data_url?.split("/").pop()?.split("?")[0] || `archivo.${extension || "bin"}`;
+  return (
+    <a
+      href={data_url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+        isOutbound
+          ? "bg-indigo-500 text-white hover:bg-indigo-400"
+          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+      }`}
+    >
+      <FileText className="w-3.5 h-3.5 flex-shrink-0" />
+      <span className="truncate max-w-[160px]">{filename}</span>
+    </a>
+  );
+}
+
 const CANNED_RESPONSES = [
   { label: "Saludo", text: "¡Hola! Buen día, ¿en qué puedo ayudarte hoy?" },
   { label: "Un momento", text: "¡Claro! Permíteme un momento para verificar esa información." },
@@ -150,6 +193,7 @@ export default function ConversationWorkspace({
         pregunta: msg.message_type === 0 ? msg.content : null,
         respuesta: (msg.message_type === 1 || msg.message_type === 3) ? msg.content : null,
         message_direction: msg.message_type === 0 ? "inbound" : "outbound",
+        attachments: Array.isArray(msg.attachments) ? msg.attachments : [],
         source_channel: sess.source_channel || "whatsapp",
         created_at: msg.created_at
           ? (typeof msg.created_at === "number"
@@ -160,7 +204,7 @@ export default function ConversationWorkspace({
         sender_name: msg.sender?.name || "",
         resumen: null,
       }))
-        .filter((m) => m.pregunta !== null || m.respuesta !== null);
+        .filter((m) => m.pregunta !== null || m.respuesta !== null || m.attachments.length > 0);
       setMessages(parsed);
 
       const latestInbound = [...parsed]
@@ -397,47 +441,61 @@ export default function ConversationWorkspace({
           {messages.map((m) => (
             <div key={m.id} className="space-y-2">
               {/* Mensaje del cliente — izquierda */}
-              {m.pregunta && (
+              {m.message_direction === "inbound" && (m.pregunta || m.attachments?.length > 0) && (
                 <div className="flex items-end gap-2 max-w-[80%] group/msg">
                   <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600 flex-shrink-0">
                     {getInitials(sess?.cliente_nombre)}
                   </div>
-                  <div>
-                    <div className="bg-white border border-gray-100 shadow-sm rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-sm text-gray-800">
-                      {m.pregunta}
-                    </div>
+                  <div className="space-y-1">
+                    {m.attachments?.map((att) => (
+                      <AttachmentBubble key={att.id} attachment={att} isOutbound={false} />
+                    ))}
+                    {m.pregunta && (
+                      <div className="bg-white border border-gray-100 shadow-sm rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-sm text-gray-800">
+                        {m.pregunta}
+                      </div>
+                    )}
                     <div className="flex items-center gap-2 mt-0.5 ml-1">
                       <p className="text-[10px] text-gray-400">{formatMsgTime(m.created_at)}</p>
-                      <button
-                        type="button"
-                        onClick={() => setQuotedMessage(m.pregunta)}
-                        className="opacity-0 group-hover/msg:opacity-100 transition-opacity text-gray-400 hover:text-indigo-500"
-                      >
-                        <CornerUpLeft className="w-3 h-3" />
-                      </button>
+                      {m.pregunta && (
+                        <button
+                          type="button"
+                          onClick={() => setQuotedMessage(m.pregunta)}
+                          className="opacity-0 group-hover/msg:opacity-100 transition-opacity text-gray-400 hover:text-indigo-500"
+                        >
+                          <CornerUpLeft className="w-3 h-3" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
               )}
 
               {/* Respuesta del agente — derecha */}
-              {m.respuesta && (
+              {m.message_direction === "outbound" && (m.respuesta || m.attachments?.length > 0) && (
                 <div className="flex items-end gap-2 max-w-[80%] ml-auto flex-row-reverse group/msg">
                   <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center text-[10px] font-bold text-indigo-600 flex-shrink-0">
                     {getInitials(user?.fullname || "A")}
                   </div>
-                  <div>
-                    <div className="bg-indigo-600 text-white shadow-sm rounded-2xl rounded-br-sm px-3.5 py-2.5 text-sm">
-                      {m.respuesta}
-                    </div>
+                  <div className="space-y-1">
+                    {m.attachments?.map((att) => (
+                      <AttachmentBubble key={att.id} attachment={att} isOutbound={true} />
+                    ))}
+                    {m.respuesta && (
+                      <div className="bg-indigo-600 text-white shadow-sm rounded-2xl rounded-br-sm px-3.5 py-2.5 text-sm">
+                        {m.respuesta}
+                      </div>
+                    )}
                     <div className="flex items-center justify-end gap-2 mt-0.5 mr-1">
-                      <button
-                        type="button"
-                        onClick={() => setQuotedMessage(m.respuesta)}
-                        className="opacity-0 group-hover/msg:opacity-100 transition-opacity text-gray-400 hover:text-indigo-500"
-                      >
-                        <CornerUpLeft className="w-3 h-3" />
-                      </button>
+                      {m.respuesta && (
+                        <button
+                          type="button"
+                          onClick={() => setQuotedMessage(m.respuesta)}
+                          className="opacity-0 group-hover/msg:opacity-100 transition-opacity text-gray-400 hover:text-indigo-500"
+                        >
+                          <CornerUpLeft className="w-3 h-3" />
+                        </button>
+                      )}
                       <p className="text-[10px] text-gray-400">
                         {formatMsgTime(m.created_at)}{" "}
                         <span className={m.message_status === "read" ? "text-blue-500" : ""}>
