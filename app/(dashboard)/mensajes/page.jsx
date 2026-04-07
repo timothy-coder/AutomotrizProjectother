@@ -43,18 +43,8 @@ function channelFromInbox(channelType) {
   return "whatsapp";
 }
 
-async function fetchConversations(status = "open") {
-  const token = getAuthToken();
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
-  const res = await fetch(`/api/chatwoot/conversations?status=${status}`, {
-    cache: "no-store",
-    headers,
-  });
-  if (!res.ok) return [];
-  const data = await res.json();
-  // Chatwoot returns { data: { payload: [...] } }
-  const payload = data?.data?.payload || [];
-  return payload.map((conv) => ({
+function mapConversation(conv) {
+  return {
     session_id: conv.id,
     client_name: conv.meta?.sender?.name || "Cliente",
     cliente_nombre: conv.meta?.sender?.name || "Cliente",
@@ -84,7 +74,32 @@ async function fetchConversations(status = "open") {
     updated_at: conv.updated_at
       ? new Date(conv.updated_at * 1000).toISOString()
       : null,
-  }));
+  };
+}
+
+async function fetchConversations(status = "open") {
+  const token = getAuthToken();
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const res = await fetch(`/api/chatwoot/conversations?status=${status}`, {
+    cache: "no-store",
+    headers,
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  const payload = data?.data?.payload || [];
+  return payload.map(mapConversation);
+}
+
+async function fetchSearchResults(q) {
+  const token = getAuthToken();
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const res = await fetch(`/api/chatwoot/search?q=${encodeURIComponent(q)}`, {
+    cache: "no-store",
+    headers,
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data?.conversations ?? []).map(mapConversation);
 }
 
 // ── Helpers globales ─────────────────────────────────────────────────────────
@@ -326,6 +341,8 @@ export default function ConversationsPage() {
   });
   const [selectedSession, setSelectedSession] = useState(null);
   const [search, setSearch] = useState("");
+  const [serverSearchResults, setServerSearchResults] = useState(null);
+  const [serverSearchLoading, setServerSearchLoading] = useState(false);
   const [channelFilter, setChannelFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [ownerFilter, setOwnerFilter] = useState("all");
@@ -406,6 +423,29 @@ export default function ConversationsPage() {
   useEffect(() => {
     load();
   }, [user?.id]);
+
+  // ── Server-side search (debounced 400ms) ──────────────────────────────────────
+  useEffect(() => {
+    const q = search.trim();
+    if (q.length < 2) {
+      setServerSearchResults(null);
+      setServerSearchLoading(false);
+      return;
+    }
+    setServerSearchLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await fetchSearchResults(q);
+        setServerSearchResults(results);
+      } catch (err) {
+        console.error("Server search error:", err);
+        setServerSearchResults([]);
+      } finally {
+        setServerSearchLoading(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // ── SSE: actualizaciones en tiempo real (reemplaza polling de 15 s) ──────────
   useEffect(() => {
@@ -650,9 +690,11 @@ export default function ConversationsPage() {
   }
 
   const filteredSessions = useMemo(() => {
-    return sessions.filter((s) => {
+    const baseList = serverSearchResults !== null ? serverSearchResults : sessions;
+    return baseList.filter((s) => {
       const term = search.trim().toLowerCase();
-      const bySearch = !term
+      const bySearch = serverSearchResults !== null
+        || !term
         || String(s?.cliente_nombre || "").toLowerCase().includes(term)
         || String(s?.celular || "").toLowerCase().includes(term)
         || String(s?.ultimomensaje || "").toLowerCase().includes(term);
@@ -1150,7 +1192,12 @@ export default function ConversationsPage() {
             {search.trim() && (
               <div className="px-4 py-2 border-b bg-blue-50/60 flex items-center justify-between">
                 <span className="text-xs text-blue-700 font-medium">
-                  {filteredSessions.length} resultado{filteredSessions.length !== 1 ? "s" : ""} para &ldquo;{search.trim()}&rdquo;
+                  {serverSearchLoading
+                    ? "Buscando en Chatwoot..."
+                    : serverSearchResults !== null
+                      ? `${filteredSessions.length} resultado${filteredSessions.length !== 1 ? "s" : ""} en Chatwoot para "${search.trim()}"`
+                      : `${filteredSessions.length} resultado${filteredSessions.length !== 1 ? "s" : ""} para "${search.trim()}"`
+                  }
                 </span>
                 <button
                   type="button"
