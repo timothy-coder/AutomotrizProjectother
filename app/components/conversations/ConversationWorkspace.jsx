@@ -3,12 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
+  CheckCircle,
   FileText,
   CornerUpLeft,
   Lock,
   MessageSquarePlus,
   Send,
   Tag,
+  UserCheck,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -153,6 +155,9 @@ export default function ConversationWorkspace({
   const [cannedOpen, setCannedOpen] = useState(false);
   const [isPrivateNote, setIsPrivateNote] = useState(false);
   const [labels, setLabels] = useState([]);
+  const [agents, setAgents] = useState([]);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [resolving, setResolving] = useState(false);
   const scrollRef = useRef(null);
   const composerRef = useRef(null);
   const lastMarkedRef = useRef(0);
@@ -173,6 +178,62 @@ export default function ConversationWorkspace({
       setLabels(data?.labels ?? []);
     } catch (err) {
       console.error("Error cargando labels:", err);
+    }
+  }
+
+  async function loadAgents() {
+    if (agents.length > 0) return;
+    try {
+      const token = getAuthToken();
+      const res = await fetch("/api/chatwoot/agents", {
+        cache: "no-store",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setAgents(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error cargando agentes:", err);
+    }
+  }
+
+  async function handleAssign(agentId) {
+    if (!sess?.session_id) return;
+    try {
+      const token = getAuthToken();
+      await fetch(`/api/chatwoot/conversations/${sess.session_id}/assign`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ agent_id: agentId }),
+      });
+      setAssignOpen(false);
+      if (onConversationUpdated) onConversationUpdated();
+    } catch (err) {
+      console.error("Error asignando agente:", err);
+    }
+  }
+
+  async function handleResolve() {
+    if (!sess?.session_id || resolving) return;
+    setResolving(true);
+    try {
+      const token = getAuthToken();
+      await fetch(`/api/chatwoot/conversations/${sess.session_id}/status`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ status: "resolved" }),
+      });
+      if (onConversationUpdated) onConversationUpdated();
+    } catch (err) {
+      console.error("Error resolviendo conversación:", err);
+    } finally {
+      setResolving(false);
     }
   }
 
@@ -302,6 +363,7 @@ export default function ConversationWorkspace({
     stickToBottomRef.current = true;
     loadTimeline();
     loadLabels();
+    loadAgents();
   }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -438,25 +500,79 @@ export default function ConversationWorkspace({
             </div>
           </div>
 
-          {/* Resumen */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="icon" className="h-8 w-8 flex-shrink-0">
-                    <FileText className="h-4 w-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent align="end" className="w-[320px]">
-                  <div className="space-y-2">
-                    <p className="text-sm font-semibold">Resumen de conversación</p>
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{resumen}</p>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </TooltipTrigger>
-            <TooltipContent>Ver resumen generado de la conversación</TooltipContent>
-          </Tooltip>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {/* Asignar agente */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Popover open={assignOpen} onOpenChange={(o) => { setAssignOpen(o); if (o) loadAgents(); }}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="icon" className="h-8 w-8">
+                      <UserCheck className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-60 p-2 space-y-1">
+                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide px-1 pb-1">Asignar a</p>
+                    {agents.length === 0 && (
+                      <p className="text-xs text-gray-400 px-2 py-1">Cargando agentes...</p>
+                    )}
+                    {agents.map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => handleAssign(a.id)}
+                        className="w-full text-left px-3 py-2 rounded-lg hover:bg-indigo-50 transition-colors flex items-center gap-2"
+                      >
+                        <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-[10px] font-bold text-indigo-700 flex-shrink-0">
+                          {(a.name || "?")[0].toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-gray-800 truncate">{a.name}</p>
+                          <p className="text-[10px] text-gray-400 truncate">{a.role}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </PopoverContent>
+                </Popover>
+              </TooltipTrigger>
+              <TooltipContent>Asignar conversación a un agente</TooltipContent>
+            </Tooltip>
+
+            {/* Resolver */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8 text-green-600 hover:bg-green-50 hover:border-green-300"
+                  onClick={() => handleResolve()}
+                  disabled={resolving}
+                >
+                  <CheckCircle className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Marcar conversación como resuelta</TooltipContent>
+            </Tooltip>
+
+            {/* Resumen */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="icon" className="h-8 w-8 flex-shrink-0">
+                      <FileText className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-[320px]">
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold">Resumen de conversación</p>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{resumen}</p>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </TooltipTrigger>
+              <TooltipContent>Ver resumen generado de la conversación</TooltipContent>
+            </Tooltip>
+          </div>
         </div>
 
         {/* ── Timeline de mensajes ─────────────────────────────── */}
