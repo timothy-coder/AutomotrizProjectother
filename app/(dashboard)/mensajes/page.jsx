@@ -571,6 +571,12 @@ export default function ConversationsPage() {
   }
 
 
+  function handleStatusTabChange(tab) {
+    const chatwootStatus = tab === "pending" ? "pending" : "open";
+    setAssignmentFilter(tab === "pending" ? "pending" : "all");
+    fetchConversations(chatwootStatus).then(setSessions).catch(console.error);
+  }
+
   async function handleOpenSummaryDialog(session) {
     setSummarySession(session);
     setSummaryText("");
@@ -1101,6 +1107,32 @@ export default function ConversationsPage() {
         {/* Layout conversaciones */}
         <div className="grid grid-cols-1 lg:grid-cols-[330px_minmax(0,1fr)] gap-2 flex-1 min-h-0">
           <div className={`${selectedSession ? "hidden lg:flex" : "flex"} border rounded-xl overflow-hidden bg-white shadow min-h-0 h-full flex-col`}>
+            {/* Tabs Activos / Pendientes */}
+            <div className="flex border-b bg-white flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => handleStatusTabChange("open")}
+                className={`flex-1 py-2 text-xs font-medium transition-colors ${
+                  assignmentFilter !== "pending"
+                    ? "border-b-2 border-blue-500 text-blue-600"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Activos
+              </button>
+              <button
+                type="button"
+                onClick={() => handleStatusTabChange("pending")}
+                className={`flex-1 py-2 text-xs font-medium transition-colors ${
+                  assignmentFilter === "pending"
+                    ? "border-b-2 border-amber-500 text-amber-600"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Pendientes
+              </button>
+            </div>
+
             {search.trim() && (
               <div className="px-4 py-2 border-b bg-blue-50/60 flex items-center justify-between">
                 <span className="text-xs text-blue-700 font-medium">
