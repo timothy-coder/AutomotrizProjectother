@@ -72,6 +72,7 @@ async function fetchConversations(status = "open") {
     last_message: conv.last_non_activity_message?.content || "",
     ultimomensaje: conv.last_non_activity_message?.content || "",
     sla_due_at: null,
+    contact_id: conv.meta?.sender?.id || null,
     assigned_agent_name: conv.meta?.assignee?.name || null,
     assigned_agent_id: conv.meta?.assignee?.id || null,
     team_name: conv.meta?.team?.name || null,

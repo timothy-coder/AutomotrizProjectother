@@ -51,6 +51,7 @@ function mapSession(session) {
     celular: session.celular ?? session.phone ?? session.meta?.sender?.phone_number ?? "",
     source_channel: session.source_channel ?? channelFromInbox(session.meta?.channel ?? session.channel ?? session.inbox?.channel_type),
     assignment_status: session.assignment_status ?? session.status ?? "open",
+    contact_id: session.contact_id ?? session.meta?.sender?.id ?? null,
     resumen: session.resumen ?? "",
   };
 }
@@ -158,6 +159,8 @@ export default function ConversationWorkspace({
   const [agents, setAgents] = useState([]);
   const [assignOpen, setAssignOpen] = useState(false);
   const [resolving, setResolving] = useState(false);
+  const [contact, setContact] = useState(null);
+  const [contactOpen, setContactOpen] = useState(false);
   const scrollRef = useRef(null);
   const composerRef = useRef(null);
   const lastMarkedRef = useRef(0);
@@ -181,6 +184,22 @@ export default function ConversationWorkspace({
     }
   }
 
+  async function loadContact() {
+    if (!sess?.contact_id) return;
+    try {
+      const token = getAuthToken();
+      const res = await fetch(`/api/chatwoot/contacts/${sess.contact_id}`, {
+        cache: "no-store",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setContact(data);
+    } catch (err) {
+      console.error("Error cargando perfil de contacto:", err);
+    }
+  }
+
   async function loadAgents() {
     if (agents.length > 0) return;
     try {
@@ -201,7 +220,7 @@ export default function ConversationWorkspace({
     if (!sess?.session_id) return;
     try {
       const token = getAuthToken();
-      await fetch(`/api/chatwoot/conversations/${sess.session_id}/assign`, {
+      const res = await fetch(`/api/chatwoot/conversations/${sess.session_id}/assign`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -209,10 +228,13 @@ export default function ConversationWorkspace({
         },
         body: JSON.stringify({ agent_id: agentId }),
       });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || "No se pudo asignar el agente");
       setAssignOpen(false);
       if (onConversationUpdated) onConversationUpdated();
     } catch (err) {
       console.error("Error asignando agente:", err);
+      setError(err?.message || "Error asignando agente");
     }
   }
 
@@ -221,7 +243,7 @@ export default function ConversationWorkspace({
     setResolving(true);
     try {
       const token = getAuthToken();
-      await fetch(`/api/chatwoot/conversations/${sess.session_id}/status`, {
+      const res = await fetch(`/api/chatwoot/conversations/${sess.session_id}/status`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -229,9 +251,12 @@ export default function ConversationWorkspace({
         },
         body: JSON.stringify({ status: "resolved" }),
       });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || "No se pudo resolver la conversación");
       if (onConversationUpdated) onConversationUpdated();
     } catch (err) {
       console.error("Error resolviendo conversación:", err);
+      setError(err?.message || "Error resolviendo conversación");
     } finally {
       setResolving(false);
     }
@@ -364,6 +389,7 @@ export default function ConversationWorkspace({
     loadTimeline();
     loadLabels();
     loadAgents();
+    loadContact();
   }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -472,9 +498,55 @@ export default function ConversationWorkspace({
 
           {/* Avatar + info */}
           <div className="flex items-center gap-2.5 flex-1 min-w-0">
-            <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm flex-shrink-0">
-              {getInitials(sess?.cliente_nombre)}
-            </div>
+            <Popover open={contactOpen} onOpenChange={setContactOpen}>
+              <PopoverTrigger asChild>
+                <button type="button" className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm flex-shrink-0 hover:ring-2 hover:ring-indigo-300 transition-all">
+                  {getInitials(sess?.cliente_nombre)}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-64 p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold flex-shrink-0">
+                    {getInitials(sess?.cliente_nombre)}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{contact?.name || sess?.cliente_nombre}</p>
+                    {contact?.company && (
+                      <p className="text-xs text-gray-500 truncate">{contact.company}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-1.5 text-xs text-gray-600">
+                  {contact?.phone && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400 w-12 flex-shrink-0">Teléfono</span>
+                      <span className="font-medium">{contact.phone}</span>
+                    </div>
+                  )}
+                  {contact?.email && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400 w-12 flex-shrink-0">Email</span>
+                      <span className="font-medium truncate">{contact.email}</span>
+                    </div>
+                  )}
+                  {contact?.location && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400 w-12 flex-shrink-0">Ciudad</span>
+                      <span className="font-medium">{contact.location}</span>
+                    </div>
+                  )}
+                  {contact?.conversations_count != null && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400 w-12 flex-shrink-0">Convs.</span>
+                      <span className="font-medium">{contact.conversations_count} conversaciones</span>
+                    </div>
+                  )}
+                  {!contact && (
+                    <p className="text-gray-400 italic">Cargando perfil...</p>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
             <div className="min-w-0">
               <p className="font-semibold text-sm text-gray-900 truncate">
                 {sess?.cliente_nombre || "Conversación"}
