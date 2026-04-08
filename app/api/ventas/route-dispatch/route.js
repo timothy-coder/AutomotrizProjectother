@@ -264,7 +264,7 @@ async function resolveVentasRoute(phone, conversationId = 0, debug = false) {
     const [rows] = await db.query(
       `SELECT id FROM conversation_sessions
        WHERE REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') = ?
-         AND conversation_id = ?
+         AND (conversation_id = ? OR conversation_id = 0)
          AND source = 'ventas_ia'
          AND updated_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
        ORDER BY updated_at DESC LIMIT 1`,
@@ -310,7 +310,7 @@ async function checkTallerActivo(phone, conversationId = 0) {
     const [rows] = await db.query(
       `SELECT id FROM conversation_sessions
        WHERE REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') = ?
-         AND conversation_id = ?
+         AND (conversation_id = ? OR conversation_id = 0)
          AND (source IS NULL OR source NOT IN ('ventas_ia'))
          AND updated_at >= DATE_SUB(NOW(), INTERVAL 4 HOUR)
        ORDER BY updated_at DESC LIMIT 1`,
@@ -353,6 +353,17 @@ async function getAgentMenuConfig() {
 
 // ── Crear/actualizar sesión ventas_ia ─────────────────────────────────────
 async function createVentasSession(phone, conversationId = 0) {
+  // Migrate legacy rows (conversation_id=0) to the actual Chatwoot conversation ID
+  if (conversationId > 0) {
+    const [upd] = await db.query(
+      `UPDATE conversation_sessions
+       SET conversation_id = ?, source = 'ventas_ia', updated_at = NOW()
+       WHERE REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') = ?
+         AND conversation_id = 0`,
+      [conversationId, phone]
+    );
+    if (upd?.affectedRows > 0) return;
+  }
   await db.query(
     `INSERT INTO conversation_sessions (phone, conversation_id, source, created_at, updated_at)
      VALUES (?, ?, 'ventas_ia', NOW(), NOW())
