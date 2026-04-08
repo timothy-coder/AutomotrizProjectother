@@ -12,6 +12,7 @@ import {
   Send,
   Tag,
   UserCheck,
+  Users,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -61,7 +62,7 @@ function getAuthToken() {
   if (typeof document === "undefined") return "";
   const match = document.cookie.match(/(?:^|;\s*)token=([^;]+)/);
   const token = match ? match[1] : "";
-  if (!token) console.warn("ConversationWorkspace: no auth token found in cookies");
+  if (!token) console.error("ConversationWorkspace: no auth token found in cookies");
   return token;
 }
 
@@ -180,6 +181,7 @@ export default function ConversationWorkspace({
   const [isPrivateNote, setIsPrivateNote] = useState(false);
   const [labels, setLabels] = useState([]);
   const [agents, setAgents] = useState([]);
+  const [teams, setTeams] = useState([]);
   const [assignOpen, setAssignOpen] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [snoozeOpen, setSnoozeOpen] = useState(false);
@@ -238,6 +240,44 @@ export default function ConversationWorkspace({
       setAgents(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Error cargando agentes:", err);
+    }
+  }
+
+  async function loadTeams() {
+    if (teams.length > 0) return;
+    try {
+      const token = getAuthToken();
+      const res = await fetch("/api/chatwoot/teams", {
+        cache: "no-store",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setTeams(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error cargando equipos:", err);
+    }
+  }
+
+  async function handleAssignTeam(teamId) {
+    if (!sess?.session_id) return;
+    try {
+      const token = getAuthToken();
+      const res = await fetch(`/api/chatwoot/conversations/${sess.session_id}/assign`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ team_id: teamId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || "No se pudo asignar el equipo");
+      setAssignOpen(false);
+      if (onConversationUpdated) onConversationUpdated();
+    } catch (err) {
+      console.error("Error asignando equipo:", err);
+      setError(err?.message || "Error asignando equipo");
     }
   }
 
@@ -635,7 +675,7 @@ export default function ConversationWorkspace({
 
           <div className="flex items-center gap-1.5 flex-shrink-0">
             {/* Asignar agente — solo usuarios con permiso edit */}
-            {canEdit && <Popover open={assignOpen} onOpenChange={(o) => { setAssignOpen(o); if (o) loadAgents(); }}>
+            {canEdit && <Popover open={assignOpen} onOpenChange={(o) => { setAssignOpen(o); if (o) { loadAgents(); loadTeams(); } }}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <PopoverTrigger asChild>
@@ -644,29 +684,54 @@ export default function ConversationWorkspace({
                     </Button>
                   </PopoverTrigger>
                 </TooltipTrigger>
-                <TooltipContent>Asignar conversación a un agente</TooltipContent>
+                <TooltipContent>Asignar conversación a agente o equipo</TooltipContent>
               </Tooltip>
-              <PopoverContent align="end" className="w-60 p-2 space-y-1">
-                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide px-1 pb-1">Asignar a</p>
-                {agents.length === 0 && (
-                  <p className="text-xs text-gray-400 px-2 py-1">Cargando agentes...</p>
+              <PopoverContent align="end" className="w-64 p-2 space-y-1">
+                {/* Equipos */}
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide px-1 pb-0.5 flex items-center gap-1">
+                  <Users className="w-3 h-3" /> Equipo
+                </p>
+                {teams.length === 0 && (
+                  <p className="text-xs text-gray-400 px-2 py-1">Cargando equipos...</p>
                 )}
-                {agents.map((a) => (
+                {teams.map((t) => (
                   <button
-                    key={a.id}
+                    key={t.id}
                     type="button"
-                    onClick={() => handleAssign(a.id)}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-indigo-50 transition-colors flex items-center gap-2"
+                    onClick={() => handleAssignTeam(t.id)}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-violet-50 transition-colors flex items-center gap-2"
                   >
-                    <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-[10px] font-bold text-indigo-700 flex-shrink-0">
-                      {(a.name || "?")[0].toUpperCase()}
+                    <div className="w-6 h-6 rounded-full bg-violet-100 flex items-center justify-center text-[10px] font-bold text-violet-700 flex-shrink-0">
+                      {(t.name || "?")[0].toUpperCase()}
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium text-gray-800 truncate">{a.name}</p>
-                      <p className="text-[10px] text-gray-400 truncate">{a.role}</p>
-                    </div>
+                    <p className="text-xs font-medium text-gray-800 truncate">{t.name}</p>
                   </button>
                 ))}
+                {/* Agentes */}
+                <div className="border-t pt-1 mt-1">
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide px-1 pb-0.5 flex items-center gap-1">
+                    <UserCheck className="w-3 h-3" /> Agente
+                  </p>
+                  {agents.length === 0 && (
+                    <p className="text-xs text-gray-400 px-2 py-1">Cargando agentes...</p>
+                  )}
+                  {agents.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => handleAssign(a.id)}
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-indigo-50 transition-colors flex items-center gap-2"
+                    >
+                      <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-[10px] font-bold text-indigo-700 flex-shrink-0">
+                        {(a.name || "?")[0].toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-gray-800 truncate">{a.name}</p>
+                        <p className="text-[10px] text-gray-400 truncate">{a.role}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </PopoverContent>
             </Popover>}
 
