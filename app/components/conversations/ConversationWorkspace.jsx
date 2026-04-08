@@ -613,45 +613,45 @@ export default function ConversationWorkspace({
 
           <div className="flex items-center gap-1.5 flex-shrink-0">
             {/* Asignar agente */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Popover open={assignOpen} onOpenChange={(o) => { setAssignOpen(o); if (o) loadAgents(); }}>
+            <Popover open={assignOpen} onOpenChange={(o) => { setAssignOpen(o); if (o) loadAgents(); }}>
+              <Tooltip>
+                <TooltipTrigger asChild>
                   <PopoverTrigger asChild>
                     <Button variant="outline" size="icon" className="h-8 w-8">
                       <UserCheck className="h-4 w-4" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent align="end" className="w-60 p-2 space-y-1">
-                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide px-1 pb-1">Asignar a</p>
-                    {agents.length === 0 && (
-                      <p className="text-xs text-gray-400 px-2 py-1">Cargando agentes...</p>
-                    )}
-                    {agents.map((a) => (
-                      <button
-                        key={a.id}
-                        type="button"
-                        onClick={() => handleAssign(a.id)}
-                        className="w-full text-left px-3 py-2 rounded-lg hover:bg-indigo-50 transition-colors flex items-center gap-2"
-                      >
-                        <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-[10px] font-bold text-indigo-700 flex-shrink-0">
-                          {(a.name || "?")[0].toUpperCase()}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-gray-800 truncate">{a.name}</p>
-                          <p className="text-[10px] text-gray-400 truncate">{a.role}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </PopoverContent>
-                </Popover>
-              </TooltipTrigger>
-              <TooltipContent>Asignar conversación a un agente</TooltipContent>
-            </Tooltip>
+                </TooltipTrigger>
+                <TooltipContent>Asignar conversación a un agente</TooltipContent>
+              </Tooltip>
+              <PopoverContent align="end" className="w-60 p-2 space-y-1">
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide px-1 pb-1">Asignar a</p>
+                {agents.length === 0 && (
+                  <p className="text-xs text-gray-400 px-2 py-1">Cargando agentes...</p>
+                )}
+                {agents.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => handleAssign(a.id)}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-indigo-50 transition-colors flex items-center gap-2"
+                  >
+                    <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-[10px] font-bold text-indigo-700 flex-shrink-0">
+                      {(a.name || "?")[0].toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-gray-800 truncate">{a.name}</p>
+                      <p className="text-[10px] text-gray-400 truncate">{a.role}</p>
+                    </div>
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
 
             {/* Snooze */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Popover open={snoozeOpen} onOpenChange={setSnoozeOpen}>
+            <Popover open={snoozeOpen} onOpenChange={setSnoozeOpen}>
+              <Tooltip>
+                <TooltipTrigger asChild>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
@@ -662,37 +662,37 @@ export default function ConversationWorkspace({
                       <Clock className="h-4 w-4" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent align="end" className="w-52 p-2 space-y-1">
-                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide px-1 pb-1">Posponer por</p>
-                    {[
-                      { label: "30 minutos", minutes: 30 },
-                      { label: "1 hora", minutes: 60 },
-                      { label: "3 horas", minutes: 180 },
-                      { label: "Mañana (9 AM)", minutes: null },
-                    ].map(({ label, minutes }) => (
-                      <button
-                        key={label}
-                        type="button"
-                        onClick={() => {
-                          if (minutes !== null) {
-                            handleSnooze(minutes);
-                          } else {
-                            const tomorrow = new Date();
-                            tomorrow.setDate(tomorrow.getDate() + 1);
-                            tomorrow.setHours(9, 0, 0, 0);
-                            handleSnooze(Math.round((tomorrow.getTime() - Date.now()) / 60000));
-                          }
-                        }}
-                        className="w-full text-left px-3 py-2 rounded-lg hover:bg-amber-50 text-xs text-gray-700 transition-colors"
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </PopoverContent>
-                </Popover>
-              </TooltipTrigger>
-              <TooltipContent>Posponer conversación</TooltipContent>
-            </Tooltip>
+                </TooltipTrigger>
+                <TooltipContent>Posponer conversación</TooltipContent>
+              </Tooltip>
+              <PopoverContent align="end" className="w-52 p-2 space-y-1">
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide px-1 pb-1">Posponer por</p>
+                {[
+                  { label: "30 minutos", minutes: 30 },
+                  { label: "1 hora", minutes: 60 },
+                  { label: "3 horas", minutes: 180 },
+                  { label: "Mañana (9 AM)", minutes: null },
+                ].map(({ label, minutes }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => {
+                      if (minutes !== null) {
+                        handleSnooze(minutes);
+                      } else {
+                        const tomorrow = new Date();
+                        tomorrow.setDate(tomorrow.getDate() + 1);
+                        tomorrow.setHours(9, 0, 0, 0);
+                        handleSnooze(Math.round((tomorrow.getTime() - Date.now()) / 60000));
+                      }
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-amber-50 text-xs text-gray-700 transition-colors"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
 
             {/* Resolver */}
             <Tooltip>
@@ -711,24 +711,24 @@ export default function ConversationWorkspace({
             </Tooltip>
 
             {/* Resumen */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Popover>
+            <Popover>
+              <Tooltip>
+                <TooltipTrigger asChild>
                   <PopoverTrigger asChild>
                     <Button variant="outline" size="icon" className="h-8 w-8 flex-shrink-0">
                       <FileText className="h-4 w-4" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent align="end" className="w-[320px]">
-                    <div className="space-y-2">
-                      <p className="text-sm font-semibold">Resumen de conversación</p>
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{resumen}</p>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              </TooltipTrigger>
-              <TooltipContent>Ver resumen generado de la conversación</TooltipContent>
-            </Tooltip>
+                </TooltipTrigger>
+                <TooltipContent>Ver resumen generado de la conversación</TooltipContent>
+              </Tooltip>
+              <PopoverContent align="end" className="w-[320px]">
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold">Resumen de conversación</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{resumen}</p>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
