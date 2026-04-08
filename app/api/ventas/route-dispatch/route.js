@@ -95,6 +95,7 @@ export async function POST(req) {
     // ── Forzar sesión ventas_ia (llamado desde bot taller tras redirect_ventas) ──
     if (body?.force_ventas === true) {
       await createVentasSession(phone, conversationId);
+      await clearVentasHistory(phone);
       return NextResponse.json({ ok: true, route: "ventas_ia", forced: true });
     }
 
@@ -130,7 +131,9 @@ export async function POST(req) {
     if (selection === "1") {
       // Opción 1: Comprar vehículo → flujo Ventas IA
       // Solo creamos la sesión; el Taller v14 hace el dispatch para evitar doble envío.
+      // Limpiar historial previo para que el agente IA empiece desde cero.
       await createVentasSession(phone, conversationId);
+      await clearVentasHistory(phone);
       return NextResponse.json({
         route: "ventas_ia",
         dispatched: false,
@@ -372,6 +375,22 @@ async function resolvePendingMenuRoute(phone, text, conversationId = 0) {
   } catch (e) {
     console.error("[resolvePendingMenuRoute] error:", e.message);
     return null;
+  }
+}
+
+// ── Limpiar historial de ventas_sessions para empezar conversación desde cero ─
+async function clearVentasHistory(phone) {
+  try {
+    await db.query(
+      `UPDATE ventas_sessions SET history_json = '[]', paso_actual = 1
+       WHERE phone = ?`,
+      [phone]
+    );
+  } catch (e) {
+    // Si la tabla no existe o no hay fila, ignorar silenciosamente
+    if (e?.code !== "ER_NO_SUCH_TABLE" && e?.errno !== 1146) {
+      console.error("[clearVentasHistory] error:", e.message);
+    }
   }
 }
 
