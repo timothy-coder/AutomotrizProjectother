@@ -521,17 +521,27 @@ export default function ConversationWorkspace({
 
         {/* ── Header ──────────────────────────────────────────── */}
         <div className="border-b px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="lg:hidden -ml-2 flex-shrink-0" onClick={onBack}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="lg:hidden -ml-2 flex-shrink-0" onClick={onBack}>
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Volver a la lista de conversaciones</TooltipContent>
+          </Tooltip>
 
           {/* Avatar + info */}
           <div className="flex items-center gap-2.5 flex-1 min-w-0">
             <Popover open={contactOpen} onOpenChange={setContactOpen}>
               <PopoverTrigger asChild>
-                <button type="button" className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm flex-shrink-0 hover:ring-2 hover:ring-indigo-300 transition-all">
-                  {getInitials(sess?.cliente_nombre)}
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm flex-shrink-0 hover:ring-2 hover:ring-indigo-300 transition-all">
+                      {getInitials(sess?.cliente_nombre)}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Ver perfil del contacto</TooltipContent>
+                </Tooltip>
               </PopoverTrigger>
               <PopoverContent align="start" className="w-64 p-4 space-y-3">
                 <div className="flex items-center gap-3">
@@ -750,13 +760,18 @@ export default function ConversationWorkspace({
                     <div className="flex items-center gap-2 mt-0.5 ml-1">
                       <p className="text-[10px] text-gray-400">{formatMsgTime(m.created_at)}</p>
                       {m.pregunta && (
-                        <button
-                          type="button"
-                          onClick={() => setQuotedMessage(m.pregunta)}
-                          className="opacity-0 group-hover/msg:opacity-100 transition-opacity text-gray-400 hover:text-indigo-500"
-                        >
-                          <CornerUpLeft className="w-3 h-3" />
-                        </button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={() => setQuotedMessage(m.pregunta)}
+                              className="opacity-0 group-hover/msg:opacity-100 transition-opacity text-gray-400 hover:text-indigo-500"
+                            >
+                              <CornerUpLeft className="w-3 h-3" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="right">Citar este mensaje</TooltipContent>
+                        </Tooltip>
                       )}
                     </div>
                   </div>
@@ -786,13 +801,18 @@ export default function ConversationWorkspace({
                     )}
                     <div className="flex items-center justify-end gap-2 mt-0.5 mr-1">
                       {m.respuesta && (
-                        <button
-                          type="button"
-                          onClick={() => setQuotedMessage(m.respuesta)}
-                          className="opacity-0 group-hover/msg:opacity-100 transition-opacity text-gray-400 hover:text-indigo-500"
-                        >
-                          <CornerUpLeft className="w-3 h-3" />
-                        </button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={() => setQuotedMessage(m.respuesta)}
+                              className="opacity-0 group-hover/msg:opacity-100 transition-opacity text-gray-400 hover:text-indigo-500"
+                            >
+                              <CornerUpLeft className="w-3 h-3" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="left">Citar este mensaje</TooltipContent>
+                        </Tooltip>
                       )}
                       <p className="text-[10px] text-gray-400">
                         {formatMsgTime(m.created_at)}{" "}
@@ -828,18 +848,23 @@ export default function ConversationWorkspace({
 
           {/* Toggle nota privada */}
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsPrivateNote((prev) => !prev)}
-              className={`flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border transition-colors ${
-                isPrivateNote
-                  ? "bg-amber-50 border-amber-300 text-amber-700"
-                  : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
-              }`}
-            >
-              <Lock className="w-3 h-3" />
-              {isPrivateNote ? "Nota interna activa" : "Nota interna"}
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => setIsPrivateNote((prev) => !prev)}
+                  className={`flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border transition-colors ${
+                    isPrivateNote
+                      ? "bg-amber-50 border-amber-300 text-amber-700"
+                      : "bg-white border-gray-200 text-gray-500 hover:border-gray-300"
+                  }`}
+                >
+                  <Lock className="w-3 h-3" />
+                  {isPrivateNote ? "Nota interna activa" : "Nota interna"}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Las notas internas solo son visibles para el equipo, no para el cliente</TooltipContent>
+            </Tooltip>
             {isPrivateNote && (
               <span className="text-[10px] text-amber-600">Solo visible para el equipo</span>
             )}
@@ -864,12 +889,17 @@ export default function ConversationWorkspace({
               {/* Respuestas rápidas */}
               <Popover open={cannedOpen} onOpenChange={setCannedOpen}>
                 <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    className="absolute right-2.5 bottom-2.5 text-gray-400 hover:text-indigo-500 transition-colors"
-                  >
-                    <MessageSquarePlus className="w-4 h-4" />
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="absolute right-2.5 bottom-2.5 text-gray-400 hover:text-indigo-500 transition-colors"
+                      >
+                        <MessageSquarePlus className="w-4 h-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Respuestas rápidas predefinidas</TooltipContent>
+                  </Tooltip>
                 </PopoverTrigger>
                 <PopoverContent align="end" side="top" className="w-72 p-2 space-y-1">
                   <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide px-1 pb-1">Respuestas rápidas</p>
@@ -915,10 +945,15 @@ export default function ConversationWorkspace({
                 <TooltipContent>Respondiendo por {channelToSend} — canal del cliente</TooltipContent>
               </Tooltip>
 
-              <Button className="w-full" onClick={() => handleSendMessage()} disabled={sending || !newMessage.trim()}>
-                <Send className="h-4 w-4 mr-2" />
-                {sending ? "Enviando..." : "Enviar"}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button className="w-full" onClick={() => handleSendMessage()} disabled={sending || !newMessage.trim()}>
+                    <Send className="h-4 w-4 mr-2" />
+                    {sending ? "Enviando..." : "Enviar"}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Enviar mensaje (Ctrl+Enter)</TooltipContent>
+              </Tooltip>
             </div>
           </div>
 
