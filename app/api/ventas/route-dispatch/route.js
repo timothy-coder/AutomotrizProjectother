@@ -2,6 +2,23 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { normalizePhone } from "@/lib/phoneUtils";
 
+// ── Cache del intervalo de follow-up (evita query en cada mensaje) ───────
+let _followupDaysCache = { value: 3, expiresAt: 0 };
+async function getFollowupDays() {
+  if (Date.now() < _followupDaysCache.expiresAt) return _followupDaysCache.value;
+  try {
+    const [[row]] = await db.query(
+      "SELECT followup_interval_days FROM agent_prompt_config WHERE agent_key = 'taller' AND is_active = 1 LIMIT 1"
+    );
+    const d = Number(row?.followup_interval_days);
+    const days = Number.isInteger(d) && d >= 1 && d <= 30 ? d : 3;
+    _followupDaysCache = { value: days, expiresAt: Date.now() + 5 * 60_000 };
+    return days;
+  } catch {
+    return _followupDaysCache.value;
+  }
+}
+
 /**
  * PUT /api/ventas/route-dispatch
  *
@@ -337,17 +354,18 @@ async function getAgentMenuConfig() {
 
 // ── Crear/actualizar sesión ventas_ia ─────────────────────────────────────
 async function createVentasSession(phone, conversationId = 0) {
+  const days = await getFollowupDays();
   // Migrate legacy rows (conversation_id=0) to the actual Chatwoot conversation ID
   if (conversationId > 0) {
     try {
       const [upd] = await db.query(
         `UPDATE conversation_sessions
          SET conversation_id = ?, source = 'ventas_ia', updated_at = NOW(),
-             followup_next_at = DATE_ADD(NOW(), INTERVAL 3 DAY),
+             followup_next_at = DATE_ADD(NOW(), INTERVAL ? DAY),
              followup_count = 0, closure_reason = NULL
          WHERE REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') = ?
            AND conversation_id = 0`,
-        [conversationId, phone]
+        [conversationId, days, phone]
       );
       if (upd?.affectedRows > 0) return;
     } catch (e) {
@@ -366,11 +384,11 @@ async function createVentasSession(phone, conversationId = 0) {
   try {
     await db.query(
       `INSERT INTO conversation_sessions (phone, conversation_id, source, created_at, updated_at, followup_next_at, followup_count)
-       VALUES (?, ?, 'ventas_ia', NOW(), NOW(), DATE_ADD(NOW(), INTERVAL 3 DAY), 0)
+       VALUES (?, ?, 'ventas_ia', NOW(), NOW(), DATE_ADD(NOW(), INTERVAL ? DAY), 0)
        ON DUPLICATE KEY UPDATE source = 'ventas_ia', updated_at = NOW(),
-         followup_next_at = DATE_ADD(NOW(), INTERVAL 3 DAY),
+         followup_next_at = DATE_ADD(NOW(), INTERVAL ? DAY),
          followup_count = 0, closure_reason = NULL`,
-      [phone, conversationId]
+      [phone, conversationId, days, days]
     );
   } catch (e) {
     if (e?.code === "ER_BAD_FIELD_ERROR" || e?.errno === 1054) {
@@ -415,14 +433,15 @@ async function clearVentasHistory(phone) {
 // empuja followup_next_at 3 días hacia adelante y resetea el contador.
 async function touchSession(phone, conversationId = 0, source = null) {
   const sourceClause = source ? "AND source = ?" : "";
+  const days = await getFollowupDays();
   const params = source
-    ? [phone, conversationId, source]
-    : [phone, conversationId];
+    ? [days, phone, conversationId, source]
+    : [days, phone, conversationId];
   try {
     await db.query(
       `UPDATE conversation_sessions
          SET updated_at       = NOW(),
-             followup_next_at = DATE_ADD(NOW(), INTERVAL 3 DAY),
+             followup_next_at = DATE_ADD(NOW(), INTERVAL ? DAY),
              followup_count   = 0,
              closure_reason   = NULL
        WHERE REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') = ?
@@ -434,13 +453,14 @@ async function touchSession(phone, conversationId = 0, source = null) {
   } catch (e) {
     if (e?.code === "ER_BAD_FIELD_ERROR" || e?.errno === 1054) {
       // followup columns not yet migrated — update only updated_at
+      const fallbackParams = source ? [phone, conversationId, source] : [phone, conversationId];
       await db.query(
         `UPDATE conversation_sessions SET updated_at = NOW()
          WHERE REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') = ?
            AND (conversation_id = ? OR conversation_id = 0)
            ${sourceClause}
          ORDER BY updated_at DESC LIMIT 1`,
-        params
+        fallbackParams
       ).catch(err => console.error("[touchSession] fallback error:", err.message));
     } else {
       console.error("[touchSession] error:", e.message);
