@@ -339,21 +339,49 @@ async function getAgentMenuConfig() {
 async function createVentasSession(phone, conversationId = 0) {
   // Migrate legacy rows (conversation_id=0) to the actual Chatwoot conversation ID
   if (conversationId > 0) {
-    const [upd] = await db.query(
-      `UPDATE conversation_sessions
-       SET conversation_id = ?, source = 'ventas_ia', updated_at = NOW()
-       WHERE REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') = ?
-         AND conversation_id = 0`,
-      [conversationId, phone]
-    );
-    if (upd?.affectedRows > 0) return;
+    try {
+      const [upd] = await db.query(
+        `UPDATE conversation_sessions
+         SET conversation_id = ?, source = 'ventas_ia', updated_at = NOW(),
+             followup_next_at = DATE_ADD(NOW(), INTERVAL 3 DAY),
+             followup_count = 0, closure_reason = NULL
+         WHERE REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') = ?
+           AND conversation_id = 0`,
+        [conversationId, phone]
+      );
+      if (upd?.affectedRows > 0) return;
+    } catch (e) {
+      if (e?.code === "ER_BAD_FIELD_ERROR" || e?.errno === 1054) {
+        const [upd] = await db.query(
+          `UPDATE conversation_sessions
+           SET conversation_id = ?, source = 'ventas_ia', updated_at = NOW()
+           WHERE REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') = ?
+             AND conversation_id = 0`,
+          [conversationId, phone]
+        );
+        if (upd?.affectedRows > 0) return;
+      } else { throw e; }
+    }
   }
-  await db.query(
-    `INSERT INTO conversation_sessions (phone, conversation_id, source, created_at, updated_at)
-     VALUES (?, ?, 'ventas_ia', NOW(), NOW())
-     ON DUPLICATE KEY UPDATE source = 'ventas_ia', updated_at = NOW()`,
-    [phone, conversationId]
-  );
+  try {
+    await db.query(
+      `INSERT INTO conversation_sessions (phone, conversation_id, source, created_at, updated_at, followup_next_at, followup_count)
+       VALUES (?, ?, 'ventas_ia', NOW(), NOW(), DATE_ADD(NOW(), INTERVAL 3 DAY), 0)
+       ON DUPLICATE KEY UPDATE source = 'ventas_ia', updated_at = NOW(),
+         followup_next_at = DATE_ADD(NOW(), INTERVAL 3 DAY),
+         followup_count = 0, closure_reason = NULL`,
+      [phone, conversationId]
+    );
+  } catch (e) {
+    if (e?.code === "ER_BAD_FIELD_ERROR" || e?.errno === 1054) {
+      await db.query(
+        `INSERT INTO conversation_sessions (phone, conversation_id, source, created_at, updated_at)
+         VALUES (?, ?, 'ventas_ia', NOW(), NOW())
+         ON DUPLICATE KEY UPDATE source = 'ventas_ia', updated_at = NOW()`,
+        [phone, conversationId]
+      );
+    } else { throw e; }
+  }
 }
 
 
@@ -383,14 +411,20 @@ async function clearVentasHistory(phone) {
 }
 
 // ── Actualizar updated_at en cada mensaje para mantener la sesión viva ────
+// También resetea el timer de follow-up 3-3-3: cada mensaje del cliente
+// empuja followup_next_at 3 días hacia adelante y resetea el contador.
 async function touchSession(phone, conversationId = 0, source = null) {
+  const sourceClause = source ? "AND source = ?" : "";
+  const params = source
+    ? [phone, conversationId, source]
+    : [phone, conversationId];
   try {
-    const sourceClause = source ? "AND source = ?" : "";
-    const params = source
-      ? [phone, conversationId, source]
-      : [phone, conversationId];
     await db.query(
-      `UPDATE conversation_sessions SET updated_at = NOW()
+      `UPDATE conversation_sessions
+         SET updated_at       = NOW(),
+             followup_next_at = DATE_ADD(NOW(), INTERVAL 3 DAY),
+             followup_count   = 0,
+             closure_reason   = NULL
        WHERE REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') = ?
          AND (conversation_id = ? OR conversation_id = 0)
          ${sourceClause}
@@ -398,6 +432,18 @@ async function touchSession(phone, conversationId = 0, source = null) {
       params
     );
   } catch (e) {
-    console.error("[touchSession] error:", e.message);
+    if (e?.code === "ER_BAD_FIELD_ERROR" || e?.errno === 1054) {
+      // followup columns not yet migrated — update only updated_at
+      await db.query(
+        `UPDATE conversation_sessions SET updated_at = NOW()
+         WHERE REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') = ?
+           AND (conversation_id = ? OR conversation_id = 0)
+           ${sourceClause}
+         ORDER BY updated_at DESC LIMIT 1`,
+        params
+      ).catch(err => console.error("[touchSession] fallback error:", err.message));
+    } else {
+      console.error("[touchSession] error:", e.message);
+    }
   }
 }
