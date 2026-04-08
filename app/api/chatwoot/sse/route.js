@@ -1,4 +1,5 @@
 // app/api/chatwoot/sse/route.js
+import { db } from "@/lib/db";
 import { addSseClient, removeSseClient } from "@/lib/chatwootSse";
 import { verifyToken } from "@/lib/auth";
 
@@ -6,6 +7,32 @@ import { verifyToken } from "@/lib/auth";
 // headers custom (Authorization). Por eso el JWT viene como query param ?token=
 // y se valida directamente con verifyToken() en lugar de authorizeConversation().
 // Esto es una desviación aprobada del estándar solo para endpoints SSE.
+
+async function resolveUserTeams(decoded) {
+  const role = String(decoded?.role || "").toLowerCase();
+  if (role.includes("admin")) {
+    return { isAdmin: true, chatwootTeamIds: [] };
+  }
+
+  try {
+    const [rows] = await db.query(
+      `SELECT rcm.chatwoot_team_id
+       FROM roles_chatwoot_mapping rcm
+       JOIN roles r ON r.id = rcm.role_id
+       WHERE LOWER(r.name) = LOWER(?)
+       LIMIT 1`,
+      [decoded.role || ""]
+    );
+    const teamId = rows[0]?.chatwoot_team_id;
+    return {
+      isAdmin: false,
+      chatwootTeamIds: teamId ? [Number(teamId)] : [],
+    };
+  } catch (err) {
+    console.error("SSE: error resolviendo equipos del usuario:", err.message);
+    return { isAdmin: false, chatwootTeamIds: [] };
+  }
+}
 
 export async function GET(req) {
   // SSE no soporta headers custom — token viene por query param
@@ -15,16 +42,19 @@ export async function GET(req) {
     return new Response("Unauthorized", { status: 401 });
   }
 
+  let decoded;
   try {
-    verifyToken(token);
+    decoded = verifyToken(token);
   } catch (err) {
     console.error("SSE: token inválido o expirado:", err?.message);
     return new Response("Unauthorized", { status: 401 });
   }
 
+  const { isAdmin, chatwootTeamIds } = await resolveUserTeams(decoded);
+
   const stream = new ReadableStream({
     start(ctrl) {
-      addSseClient(ctrl);
+      addSseClient(ctrl, chatwootTeamIds, isAdmin);
       // keepalive cada 25s para evitar que el proxy cierre la conexión
       const interval = setInterval(() => {
         try {

@@ -99,11 +99,15 @@ export async function POST(req) {
   }
 
   if (errors.length === 0) {
-    broadcastSseEvent("bot_alert", {
-      conversation_id: Number(conversation_id),
-      alert_type,
-      timestamp: new Date().toISOString(),
-    });
+    broadcastSseEvent(
+      "bot_alert",
+      {
+        conversation_id: Number(conversation_id),
+        alert_type,
+        timestamp: new Date().toISOString(),
+      },
+      routing.chatwoot_team_id ?? null
+    );
   }
 
   return NextResponse.json({
