@@ -7,6 +7,13 @@ export async function POST(req) {
 
     const { username, password } = await req.json();
 
+    if (!username || !password) {
+      return NextResponse.json(
+        { message: "Usuario y contraseña son requeridos" },
+        { status: 400 }
+      );
+    }
+
     const [rows] = await db.query(
       `SELECT u.*, r.name AS role
        FROM usuarios u
@@ -43,7 +50,8 @@ export async function POST(req) {
         fullname: user.fullname,
         username: user.username,
         role: user.role,
-        permissions: user.permissions   // ⭐ ESTA LÍNEA FALTABA
+        permissions: user.permissions,
+        chatwoot_agent_id: user.chatwoot_agent_id ?? null,
       }
     });
 

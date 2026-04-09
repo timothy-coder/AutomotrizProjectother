@@ -344,6 +344,7 @@ export default function ConversationsPage() {
   const [search, setSearch] = useState("");
   const [serverSearchResults, setServerSearchResults] = useState(null);
   const [serverSearchLoading, setServerSearchLoading] = useState(false);
+  const [viewFilter, setViewFilter] = useState("team"); // "team" | "mine"
   const [channelFilter, setChannelFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [ownerFilter, setOwnerFilter] = useState("all");
@@ -723,10 +724,13 @@ export default function ConversationsPage() {
         || (statusFilter === "unread" && unreadCount > 0);
 
       const assignedAgentId = Number(s?.assigned_agent_id || 0);
-      const currentUserId = Number(user?.id || 0);
+      const chatwootAgentId = Number(user?.chatwoot_agent_id || 0);
       const byOwner = ownerFilter === "all"
-        || (ownerFilter === "mine" && currentUserId > 0 && assignedAgentId === currentUserId)
+        || (ownerFilter === "mine" && chatwootAgentId > 0 && assignedAgentId === chatwootAgentId)
         || (ownerFilter === "unassigned" && !assignedAgentId);
+
+      const byView = viewFilter === "team"
+        || (viewFilter === "mine" && chatwootAgentId > 0 && assignedAgentId === chatwootAgentId);
 
       const assignmentStatus = String(s?.assignment_status || "unassigned").toLowerCase();
       const byAssignment = assignmentFilter === "all"
@@ -738,9 +742,9 @@ export default function ConversationsPage() {
         || (priorityFilter === "overdue" && Number(s?.is_overdue || 0) === 1)
         || priorityLevel === priorityFilter;
 
-      return bySearch && byChannel && byStatus && byOwner && byAssignment && byPriority;
+      return bySearch && byChannel && byStatus && byOwner && byAssignment && byPriority && byView;
     });
-  }, [sessions, search, channelFilter, statusFilter, ownerFilter, assignmentFilter, priorityFilter, user]);
+  }, [sessions, search, channelFilter, statusFilter, ownerFilter, assignmentFilter, priorityFilter, viewFilter, user]);
 
   const scopedSessions = useMemo(() => {
     if (!selectedSession?.session_id) return filteredSessions;
@@ -777,11 +781,11 @@ export default function ConversationsPage() {
     const overdue = scopedSessions.filter((s) => Number(s?.is_overdue || 0) === 1).length;
     const unread = scopedSessions.reduce((acc, s) => acc + Number(s?.unread_count || 0), 0);
 
-    const currentUserId = Number(user?.id || 0);
+    const chatwootAgentId = Number(user?.chatwoot_agent_id || 0);
     const mine = scopedSessions.filter((s) => {
       const assignedId = Number(s?.assigned_agent_id || 0);
       const status = String(s?.assignment_status || "unassigned").toLowerCase();
-      return currentUserId > 0 && assignedId === currentUserId && (status === "open" || status === "pending");
+      return chatwootAgentId > 0 && assignedId === chatwootAgentId && (status === "open" || status === "pending");
     }).length;
 
     // ── Espera máxima calculada desde scopedSessions ──────────
@@ -1186,6 +1190,34 @@ export default function ConversationsPage() {
         {/* Layout conversaciones */}
         <div className="grid grid-cols-1 lg:grid-cols-[330px_minmax(0,1fr)] gap-2 flex-1 min-h-0">
           <div className={`${selectedSession ? "hidden lg:flex" : "flex"} border rounded-xl overflow-hidden bg-white shadow min-h-0 h-full flex-col`}>
+            {/* Tabs Del equipo / Mis chats (solo si el usuario tiene agente Chatwoot) */}
+            {user?.chatwoot_agent_id && (
+              <div className="flex border-b bg-gray-50 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setViewFilter("team")}
+                  className={`flex-1 py-1.5 text-[11px] font-medium transition-colors ${
+                    viewFilter === "team"
+                      ? "border-b-2 border-violet-500 text-violet-700 bg-violet-50"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  Del equipo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewFilter("mine")}
+                  className={`flex-1 py-1.5 text-[11px] font-medium transition-colors ${
+                    viewFilter === "mine"
+                      ? "border-b-2 border-violet-500 text-violet-700 bg-violet-50"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  Mis chats
+                </button>
+              </div>
+            )}
+
             {/* Tabs Activos / Pendientes */}
             <div className="flex border-b bg-white flex-shrink-0">
               <button
