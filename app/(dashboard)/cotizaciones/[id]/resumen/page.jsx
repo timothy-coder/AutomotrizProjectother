@@ -21,9 +21,11 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Loader, Download, ArrowLeft, Check, X, Plus, Trash2 } from "lucide-react";
+import { Loader, Download, ArrowLeft, Check, X, Plus, Trash2, Edit2 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+
+const IGV_RATE = 0.18; // 18% IGV
 
 // ============================================
 // DIALOG: AGREGAR ACCESORIOS
@@ -79,12 +81,16 @@ function AgregarAccesorioDialog({
       descuento = parseFloat(accesorio.descuento_monto);
     }
 
-    const total = subtotal - descuento;
+    const totalSinIgv = subtotal - descuento;
+    const igv = totalSinIgv * IGV_RATE;
+    const totalConIgv = totalSinIgv + igv;
 
     return {
       subtotal: subtotal.toFixed(2),
       descuento: descuento.toFixed(2),
-      total: total.toFixed(2),
+      totalSinIgv: totalSinIgv.toFixed(2),
+      igv: igv.toFixed(2),
+      totalConIgv: totalConIgv.toFixed(2),
     };
   };
 
@@ -241,7 +247,7 @@ function AgregarAccesorioDialog({
                         </td>
                         <td className="text-right p-3 font-bold text-blue-600">
                           {isSelected && totals
-                            ? `$${totals.total}`
+                            ? `$${totals.totalConIgv}`
                             : "-"}
                         </td>
                         <td className="p-3 text-center">
@@ -408,30 +414,25 @@ function AgregarAccesorioDialog({
 
                             {/* Resumen */}
                             {totals && (
-                              <div className="grid grid-cols-3 gap-3 p-3 bg-white rounded border-2 border-blue-200">
-                                <div className="text-center">
-                                  <p className="text-xs text-gray-600 font-medium">
-                                    Subtotal
-                                  </p>
-                                  <p className="text-base font-bold text-gray-900">
-                                    ${totals.subtotal}
-                                  </p>
+                              <div className="space-y-2 p-3 bg-white rounded border-2 border-blue-200">
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                  <p className="text-gray-600">Subtotal:</p>
+                                  <p className="text-right font-bold">${totals.subtotal}</p>
+                                  
+                                  <p className="text-gray-600">Descuento:</p>
+                                  <p className="text-right font-bold text-red-600">-${totals.descuento}</p>
+                                  
+                                  <p className="text-gray-600">Subtotal (sin IGV):</p>
+                                  <p className="text-right font-bold">${totals.totalSinIgv}</p>
+                                  
+                                  <p className="text-gray-600">IGV (18%):</p>
+                                  <p className="text-right font-bold text-green-600">+${totals.igv}</p>
                                 </div>
-                                <div className="text-center">
-                                  <p className="text-xs text-gray-600 font-medium">
-                                    Descuento
-                                  </p>
-                                  <p className="text-base font-bold text-red-600">
-                                    -${totals.descuento}
-                                  </p>
-                                </div>
-                                <div className="text-center">
-                                  <p className="text-xs text-gray-600 font-medium">
-                                    Total
-                                  </p>
-                                  <p className="text-base font-bold text-blue-600">
-                                    ${totals.total}
-                                  </p>
+                                <div className="border-t pt-2">
+                                  <div className="flex justify-between text-sm font-bold">
+                                    <p>Total (con IGV):</p>
+                                    <p className="text-blue-600">${totals.totalConIgv}</p>
+                                  </div>
                                 </div>
                               </div>
                             )}
@@ -455,7 +456,7 @@ function AgregarAccesorioDialog({
                       <p key={acc.id} className="text-sm text-blue-700">
                         • <strong>{acc.detalle}</strong> x{acc.cantidad} =
                         <span className="font-bold text-blue-600 ml-1">
-                          ${totals.total}
+                          ${totals.totalConIgv}
                         </span>
                       </p>
                     );
@@ -540,12 +541,16 @@ function AgregarRegalosDialog({
       descuento = parseFloat(regalo.descuento_monto);
     }
 
-    const total = subtotal - descuento;
+    const totalSinIgv = subtotal - descuento;
+    const igv = totalSinIgv * IGV_RATE;
+    const totalConIgv = totalSinIgv + igv;
 
     return {
       subtotal: subtotal.toFixed(2),
       descuento: descuento.toFixed(2),
-      total: total.toFixed(2),
+      totalSinIgv: totalSinIgv.toFixed(2),
+      igv: igv.toFixed(2),
+      totalConIgv: totalConIgv.toFixed(2),
     };
   };
 
@@ -710,7 +715,7 @@ function AgregarRegalosDialog({
                         </td>
                         <td className="text-right p-3 font-bold text-blue-600">
                           {isSelected && totals
-                            ? `$${totals.total}`
+                            ? `$${totals.totalConIgv}`
                             : "-"}
                         </td>
                         <td className="p-3 text-center">
@@ -877,30 +882,25 @@ function AgregarRegalosDialog({
 
                             {/* Resumen */}
                             {totals && (
-                              <div className="grid grid-cols-3 gap-3 p-3 bg-white rounded border-2 border-blue-200">
-                                <div className="text-center">
-                                  <p className="text-xs text-gray-600 font-medium">
-                                    Subtotal
-                                  </p>
-                                  <p className="text-base font-bold text-gray-900">
-                                    ${totals.subtotal}
-                                  </p>
+                              <div className="space-y-2 p-3 bg-white rounded border-2 border-blue-200">
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                  <p className="text-gray-600">Subtotal:</p>
+                                  <p className="text-right font-bold">${totals.subtotal}</p>
+                                  
+                                  <p className="text-gray-600">Descuento:</p>
+                                  <p className="text-right font-bold text-red-600">-${totals.descuento}</p>
+                                  
+                                  <p className="text-gray-600">Subtotal (sin IGV):</p>
+                                  <p className="text-right font-bold">${totals.totalSinIgv}</p>
+                                  
+                                  <p className="text-gray-600">IGV (18%):</p>
+                                  <p className="text-right font-bold text-green-600">+${totals.igv}</p>
                                 </div>
-                                <div className="text-center">
-                                  <p className="text-xs text-gray-600 font-medium">
-                                    Descuento
-                                  </p>
-                                  <p className="text-base font-bold text-red-600">
-                                    -${totals.descuento}
-                                  </p>
-                                </div>
-                                <div className="text-center">
-                                  <p className="text-xs text-gray-600 font-medium">
-                                    Total
-                                  </p>
-                                  <p className="text-base font-bold text-blue-600">
-                                    ${totals.total}
-                                  </p>
+                                <div className="border-t pt-2">
+                                  <div className="flex justify-between text-sm font-bold">
+                                    <p>Total (con IGV):</p>
+                                    <p className="text-blue-600">${totals.totalConIgv}</p>
+                                  </div>
                                 </div>
                               </div>
                             )}
@@ -924,7 +924,7 @@ function AgregarRegalosDialog({
                       <p key={regalo.id} className="text-sm text-blue-700">
                         • <strong>{regalo.detalle}</strong> x{regalo.cantidad} =
                         <span className="font-bold text-blue-600 ml-1">
-                          ${totals.total}
+                          ${totals.totalConIgv}
                         </span>
                       </p>
                     );
@@ -958,6 +958,572 @@ function AgregarRegalosDialog({
 }
 
 // ============================================
+// DIALOG: EDITAR ACCESORIO
+// ============================================
+function EditarAccesorioDialog({
+  open,
+  onOpenChange,
+  accesorio,
+  onAccesorioUpdated,
+}) {
+  const [formData, setFormData] = useState({
+    cantidad: 1,
+    descuento_tipo: "porcentaje",
+    descuento_porcentaje: null,
+    descuento_monto: null,
+    notas: null,
+  });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (accesorio && open) {
+      setFormData({
+        cantidad: accesorio.cantidad || 1,
+        descuento_tipo:
+          accesorio.descuento_porcentaje > 0
+            ? "porcentaje"
+            : accesorio.descuento_monto > 0
+            ? "monto"
+            : "ninguno",
+        descuento_porcentaje: accesorio.descuento_porcentaje || null,
+        descuento_monto: accesorio.descuento_monto || null,
+        notas: accesorio.notas || null,
+      });
+    }
+  }, [accesorio, open]);
+
+  const calculateTotals = () => {
+    const precio = parseFloat(accesorio.precio_unitario) || 0;
+    const cantidad = formData.cantidad || 1;
+    const subtotal = precio * cantidad;
+
+    let descuento = 0;
+    if (formData.descuento_tipo === "porcentaje" && formData.descuento_porcentaje) {
+      descuento =
+        subtotal * (parseFloat(formData.descuento_porcentaje) / 100);
+    } else if (formData.descuento_tipo === "monto" && formData.descuento_monto) {
+      descuento = parseFloat(formData.descuento_monto);
+    }
+
+    const totalSinIgv = subtotal - descuento;
+    const igv = totalSinIgv * IGV_RATE;
+    const totalConIgv = totalSinIgv + igv;
+
+    return {
+      subtotal: subtotal.toFixed(2),
+      descuento: descuento.toFixed(2),
+      totalSinIgv: totalSinIgv.toFixed(2),
+      igv: igv.toFixed(2),
+      totalConIgv: totalConIgv.toFixed(2),
+    };
+  };
+
+  async function handleGuardar() {
+    try {
+      setSaving(true);
+
+      const res = await fetch(
+        `/api/cotizaciones-accesorios/${accesorio.id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cantidad: formData.cantidad,
+            descuento_porcentaje:
+              formData.descuento_tipo === "porcentaje"
+                ? formData.descuento_porcentaje
+                : null,
+            descuento_monto:
+              formData.descuento_tipo === "monto"
+                ? formData.descuento_monto
+                : null,
+            notas: formData.notas,
+          }),
+        }
+      );
+
+      if (!res.ok) throw new Error("Error guardando cambios");
+
+      toast.success("Accesorio actualizado");
+      onOpenChange(false);
+      onAccesorioUpdated?.();
+    } catch (error) {
+      console.error(error);
+      toast.error("Error: " + error.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const totals = accesorio ? calculateTotals() : null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Editar Accesorio</DialogTitle>
+        </DialogHeader>
+
+        {accesorio && (
+          <div className="space-y-4">
+            {/* Info del Accesorio */}
+            <div className="bg-gray-50 p-4 rounded-lg border">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-600 font-semibold">Detalle</p>
+                  <p className="text-gray-900">{accesorio.detalle}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 font-semibold">N° Parte</p>
+                  <p className="text-gray-900">{accesorio.numero_parte}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 font-semibold">Precio Unitario</p>
+                  <p className="text-gray-900">
+                    ${parseFloat(accesorio.precio_unitario).toFixed(2)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-600 font-semibold">Moneda</p>
+                  <p className="text-gray-900">
+                    {accesorio.moneda_codigo} ({accesorio.moneda_simbolo})
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Edición */}
+            <div className="space-y-4">
+              {/* Cantidad */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 block mb-2">
+                  Cantidad
+                </label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={formData.cantidad}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      cantidad: parseInt(e.target.value) || 1,
+                    })
+                  }
+                  disabled={saving}
+                />
+              </div>
+
+              {/* Tipo de Descuento */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 block mb-2">
+                  Tipo de Descuento
+                </label>
+                <Select
+                  value={formData.descuento_tipo}
+                  onValueChange={(value) =>
+                    setFormData({
+                      ...formData,
+                      descuento_tipo: value,
+                      descuento_porcentaje: null,
+                      descuento_monto: null,
+                    })
+                  }
+                  disabled={saving}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="porcentaje">Por Porcentaje (%)</SelectItem>
+                    <SelectItem value="monto">Por Monto ($)</SelectItem>
+                    <SelectItem value="ninguno">Sin Descuento</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Valor Descuento */}
+              {formData.descuento_tipo !== "ninguno" && (
+                <div>
+                  <label className="text-sm font-semibold text-gray-700 block mb-2">
+                    {formData.descuento_tipo === "porcentaje"
+                      ? "Porcentaje (%)"
+                      : "Monto ($)"}
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max={formData.descuento_tipo === "porcentaje" ? "100" : undefined}
+                    step="0.01"
+                    placeholder="0.00"
+                    value={
+                      formData.descuento_tipo === "porcentaje"
+                        ? formData.descuento_porcentaje || ""
+                        : formData.descuento_monto || ""
+                    }
+                    onChange={(e) => {
+                      const value = e.target.value
+                        ? parseFloat(e.target.value)
+                        : null;
+                      if (formData.descuento_tipo === "porcentaje") {
+                        setFormData({
+                          ...formData,
+                          descuento_porcentaje: value,
+                        });
+                      } else {
+                        setFormData({
+                          ...formData,
+                          descuento_monto: value,
+                        });
+                      }
+                    }}
+                    disabled={saving}
+                  />
+                </div>
+              )}
+
+              {/* Notas */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 block mb-2">
+                  Notas (Opcional)
+                </label>
+                <Input
+                  type="text"
+                  placeholder="Notas sobre este accesorio..."
+                  value={formData.notas || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, notas: e.target.value })
+                  }
+                  disabled={saving}
+                />
+              </div>
+
+              {/* Resumen */}
+              {totals && (
+                <div className="space-y-2 p-3 bg-blue-50 rounded border-2 border-blue-200">
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <p className="text-gray-600">Subtotal:</p>
+                    <p className="text-right font-bold">${totals.subtotal}</p>
+                    
+                    <p className="text-gray-600">Descuento:</p>
+                    <p className="text-right font-bold text-red-600">-${totals.descuento}</p>
+                    
+                    <p className="text-gray-600">Subtotal (sin IGV):</p>
+                    <p className="text-right font-bold">${totals.totalSinIgv}</p>
+                    
+                    <p className="text-gray-600">IGV (18%):</p>
+                    <p className="text-right font-bold text-green-600">+${totals.igv}</p>
+                  </div>
+                  <div className="border-t pt-2">
+                    <div className="flex justify-between text-sm font-bold">
+                      <p>Total (con IGV):</p>
+                      <p className="text-blue-600">${totals.totalConIgv}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={saving}
+          >
+            Cancelar
+          </Button>
+          <Button onClick={handleGuardar} disabled={saving}>
+            {saving ? "Guardando..." : "Guardar Cambios"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============================================
+// DIALOG: EDITAR REGALO
+// ============================================
+function EditarRegaloDialog({
+  open,
+  onOpenChange,
+  regalo,
+  onRegaloUpdated,
+}) {
+  const [formData, setFormData] = useState({
+    cantidad: 1,
+    descuento_tipo: "porcentaje",
+    descuento_porcentaje: null,
+    descuento_monto: null,
+    notas: null,
+  });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (regalo && open) {
+      setFormData({
+        cantidad: regalo.cantidad || 1,
+        descuento_tipo:
+          regalo.descuento_porcentaje > 0
+            ? "porcentaje"
+            : regalo.descuento_monto > 0
+            ? "monto"
+            : "ninguno",
+        descuento_porcentaje: regalo.descuento_porcentaje || null,
+        descuento_monto: regalo.descuento_monto || null,
+        notas: regalo.notas || null,
+      });
+    }
+  }, [regalo, open]);
+
+  const calculateTotals = () => {
+    const precio = parseFloat(regalo.precio_unitario) || 0;
+    const cantidad = formData.cantidad || 1;
+    const subtotal = precio * cantidad;
+
+    let descuento = 0;
+    if (formData.descuento_tipo === "porcentaje" && formData.descuento_porcentaje) {
+      descuento = subtotal * (parseFloat(formData.descuento_porcentaje) / 100);
+    } else if (formData.descuento_tipo === "monto" && formData.descuento_monto) {
+      descuento = parseFloat(formData.descuento_monto);
+    }
+
+    const totalSinIgv = subtotal - descuento;
+    const igv = totalSinIgv * IGV_RATE;
+    const totalConIgv = totalSinIgv + igv;
+
+    return {
+      subtotal: subtotal.toFixed(2),
+      descuento: descuento.toFixed(2),
+      totalSinIgv: totalSinIgv.toFixed(2),
+      igv: igv.toFixed(2),
+      totalConIgv: totalConIgv.toFixed(2),
+    };
+  };
+
+  async function handleGuardar() {
+    try {
+      setSaving(true);
+
+      const res = await fetch(`/api/cotizaciones-regalos/${regalo.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cantidad: formData.cantidad,
+          descuento_porcentaje:
+            formData.descuento_tipo === "porcentaje"
+              ? formData.descuento_porcentaje
+              : null,
+          descuento_monto:
+            formData.descuento_tipo === "monto"
+              ? formData.descuento_monto
+              : null,
+          notas: formData.notas,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Error guardando cambios");
+
+      toast.success("Regalo actualizado");
+      onOpenChange(false);
+      onRegaloUpdated?.();
+    } catch (error) {
+      console.error(error);
+      toast.error("Error: " + error.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const totals = regalo ? calculateTotals() : null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Editar Regalo</DialogTitle>
+        </DialogHeader>
+
+        {regalo && (
+          <div className="space-y-4">
+            {/* Info del Regalo */}
+            <div className="bg-gray-50 p-4 rounded-lg border">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-600 font-semibold">Detalle</p>
+                  <p className="text-gray-900">{regalo.detalle}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 font-semibold">Lote</p>
+                  <p className="text-gray-900">{regalo.lote}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 font-semibold">Precio Unitario</p>
+                  <p className="text-gray-900">
+                    ${parseFloat(regalo.precio_unitario).toFixed(2)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-600 font-semibold">Moneda</p>
+                  <p className="text-gray-900">
+                    {regalo.moneda_codigo} ({regalo.moneda_simbolo})
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Edición */}
+            <div className="space-y-4">
+              {/* Cantidad */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 block mb-2">
+                  Cantidad
+                </label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={formData.cantidad}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      cantidad: parseInt(e.target.value) || 1,
+                    })
+                  }
+                  disabled={saving}
+                />
+              </div>
+
+              {/* Tipo de Descuento */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 block mb-2">
+                  Tipo de Descuento
+                </label>
+                <Select
+                  value={formData.descuento_tipo}
+                  onValueChange={(value) =>
+                    setFormData({
+                      ...formData,
+                      descuento_tipo: value,
+                      descuento_porcentaje: null,
+                      descuento_monto: null,
+                    })
+                  }
+                  disabled={saving}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="porcentaje">Por Porcentaje (%)</SelectItem>
+                    <SelectItem value="monto">Por Monto ($)</SelectItem>
+                    <SelectItem value="ninguno">Sin Descuento</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Valor Descuento */}
+              {formData.descuento_tipo !== "ninguno" && (
+                <div>
+                  <label className="text-sm font-semibold text-gray-700 block mb-2">
+                    {formData.descuento_tipo === "porcentaje"
+                      ? "Porcentaje (%)"
+                      : "Monto ($)"}
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max={formData.descuento_tipo === "porcentaje" ? "100" : undefined}
+                    step="0.01"
+                    placeholder="0.00"
+                    value={
+                      formData.descuento_tipo === "porcentaje"
+                        ? formData.descuento_porcentaje || ""
+                        : formData.descuento_monto || ""
+                    }
+                    onChange={(e) => {
+                      const value = e.target.value
+                        ? parseFloat(e.target.value)
+                        : null;
+                      if (formData.descuento_tipo === "porcentaje") {
+                        setFormData({
+                          ...formData,
+                          descuento_porcentaje: value,
+                        });
+                      } else {
+                        setFormData({
+                          ...formData,
+                          descuento_monto: value,
+                        });
+                      }
+                    }}
+                    disabled={saving}
+                  />
+                </div>
+              )}
+
+              {/* Notas */}
+              <div>
+                <label className="text-sm font-semibold text-gray-700 block mb-2">
+                  Notas (Opcional)
+                </label>
+                <Input
+                  type="text"
+                  placeholder="Notas sobre este regalo..."
+                  value={formData.notas || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, notas: e.target.value })
+                  }
+                  disabled={saving}
+                />
+              </div>
+
+              {/* Resumen */}
+              {totals && (
+                <div className="space-y-2 p-3 bg-blue-50 rounded border-2 border-blue-200">
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <p className="text-gray-600">Subtotal:</p>
+                    <p className="text-right font-bold">${totals.subtotal}</p>
+                    
+                    <p className="text-gray-600">Descuento:</p>
+                    <p className="text-right font-bold text-red-600">-${totals.descuento}</p>
+                    
+                    <p className="text-gray-600">Subtotal (sin IGV):</p>
+                    <p className="text-right font-bold">${totals.totalSinIgv}</p>
+                    
+                    <p className="text-gray-600">IGV (18%):</p>
+                    <p className="text-right font-bold text-green-600">+${totals.igv}</p>
+                  </div>
+                  <div className="border-t pt-2">
+                    <div className="flex justify-between text-sm font-bold">
+                      <p>Total (con IGV):</p>
+                      <p className="text-blue-600">${totals.totalConIgv}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={saving}
+          >
+            Cancelar
+          </Button>
+          <Button onClick={handleGuardar} disabled={saving}>
+            {saving ? "Guardando..." : "Guardar Cambios"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============================================
 // PÁGINA PRINCIPAL
 // ============================================
 export default function CotizacionResumenPage() {
@@ -972,17 +1538,18 @@ export default function CotizacionResumenPage() {
   const [editValues, setEditValues] = useState({});
   const [savingEdit, setSavingEdit] = useState(false);
 
-  // Opciones para selects
   const [marcas, setMarcas] = useState([]);
   const [modelos, setModelos] = useState([]);
   const [versiones, setVersiones] = useState([]);
   const [loadingOptions, setLoadingOptions] = useState(false);
 
-  // Dialogs
   const [openAccesoriosDialog, setOpenAccesoriosDialog] = useState(false);
   const [openRegalosDialog, setOpenRegalosDialog] = useState(false);
+  const [editingAccesorio, setEditingAccesorio] = useState(null);
+  const [editingRegalo, setEditingRegalo] = useState(null);
+  const [openEditAccesorio, setOpenEditAccesorio] = useState(false);
+  const [openEditRegalo, setOpenEditRegalo] = useState(false);
 
-  // Edición de descuentos
   const [editingDescuentoAcc, setEditingDescuentoAcc] = useState(false);
   const [editingDescuentoReg, setEditingDescuentoReg] = useState(false);
   const [descuentoAccValue, setDescuentoAccValue] = useState(0);
@@ -997,7 +1564,6 @@ export default function CotizacionResumenPage() {
     try {
       setLoading(true);
 
-      // Cargar cotización
       const resCot = await fetch(
         `/api/cotizacionesagenda/${cotizacionId}`,
         { cache: "no-store" }
@@ -1009,7 +1575,6 @@ export default function CotizacionResumenPage() {
         setDescuentoRegValue(parseFloat(data.descuento_total_regalos) || 0);
       }
 
-      // Cargar accesorios
       const resAcc = await fetch(
         `/api/cotizaciones-accesorios/by-cotizacion/${cotizacionId}`,
         { cache: "no-store" }
@@ -1019,7 +1584,6 @@ export default function CotizacionResumenPage() {
         setAccesorios(Array.isArray(data) ? data : []);
       }
 
-      // Cargar regalos
       const resReg = await fetch(
         `/api/cotizaciones-regalos/by-cotizacion/${cotizacionId}`,
         { cache: "no-store" }
@@ -1040,21 +1604,18 @@ export default function CotizacionResumenPage() {
     try {
       setLoadingOptions(true);
 
-      // Cargar marcas
       const resMarcas = await fetch("/api/marcas", { cache: "no-store" });
       if (resMarcas.ok) {
         const data = await resMarcas.json();
         setMarcas(Array.isArray(data) ? data : []);
       }
 
-      // Cargar modelos
       const resModelos = await fetch("/api/modelos", { cache: "no-store" });
       if (resModelos.ok) {
         const data = await resModelos.json();
         setModelos(Array.isArray(data) ? data : []);
       }
 
-      // Cargar versiones
       const resVersiones = await fetch("/api/versiones", { cache: "no-store" });
       if (resVersiones.ok) {
         const data = await resVersiones.json();
@@ -1068,7 +1629,6 @@ export default function CotizacionResumenPage() {
     }
   }
 
-  // ✅ Guardar cambios de cotización
   async function handleSaveEdit(field) {
     try {
       setSavingEdit(true);
@@ -1099,7 +1659,6 @@ export default function CotizacionResumenPage() {
     }
   }
 
-  // ✅ Guardar descuentos generales
   async function handleSaveDescuentoAcc() {
     try {
       setSavingEdit(true);
@@ -1162,7 +1721,6 @@ export default function CotizacionResumenPage() {
     }
   }
 
-  // ✅ Eliminar accesorio
   async function handleEliminarAccesorio(id) {
     try {
       setSavingEdit(true);
@@ -1182,7 +1740,6 @@ export default function CotizacionResumenPage() {
     }
   }
 
-  // ✅ Eliminar regalo
   async function handleEliminarRegalo(id) {
     try {
       setSavingEdit(true);
@@ -1202,56 +1759,59 @@ export default function CotizacionResumenPage() {
     }
   }
 
-  // ✅ Cancelar edición
   function handleCancelEdit() {
     setEditingField(null);
     setEditValues({});
   }
 
-  // ✅ Iniciar edición
   function handleStartEdit(field, value) {
     setEditingField(field);
     setEditValues({ [field]: value });
   }
 
-  // ✅ Obtener nombre de marca por ID
   function getMarcaName(id) {
     return marcas.find((m) => m.id === id)?.name || "N/A";
   }
 
-  // ✅ Obtener nombre de modelo por ID
   function getModeloName(id) {
     return modelos.find((m) => m.id === id)?.name || "N/A";
   }
 
-  // ✅ Obtener nombre de versión por ID
   function getVersionName(id) {
     return versiones.find((v) => v.id === id)?.name || "N/A";
   }
 
-  // ✅ Calcular totales por sección
   const accesoriosTotales = {
     subtotal: accesorios.reduce((sum, a) => sum + (parseFloat(a.subtotal) || 0), 0),
     descuentos: accesorios.reduce((sum, a) => sum + (parseFloat(a.descuento_monto) || 0), 0),
-    total: accesorios.reduce((sum, a) => sum + (parseFloat(a.total) || 0), 0),
+    totalSinIgv: 0,
+    igv: 0,
+    total: 0,
   };
+
+  accesoriosTotales.totalSinIgv = accesoriosTotales.subtotal - accesoriosTotales.descuentos;
+  accesoriosTotales.igv = accesoriosTotales.totalSinIgv * IGV_RATE;
+  accesoriosTotales.total = accesoriosTotales.totalSinIgv + accesoriosTotales.igv;
 
   const regalosTotal = {
     subtotal: regalos.reduce((sum, r) => sum + (parseFloat(r.subtotal) || 0), 0),
     descuentos: regalos.reduce((sum, r) => sum + (parseFloat(r.descuento_monto) || 0), 0),
-    total: regalos.reduce((sum, r) => sum + (parseFloat(r.total) || 0), 0),
+    totalSinIgv: 0,
+    igv: 0,
+    total: 0,
   };
+
+  regalosTotal.totalSinIgv = regalosTotal.subtotal - regalosTotal.descuentos;
+  regalosTotal.igv = regalosTotal.totalSinIgv * IGV_RATE;
+  regalosTotal.total = regalosTotal.totalSinIgv + regalosTotal.igv;
 
   const descuentoTotalAcc = parseFloat(cotizacion?.descuento_total_accesorios) || 0;
   const descuentoTotalReg = parseFloat(cotizacion?.descuento_total_regalos) || 0;
 
-  const granTotal =
-    accesoriosTotales.total +
-    regalosTotal.total -
-    descuentoTotalAcc -
-    descuentoTotalReg;
+  const subtotalGeneral = accesoriosTotales.totalSinIgv + regalosTotal.totalSinIgv;
+  const igvGeneral = subtotalGeneral * IGV_RATE;
+  const granTotal = subtotalGeneral + igvGeneral - descuentoTotalAcc - descuentoTotalReg;
 
-  // ✅ Agrupar por moneda
   const agruparPorMoneda = (items) => {
     const grupos = {};
     items.forEach((item) => {
@@ -1721,55 +2281,74 @@ export default function CotizacionResumenPage() {
                             <th className="text-right p-3 font-semibold">Cant.</th>
                             <th className="text-right p-3 font-semibold">Unitario</th>
                             <th className="text-right p-3 font-semibold">Subtotal</th>
-                            <th className="text-right p-3 font-semibold">Descuento</th>
+                            <th className="text-right p-3 font-semibold">Desc.</th>
+                            <th className="text-right p-3 font-semibold">S/IGV</th>
+                            <th className="text-right p-3 font-semibold">IGV</th>
                             <th className="text-right p-3 font-semibold">Total</th>
                             <th className="text-center p-3 font-semibold">Acción</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {grupo.items.map((acc) => (
-                            <tr key={acc.id} className="border-b hover:bg-gray-50">
-                              <td className="p-3">{acc.detalle}</td>
-                              <td className="p-3 text-gray-600">{acc.numero_parte}</td>
-                              <td className="text-right p-3">{acc.cantidad}</td>
-                              <td className="text-right p-3">
-                                ${parseFloat(acc.precio_unitario).toFixed(2)}
-                              </td>
-                              <td className="text-right p-3">
-                                ${parseFloat(acc.subtotal).toFixed(2)}
-                              </td>
-                              <td className="text-right p-3">
-                                {parseFloat(acc.descuento_monto) > 0 ? (
-                                  <div className="text-xs">
-                                    {parseFloat(acc.descuento_porcentaje) > 0 && (
-                                      <p className="text-gray-500">
-                                        {parseFloat(acc.descuento_porcentaje).toFixed(2)}%
-                                      </p>
-                                    )}
-                                    <p className="font-bold text-red-600">
+                          {grupo.items.map((acc) => {
+                            const totalSinIgv = parseFloat(acc.subtotal) - parseFloat(acc.descuento_monto);
+                            const igv = totalSinIgv * IGV_RATE;
+                            const totalConIgv = totalSinIgv + igv;
+
+                            return (
+                              <tr key={acc.id} className="border-b hover:bg-gray-50">
+                                <td className="p-3">{acc.detalle}</td>
+                                <td className="p-3 text-gray-600">{acc.numero_parte}</td>
+                                <td className="text-right p-3">{acc.cantidad}</td>
+                                <td className="text-right p-3">
+                                  ${parseFloat(acc.precio_unitario).toFixed(2)}
+                                </td>
+                                <td className="text-right p-3">
+                                  ${parseFloat(acc.subtotal).toFixed(2)}
+                                </td>
+                                <td className="text-right p-3">
+                                  {parseFloat(acc.descuento_monto) > 0 ? (
+                                    <p className="text-red-600 font-bold">
                                       -${parseFloat(acc.descuento_monto).toFixed(2)}
                                     </p>
-                                  </div>
-                                ) : (
-                                  "-"
-                                )}
-                              </td>
-                              <td className="text-right p-3 font-bold text-blue-600">
-                                ${parseFloat(acc.total).toFixed(2)}
-                              </td>
-                              <td className="text-center p-3">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleEliminarAccesorio(acc.id)}
-                                  disabled={savingEdit}
-                                  className="text-red-600 hover:text-red-700"
-                                >
-                                  <Trash2 size={14} />
-                                </Button>
-                              </td>
-                            </tr>
-                          ))}
+                                  ) : (
+                                    "-"
+                                  )}
+                                </td>
+                                <td className="text-right p-3">
+                                  ${totalSinIgv.toFixed(2)}
+                                </td>
+                                <td className="text-right p-3 text-green-600 font-bold">
+                                  ${igv.toFixed(2)}
+                                </td>
+                                <td className="text-right p-3 font-bold text-blue-600">
+                                  ${totalConIgv.toFixed(2)}
+                                </td>
+                                <td className="text-center p-3 flex gap-1 justify-center">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      setEditingAccesorio(acc);
+                                      setOpenEditAccesorio(true);
+                                    }}
+                                    disabled={savingEdit}
+                                    className="text-blue-600 hover:text-blue-700"
+                                  >
+                                    <Edit2 size={14} />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleEliminarAccesorio(acc.id)}
+                                    disabled={savingEdit}
+                                    className="text-red-600 hover:text-red-700"
+                                  >
+                                    <Trash2 size={14} />
+                                  </Button>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -1778,25 +2357,31 @@ export default function CotizacionResumenPage() {
 
                 {/* Totales de Accesorios */}
                 <div className="bg-gradient-to-r from-blue-50 to-cyan-50 p-4 rounded-lg border border-blue-200 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="font-semibold text-gray-700">Subtotal Accesorios:</span>
-                    <span className="font-bold">
-                      ${accesoriosTotales.subtotal.toFixed(2)}
-                    </span>
+                  <div className="grid grid-cols-4 gap-4 text-sm font-semibold">
+                    <div>
+                      <p className="text-gray-700">Subtotal:</p>
+                      <p className="font-bold">${accesoriosTotales.subtotal.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-700">Descuentos:</p>
+                      <p className="font-bold text-red-600">-${accesoriosTotales.descuentos.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-700">S/IGV:</p>
+                      <p className="font-bold">${accesoriosTotales.totalSinIgv.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-700">IGV (18%):</p>
+                      <p className="font-bold text-green-600">+${accesoriosTotales.igv.toFixed(2)}</p>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="font-semibold text-gray-700">Descuentos en Items:</span>
-                    <span className="font-bold text-red-600">
-                      -${accesoriosTotales.descuentos.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="border-t pt-2 flex justify-between">
-                    <span className="font-bold text-gray-900">
-                      Subtotal Final:
-                    </span>
-                    <span className="font-bold text-lg text-blue-600">
-                      ${accesoriosTotales.total.toFixed(2)}
-                    </span>
+                  <div className="border-t pt-3">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-lg text-gray-900">Total Accesorios:</span>
+                      <span className="font-bold text-lg text-blue-600">
+                        ${accesoriosTotales.total.toFixed(2)}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Descuento Total Accesorios */}
@@ -1804,7 +2389,7 @@ export default function CotizacionResumenPage() {
                     {editingDescuentoAcc ? (
                       <div className="flex gap-2 items-center">
                         <span className="font-bold text-gray-900 flex-1">
-                          Descuento Total:
+                          Descuento Gral.:
                         </span>
                         <Input
                           type="number"
@@ -1842,7 +2427,7 @@ export default function CotizacionResumenPage() {
                         onClick={() => setEditingDescuentoAcc(true)}
                       >
                         <span className="font-bold text-gray-900">
-                          Descuento Total:
+                          Descuento Gral.:
                         </span>
                         <span className="font-bold text-red-600">
                           -${descuentoTotalAcc.toFixed(2)}
@@ -1894,64 +2479,83 @@ export default function CotizacionResumenPage() {
                             <th className="text-right p-3 font-semibold">Cant.</th>
                             <th className="text-right p-3 font-semibold">Unitario</th>
                             <th className="text-right p-3 font-semibold">Subtotal</th>
-                            <th className="text-right p-3 font-semibold">Descuento</th>
+                            <th className="text-right p-3 font-semibold">Desc.</th>
+                            <th className="text-right p-3 font-semibold">S/IGV</th>
+                            <th className="text-right p-3 font-semibold">IGV</th>
                             <th className="text-right p-3 font-semibold">Total</th>
                             <th className="text-center p-3 font-semibold">Acción</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {grupo.items.map((regalo) => (
-                            <tr key={regalo.id} className="border-b hover:bg-gray-50">
-                              <td className="p-3">{regalo.detalle}</td>
-                              <td className="p-3 text-gray-600">{regalo.lote}</td>
-                              <td className="p-3 text-center">
-                                <span className={`text-xs font-bold ${
-                                  regalo.regalo_tienda
-                                    ? "text-green-600"
-                                    : "text-gray-600"
-                                }`}>
-                                  {regalo.regalo_tienda ? "✓" : "✗"}
-                                </span>
-                              </td>
-                              <td className="text-right p-3">{regalo.cantidad}</td>
-                              <td className="text-right p-3">
-                                ${parseFloat(regalo.precio_unitario).toFixed(2)}
-                              </td>
-                              <td className="text-right p-3">
-                                ${parseFloat(regalo.subtotal).toFixed(2)}
-                              </td>
-                              <td className="text-right p-3">
-                                {parseFloat(regalo.descuento_monto) > 0 ? (
-                                  <div className="text-xs">
-                                    {parseFloat(regalo.descuento_porcentaje) > 0 && (
-                                      <p className="text-gray-500">
-                                        {parseFloat(regalo.descuento_porcentaje).toFixed(2)}%
-                                      </p>
-                                    )}
-                                    <p className="font-bold text-red-600">
+                          {grupo.items.map((regalo) => {
+                            const totalSinIgv = parseFloat(regalo.subtotal) - parseFloat(regalo.descuento_monto);
+                            const igv = totalSinIgv * IGV_RATE;
+                            const totalConIgv = totalSinIgv + igv;
+
+                            return (
+                              <tr key={regalo.id} className="border-b hover:bg-gray-50">
+                                <td className="p-3">{regalo.detalle}</td>
+                                <td className="p-3 text-gray-600">{regalo.lote}</td>
+                                <td className="p-3 text-center">
+                                  <span className={`text-xs font-bold ${
+                                    regalo.regalo_tienda
+                                      ? "text-green-600"
+                                      : "text-gray-600"
+                                  }`}>
+                                    {regalo.regalo_tienda ? "✓" : "✗"}
+                                  </span>
+                                </td>
+                                <td className="text-right p-3">{regalo.cantidad}</td>
+                                <td className="text-right p-3">
+                                  ${parseFloat(regalo.precio_unitario).toFixed(2)}
+                                </td>
+                                <td className="text-right p-3">
+                                  ${parseFloat(regalo.subtotal).toFixed(2)}
+                                </td>
+                                <td className="text-right p-3">
+                                  {parseFloat(regalo.descuento_monto) > 0 ? (
+                                    <p className="text-red-600 font-bold">
                                       -${parseFloat(regalo.descuento_monto).toFixed(2)}
                                     </p>
-                                  </div>
-                                ) : (
-                                  "-"
-                                )}
-                              </td>
-                              <td className="text-right p-3 font-bold text-blue-600">
-                                ${parseFloat(regalo.total).toFixed(2)}
-                              </td>
-                              <td className="text-center p-3">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleEliminarRegalo(regalo.id)}
-                                  disabled={savingEdit}
-                                  className="text-red-600 hover:text-red-700"
-                                >
-                                  <Trash2 size={14} />
-                                </Button>
-                              </td>
-                            </tr>
-                          ))}
+                                  ) : (
+                                    "-"
+                                  )}
+                                </td>
+                                <td className="text-right p-3">
+                                  ${totalSinIgv.toFixed(2)}
+                                </td>
+                                <td className="text-right p-3 text-green-600 font-bold">
+                                  ${igv.toFixed(2)}
+                                </td>
+                                <td className="text-right p-3 font-bold text-blue-600">
+                                  ${totalConIgv.toFixed(2)}
+                                </td>
+                                <td className="text-center p-3 flex gap-1 justify-center">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      setEditingRegalo(regalo);
+                                      setOpenEditRegalo(true);
+                                    }}
+                                    disabled={savingEdit}
+                                    className="text-blue-600 hover:text-blue-700"
+                                  >
+                                    <Edit2 size={14} />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleEliminarRegalo(regalo.id)}
+                                    disabled={savingEdit}
+                                    className="text-red-600 hover:text-red-700"
+                                  >
+                                    <Trash2 size={14} />
+                                  </Button>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -1960,25 +2564,31 @@ export default function CotizacionResumenPage() {
 
                 {/* Totales de Regalos */}
                 <div className="bg-gradient-to-r from-pink-50 to-rose-50 p-4 rounded-lg border border-pink-200 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="font-semibold text-gray-700">Subtotal Regalos:</span>
-                    <span className="font-bold">
-                      ${regalosTotal.subtotal.toFixed(2)}
-                    </span>
+                  <div className="grid grid-cols-4 gap-4 text-sm font-semibold">
+                    <div>
+                      <p className="text-gray-700">Subtotal:</p>
+                      <p className="font-bold">${regalosTotal.subtotal.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-700">Descuentos:</p>
+                      <p className="font-bold text-red-600">-${regalosTotal.descuentos.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-700">S/IGV:</p>
+                      <p className="font-bold">${regalosTotal.totalSinIgv.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-700">IGV (18%):</p>
+                      <p className="font-bold text-green-600">+${regalosTotal.igv.toFixed(2)}</p>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="font-semibold text-gray-700">Descuentos en Items:</span>
-                    <span className="font-bold text-red-600">
-                      -${regalosTotal.descuentos.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="border-t pt-2 flex justify-between">
-                    <span className="font-bold text-gray-900">
-                      Subtotal Final:
-                    </span>
-                    <span className="font-bold text-lg text-pink-600">
-                      ${regalosTotal.total.toFixed(2)}
-                    </span>
+                  <div className="border-t pt-3">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-lg text-gray-900">Total Regalos:</span>
+                      <span className="font-bold text-lg text-pink-600">
+                        ${regalosTotal.total.toFixed(2)}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Descuento Total Regalos */}
@@ -1986,7 +2596,7 @@ export default function CotizacionResumenPage() {
                     {editingDescuentoReg ? (
                       <div className="flex gap-2 items-center">
                         <span className="font-bold text-gray-900 flex-1">
-                          Descuento Total:
+                          Descuento Gral.:
                         </span>
                         <Input
                           type="number"
@@ -2024,7 +2634,7 @@ export default function CotizacionResumenPage() {
                         onClick={() => setEditingDescuentoReg(true)}
                       >
                         <span className="font-bold text-gray-900">
-                          Descuento Total:
+                          Descuento Gral.:
                         </span>
                         <span className="font-bold text-red-600">
                           -${descuentoTotalReg.toFixed(2)}
@@ -2050,85 +2660,47 @@ export default function CotizacionResumenPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div className="bg-white p-4 rounded-lg border border-green-200">
-                  <p className="text-sm text-gray-600 font-semibold">
-                    Subtotal Accesorios
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    ${accesoriosTotales.subtotal.toFixed(2)}
-                  </p>
-                </div>
-                <div className="bg-white p-4 rounded-lg border border-green-200">
-                  <p className="text-sm text-gray-600 font-semibold">
-                    Subtotal Regalos
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    ${regalosTotal.subtotal.toFixed(2)}
-                  </p>
-                </div>
-                <div className="bg-white p-4 rounded-lg border border-green-200">
-                  <p className="text-sm text-gray-600 font-semibold">
-                    Subtotal General
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-xs text-gray-600 font-semibold">Subtotal</p>
+                  <p className="text-lg font-bold text-gray-900">
                     ${(accesoriosTotales.subtotal + regalosTotal.subtotal).toFixed(2)}
                   </p>
                 </div>
-              </div>
-
-              <div className="border-t-2 border-green-300 pt-4 space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold text-gray-700">
-                    Descuentos en Items (Accesorios):
-                  </span>
-                  <span className="font-bold text-red-600">
-                    -${accesoriosTotales.descuentos.toFixed(2)}
-                  </span>
+                <div className="bg-white p-4 rounded-lg border border-green-200">
+                  <p className="text-xs text-gray-600 font-semibold">Descuentos Items</p>
+                  <p className="text-lg font-bold text-red-600">
+                    -${(accesoriosTotales.descuentos + regalosTotal.descuentos).toFixed(2)}
+                  </p>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold text-gray-700">
-                    Descuentos en Items (Regalos):
-                  </span>
-                  <span className="font-bold text-red-600">
-                    -${regalosTotal.descuentos.toFixed(2)}
-                  </span>
+                <div className="bg-white p-4 rounded-lg border border-green-200">
+                  <p className="text-xs text-gray-600 font-semibold">Subtotal (S/IGV)</p>
+                  <p className="text-lg font-bold text-gray-900">
+                    ${subtotalGeneral.toFixed(2)}
+                  </p>
                 </div>
-                {(descuentoTotalAcc > 0 ||
-                  descuentoTotalReg > 0) && (
-                  <>
-                    {descuentoTotalAcc > 0 && (
-                      <div className="flex justify-between items-center">
-                        <span className="font-semibold text-gray-700">
-                          Descuento Total Accesorios:
-                        </span>
-                        <span className="font-bold text-red-600">
-                          -${descuentoTotalAcc.toFixed(2)}
-                        </span>
-                      </div>
-                    )}
-                    {descuentoTotalReg > 0 && (
-                      <div className="flex justify-between items-center">
-                        <span className="font-semibold text-gray-700">
-                          Descuento Total Regalos:
-                        </span>
-                        <span className="font-bold text-red-600">
-                          -${descuentoTotalReg.toFixed(2)}
-                        </span>
-                      </div>
-                    )}
-                  </>
-                )}
+                <div className="bg-white p-4 rounded-lg border border-green-200">
+                  <p className="text-xs text-gray-600 font-semibold">IGV (18%)</p>
+                  <p className="text-lg font-bold text-green-600">
+                    +${igvGeneral.toFixed(2)}
+                  </p>
+                </div>
+                <div className="bg-white p-4 rounded-lg border border-green-200">
+                  <p className="text-xs text-gray-600 font-semibold">Desc. Generales</p>
+                  <p className="text-lg font-bold text-red-600">
+                    -${(descuentoTotalAcc + descuentoTotalReg).toFixed(2)}
+                  </p>
+                </div>
               </div>
 
               <div className="bg-white border-2 border-green-400 rounded-lg p-4 mt-4">
-                <p className="text-sm text-gray-600 font-bold">GRAN TOTAL</p>
-                <p className="text-4xl font-bold text-green-600">
+                <p className="text-sm text-gray-600 font-bold">GRAN TOTAL (CON IGV)</p>
+                <p className="text-5xl font-bold text-green-600">
                   ${granTotal.toFixed(2)}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Todos los descuentos incluidos
+                <p className="text-xs text-gray-500 mt-2">
+                  Incluye todos los descuentos e IGV
                 </p>
               </div>
             </div>
@@ -2159,6 +2731,20 @@ export default function CotizacionResumenPage() {
         onOpenChange={setOpenRegalosDialog}
         cotizacion={cotizacion}
         onRegaloAdded={loadData}
+      />
+
+      <EditarAccesorioDialog
+        open={openEditAccesorio}
+        onOpenChange={setOpenEditAccesorio}
+        accesorio={editingAccesorio}
+        onAccesorioUpdated={loadData}
+      />
+
+      <EditarRegaloDialog
+        open={openEditRegalo}
+        onOpenChange={setOpenEditRegalo}
+        regalo={editingRegalo}
+        onRegaloUpdated={loadData}
       />
     </div>
   );
