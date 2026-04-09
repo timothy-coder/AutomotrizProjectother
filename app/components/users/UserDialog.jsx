@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import {
   Dialog,
@@ -136,12 +137,12 @@ export default function UserDialog({
       try {
         setLoadingRoles(true);
         const res = await fetch("/api/roles", { cache: "no-store" });
+        if (!res.ok) throw new Error(`Error cargando roles: ${res.status}`);
         const data = await res.json();
         if (!active) return;
         setRolesOptions(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Error cargando roles:", error);
-        if (active) setRolesOptions([]);
+      } catch {
+        if (active) { setRolesOptions([]); toast.error("Error al cargar roles"); }
       } finally {
         if (active) setLoadingRoles(false);
       }
@@ -156,12 +157,12 @@ export default function UserDialog({
           cache: "no-store",
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
+        if (!res.ok) throw new Error(`Error cargando agentes: ${res.status}`);
         if (!active) return;
         const data = await res.json();
-        setChatwootAgents(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Error cargando agentes Chatwoot:", error);
-        if (active) setChatwootAgents([]);
+        setChatwootAgents(Array.isArray(data?.data) ? data.data : []);
+      } catch {
+        if (active) { setChatwootAgents([]); toast.error("Error al cargar agentes de Chatwoot"); }
       } finally {
         if (active) setLoadingAgents(false);
       }
@@ -227,13 +228,13 @@ export default function UserDialog({
       try {
         setLoadingCentros(true);
         const res = await fetch("/api/centros", { cache: "no-store" });
+        if (!res.ok) throw new Error(`Error cargando centros: ${res.status}`);
         const data = await res.json();
 
         if (!active) return;
         setCentrosOptions(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Error cargando centros:", error);
-        if (active) setCentrosOptions([]);
+      } catch {
+        if (active) { setCentrosOptions([]); toast.error("Error al cargar centros"); }
       } finally {
         if (active) setLoadingCentros(false);
       }
@@ -245,6 +246,11 @@ export default function UserDialog({
       active = false;
     };
   }, [open]);
+
+  const centrosKey = useMemo(
+    () => normalizeIds(form.centros).join(","),
+    [form.centros]
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -275,8 +281,8 @@ export default function UserDialog({
               fetch(`/api/mostradores/bycentro?centro_id=${centroId}`, { cache: "no-store" }),
             ]);
 
-            const talleresData = await talleresRes.json();
-            const mostradoresData = await mostradoresRes.json();
+            const talleresData = talleresRes.ok ? await talleresRes.json() : [];
+            const mostradoresData = mostradoresRes.ok ? await mostradoresRes.json() : [];
 
             return {
               talleres: Array.isArray(talleresData) ? talleresData : [],
@@ -306,11 +312,11 @@ export default function UserDialog({
             mostradores: prevMostradores.filter((id) => mostradoresValidos.has(id)),
           };
         });
-      } catch (error) {
-        console.error("Error cargando talleres/mostradores:", error);
+      } catch {
         if (!active) return;
         setTalleresOptions([]);
         setMostradoresOptions([]);
+        toast.error("Error al cargar talleres y mostradores");
       } finally {
         if (active) setLoadingDependientes(false);
       }
@@ -321,7 +327,7 @@ export default function UserDialog({
     return () => {
       active = false;
     };
-  }, [open, JSON.stringify(normalizeIds(form.centros))]);
+  }, [open, centrosKey]);
 
   function updateField(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -379,16 +385,16 @@ export default function UserDialog({
     }));
   }
 
+  const passMismatch =
+    form.password &&
+    form.password2 &&
+    form.password !== form.password2;
+
   function handleSave() {
     if (isView) return;
     if (passMismatch) return;
     onSave(form);
   }
-
-  const passMismatch =
-    form.password &&
-    form.password2 &&
-    form.password !== form.password2;
 
   const centrosSeleccionadosTexto = useMemo(() => {
     if (!form.centros?.length) return "Ninguno";
@@ -401,7 +407,7 @@ export default function UserDialog({
 
   return (
     <TooltipProvider>
-      <Dialog open={open} onOpenChange={onOpenChange} className="bg-white">
+      <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="sticky top-0 bg-white border-b pb-4 z-10">
             <div className="flex items-center gap-2">
