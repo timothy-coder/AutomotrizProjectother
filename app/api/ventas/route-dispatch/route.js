@@ -4,6 +4,90 @@ import { normalizePhone } from "@/lib/phoneUtils";
 
 // ── Cache del intervalo de follow-up (evita query en cada mensaje) ───────
 let _followupDaysCache = { value: 3, expiresAt: 0 };
+
+// ── Cache de horarios de atención (horacitas_centro) ─────────────────────
+const DAY_MAP = ["domingo", "lunes", "martes", "miercoles", "jueves", "viernes", "sabado"];
+let _hoursCache = { schedules: [], expiresAt: 0 };
+
+async function getBusinessSchedules() {
+  if (Date.now() < _hoursCache.expiresAt) return _hoursCache.schedules;
+  try {
+    const [rows] = await db.query(
+      "SELECT hc.week_json, c.nombre AS centro_nombre FROM horacitas_centro hc JOIN centros c ON c.id = hc.centro_id"
+    );
+    const schedules = rows.map(r => ({
+      centro: r.centro_nombre,
+      week: typeof r.week_json === "string" ? JSON.parse(r.week_json) : r.week_json,
+    }));
+    _hoursCache = { schedules, expiresAt: Date.now() + 5 * 60_000 };
+    return schedules;
+  } catch (e) {
+    console.error("[getBusinessSchedules] error:", e.message);
+    return _hoursCache.schedules;
+  }
+}
+
+/**
+ * Verifica si ALGÚN centro está abierto en este momento.
+ * Retorna { open: true } o { open: false, schedule_text: "..." }
+ */
+async function checkBusinessHours() {
+  const schedules = await getBusinessSchedules();
+  if (schedules.length === 0) return { open: true }; // sin config → asumir abierto
+
+  const now = new Date();
+  // Usar timezone de Perú (UTC-5)
+  const peruNow = new Date(now.toLocaleString("en-US", { timeZone: "America/Lima" }));
+  const dayKey = DAY_MAP[peruNow.getDay()];
+  const currentMinutes = peruNow.getHours() * 60 + peruNow.getMinutes();
+
+  let anyOpen = false;
+  const horarioLines = [];
+
+  for (const s of schedules) {
+    const dayConfig = s.week?.[dayKey];
+    if (dayConfig?.active && dayConfig.start && dayConfig.end) {
+      const [sh, sm] = dayConfig.start.split(":").map(Number);
+      const [eh, em] = dayConfig.end.split(":").map(Number);
+      const startMin = sh * 60 + sm;
+      const endMin = eh * 60 + em;
+      if (currentMinutes >= startMin && currentMinutes < endMin) {
+        anyOpen = true;
+      }
+    }
+  }
+
+  if (anyOpen) return { open: true };
+
+  // Construir texto de horarios para el cliente
+  const dayLabels = {
+    lunes: "Lun", martes: "Mar", miercoles: "Mié",
+    jueves: "Jue", viernes: "Vie", sabado: "Sáb", domingo: "Dom",
+  };
+
+  // Agrupar horarios: buscar el rango más común entre centros
+  const allDays = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"];
+  for (const d of allDays) {
+    // Tomar el horario más amplio de todos los centros para cada día
+    let earliest = null, latest = null;
+    for (const s of schedules) {
+      const dc = s.week?.[d];
+      if (dc?.active && dc.start && dc.end) {
+        if (!earliest || dc.start < earliest) earliest = dc.start;
+        if (!latest || dc.end > latest) latest = dc.end;
+      }
+    }
+    if (earliest && latest) {
+      horarioLines.push(`✅ ${dayLabels[d]}: ${earliest} a ${latest}`);
+    }
+  }
+
+  const scheduleText = horarioLines.length > 0
+    ? horarioLines.join("\n")
+    : "Lun a Vie: 08:30 a 17:00";
+
+  return { open: false, scheduleText };
+}
 async function getFollowupDays() {
   if (Date.now() < _followupDaysCache.expiresAt) return _followupDaysCache.value;
   try {
@@ -74,9 +158,10 @@ export async function PUT(req) {
  * 5. Si el cliente ya seleccionó opción del menú: rutear al flujo correcto
  *
  * route responses:
- *   "ventas_ia"       → el Taller v14 debe saltarse su lógica IA (ya se despachó)
- *   "new_client_menu" → el Taller v14 debe enviar menu_text al cliente
- *   "default"         → el Taller v14 continúa con su agente IA normal
+ *   "ventas_ia"         → el Taller v14 debe saltarse su lógica IA (ya se despachó)
+ *   "new_client_menu"   → el Taller v14 debe enviar menu_text al cliente
+ *   "fuera_de_horario"  → el Taller v14 envía off_hours_text (horario de atención)
+ *   "default"           → el Taller v14 continúa con su agente IA normal
  */
 export async function POST(req) {
   const secret = process.env.CONVERSATIONS_WEBHOOK_SECRET;
@@ -106,6 +191,57 @@ export async function POST(req) {
     const text = body?.text || "";
     const _dbg = process.env.DEBUG_ROUTE_DISPATCH === "1";
     if (_dbg) console.error("[route-dispatch] phone=%s convId=%s text=%s", phone, conversationId, text?.substring(0, 50));
+
+    // ── Verificar horario de atención ────────────────────────────────────────
+    const hours = await checkBusinessHours();
+    if (!hours.open) {
+      const agentCfg = await getAgentMenuConfig();
+      const agentName = agentCfg.agent_name || "Carlos";
+      const dealerName = agentCfg.dealer_name || "Taller Automotriz";
+
+      const offHoursText =
+        `👋 ¡Hola! Soy *${agentName}*, tu asesor virtual de *${dealerName}*.\n\n` +
+        `Nos encontramos *fuera de horario de atención*. 🥹\n\n` +
+        `Pero no te preocupes, dejanos tu mensaje y pronto estaremos en contacto contigo. 🫡\n\n` +
+        `Nuestro horario de atención es:\n\n` +
+        `${hours.scheduleText}\n\n` +
+        `Cuando un agente esté disponible, se comunicará contigo 📱✨`;
+
+      // Marcar sesión para notificación de reapertura
+      try {
+        await db.query(
+          `UPDATE conversation_sessions SET pending_reopen = 1, updated_at = NOW()
+           WHERE REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') = ?
+             AND (conversation_id = ? OR conversation_id = 0)
+           ORDER BY updated_at DESC LIMIT 1`,
+          [phone, conversationId]
+        );
+      } catch (e) {
+        // Si la columna no existe, crear la sesión igualmente
+        if (e?.code !== "ER_BAD_FIELD_ERROR" && e?.errno !== 1054) {
+          console.error("[route-dispatch] pending_reopen error:", e.message);
+        }
+      }
+
+      // Si no tiene sesión aún, crear una para trackear la reapertura
+      try {
+        await db.query(
+          `INSERT IGNORE INTO conversation_sessions (phone, conversation_id, source, created_at, updated_at, pending_reopen)
+           VALUES (?, ?, 'fuera_horario', NOW(), NOW(), 1)`,
+          [phone, conversationId]
+        );
+      } catch (e) {
+        if (e?.code !== "ER_BAD_FIELD_ERROR" && e?.errno !== 1054) {
+          console.error("[route-dispatch] create off-hours session error:", e.message);
+        }
+      }
+
+      return NextResponse.json({
+        route: "fuera_de_horario",
+        off_hours_text: offHoursText,
+        phone,
+      });
+    }
 
     // ── Verificar sesión de ventas activa PRIMERO (últimas 24h) ─────────────
     // Si el usuario ya está en ventas_ia, TODOS sus mensajes van a ventas
@@ -443,7 +579,8 @@ async function touchSession(phone, conversationId = 0, source = null) {
          SET updated_at       = NOW(),
              followup_next_at = DATE_ADD(NOW(), INTERVAL ? DAY),
              followup_count   = 0,
-             closure_reason   = NULL
+             closure_reason   = NULL,
+             pending_reopen   = 0
        WHERE REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') = ?
          AND (conversation_id = ? OR conversation_id = 0)
          ${sourceClause}
