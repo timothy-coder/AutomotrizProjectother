@@ -695,7 +695,7 @@ export default function ReservaDetailPage() {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-600 block mb-2">
-                    Identificación Fiscal
+                    Documento de Identidad
                   </label>
                   <Input
                     value={formData.identificacion_fiscal}

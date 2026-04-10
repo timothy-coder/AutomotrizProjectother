@@ -156,7 +156,7 @@ export async function POST(req) {
 
       const cliente = clienteInfo[0] || {};
 
-      // ✅ Crear detalle de reserva con información auto-poblada
+      // ✅ CAMBIO: Usar NULL en lugar de string vacío para los campos opcionales
       const [detalleResult] = await db.query(
         `INSERT INTO reserva_detalles (
           reserva_id,
@@ -173,12 +173,12 @@ export async function POST(req) {
           reservaId,
           cotizacionId,
           oportunidad_id,
-          "", // vin - vacío para editar después
-          "", // usovehiculo - vacío para editar
-          "", // placa - vacía para editar
-          "", // numero_motor - vacío para editar
-          1.00, // cantidad por defecto
-          cotizacion.precio_base || 0, // precio_unitario de precio_base
+          null, // ✅ CAMBIO: null en lugar de ""
+          null, // ✅ CAMBIO: null en lugar de ""
+          null, // ✅ CAMBIO: null en lugar de ""
+          null, // ✅ CAMBIO: null en lugar de ""
+          1.00,
+          cotizacion.precio_base || 0,
         ]
       );
 
@@ -199,14 +199,14 @@ export async function POST(req) {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           reservaId,
-          0, // sin cotización
+          0,
           oportunidad_id,
-          "", // vin
-          "", // usovehiculo
-          "", // placa
-          "", // numero_motor
-          1.00, // cantidad
-          0, // precio_unitario
+          null, // ✅ CAMBIO: null en lugar de ""
+          null, // ✅ CAMBIO: null en lugar de ""
+          null, // ✅ CAMBIO: null en lugar de ""
+          null, // ✅ CAMBIO: null en lugar de ""
+          1.00,
+          0,
         ]
       );
 

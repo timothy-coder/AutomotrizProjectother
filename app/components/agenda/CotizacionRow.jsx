@@ -55,53 +55,55 @@ export default function CotizacionRow({
   const [openRegalosDialog, setOpenRegalosDialog] = useState(false);
 
   async function generatePDF() {
-    try {
-      if (!cot || !cot.id) {
-        return;
-      }
-
-      setGeneratingPdf(true);
-
-      const cotizacionId = String(cot.id);
-      const url = `/api/cotizacionesagenda/${cotizacionId}/pdf`;
-
-      const response = await fetch(url, {
-        method: "GET",
-        cache: "no-store",
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Error response:", errorText);
-        throw new Error(`Error ${response.status}: ${errorText}`);
-      }
-
-      const blob = await response.blob();
-
-      if (blob.size === 0) {
-        throw new Error("PDF vacío recibido");
-      }
-
-      const objectUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = objectUrl;
-      link.download = `Cotizacion-Q-${String(cot.id).padStart(6, "0")}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-
-      setTimeout(() => {
-        window.URL.revokeObjectURL(objectUrl);
-        document.body.removeChild(link);
-      }, 100);
-
-      toast.success("PDF descargado correctamente");
-    } catch (error) {
-      console.error("Error generando PDF:", error);
-      toast.error("Error generando PDF: " + error.message);
-    } finally {
-      setGeneratingPdf(false);
+  try {
+    if (!cot || !cot.id) {
+      return;
     }
+
+    setGeneratingPdf(true);
+
+    const cotizacionId = cot.id;
+    
+    // CAMBIO: Usar POST en lugar de GET
+    const response = await fetch("/api/cotizaciones-pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cotizacion_id: cotizacionId }),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Error response:", errorText);
+      throw new Error(`Error ${response.status}: ${errorText}`);
+    }
+
+    const blob = await response.blob();
+
+    if (blob.size === 0) {
+      throw new Error("PDF vacío recibido");
+    }
+
+    const objectUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = `Cotizacion-Q-${String(cot.id).padStart(6, "0")}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+
+    setTimeout(() => {
+      window.URL.revokeObjectURL(objectUrl);
+      document.body.removeChild(link);
+    }, 100);
+
+    toast.success("PDF descargado correctamente");
+  } catch (error) {
+    console.error("Error generando PDF:", error);
+    toast.error("Error generando PDF: " + error.message);
+  } finally {
+    setGeneratingPdf(false);
   }
+}
 
   async function generarEnlacePublico() {
     try {
@@ -195,67 +197,175 @@ export default function CotizacionRow({
   }
 
   // ✅ CREAR RESERVA - CAMBIAR ESTADO A "RESERVADA"
-  async function handleCrearReserva() {
+  // ✅ CREAR RESERVA - CAMBIAR ESTADO A "RESERVADA"
+async function handleCrearReserva() {
+  try {
+    if (!cot.oportunidad_id) {
+      toast.error("No se encontró la oportunidad");
+      return;
+    }
+
+    if (!userId) {
+      toast.error("Usuario no identificado");
+      return;
+    }
+
+    setCreatingReserva(true);
+
+    // 1️⃣ Cambiar estado a "reservada"
+    await onChangeStatus(cot, "reservada");
+
+    // 2️⃣ Crear o verificar VIN en historial_carros
+    if (cot.sku) {
+      try {
+        await fetch("/api/historial-carros", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            vin: cot.sku,
+            marca_id: cot.marca_id,
+            modelo_id: cot.modelo_id,
+            version_id: cot.version_id,
+            anio: cot.anio,
+            color_externo: cot.color_externo,
+            color_interno: cot.color_interno,
+          }),
+        });
+      } catch (vinError) {
+        console.warn("Advertencia al registrar VIN:", vinError);
+      }
+    }
+
+    // 3️⃣ Crear reserva
+    const resReserva = await fetch("/api/reservas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        oportunidad_id: cot.oportunidad_id,
+        created_by: userId,
+        vin: cot.sku,
+      }),
+    });
+
+    if (!resReserva.ok) {
+      const errorData = await resReserva.json();
+      throw new Error(errorData.message || "Error creando reserva");
+    }
+
+    const dataReserva = await resReserva.json();
+    
+    // 4️⃣ Cambiar etapa de oportunidad a "Reserva" (etapa 8)
     try {
-      if (!cot.oportunidad_id) {
-        toast.error("No se encontró la oportunidad");
-        return;
-      }
-
-      if (!userId) {
-        toast.error("Usuario no identificado");
-        return;
-      }
-
-      setCreatingReserva(true);
-
-      // 1️⃣ Cambiar estado a "reservada"
-      await onChangeStatus(cot, "reservada");
-
-      // 2️⃣ Crear reserva
-      const resReserva = await fetch("/api/reservas", {
-        method: "POST",
+      await fetch(`/api/oportunidades-oportunidades/${cot.oportunidad_id}/etapa`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          oportunidad_id: cot.oportunidad_id,
+          etapasconversion_id: 8,
           created_by: userId,
         }),
       });
+    } catch (etapaError) {
+      console.warn("Advertencia al cambiar etapa:", etapaError);
+    }
 
-      if (!resReserva.ok) {
-        const errorData = await resReserva.json();
-        throw new Error(errorData.message || "Error creando reserva");
-      }
+    toast.success("Reserva creada correctamente");
+    
+    // ✅ REFRESH AUTOMÁTICO después de 1 segundo
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000);
+  } catch (error) {
+    console.error("Error creando reserva:", error);
+    toast.error("Error: " + error.message);
+  } finally {
+    setCreatingReserva(false);
+  }
+}
 
-      const dataReserva = await resReserva.json();
-      
-      // 3️⃣ Cambiar etapa de oportunidad a "Reserva" (etapa 8)
+// ✅ ENVIAR NOTA DE PEDIDO - CAMBIAR ESTADO A "ENVIADA" Y CREAR RESERVA
+async function handleEnviarNotaPedido() {
+  try {
+    if (!cot.oportunidad_id) {
+      toast.error("No se encontró la oportunidad");
+      return;
+    }
+
+    if (!userId) {
+      toast.error("Usuario no identificado");
+      return;
+    }
+
+    setCreatingReserva(true);
+
+    // 1️⃣ Cambiar estado a "enviada"
+    await onChangeStatus(cot, "enviada");
+
+    // 2️⃣ Crear o verificar VIN en historial_carros
+    if (cot.sku) {
       try {
-        await fetch(`/api/oportunidades-oportunidades/${cot.oportunidad_id}/etapa`, {
-          method: "PUT",
+        await fetch("/api/historial-carros", {
+          method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            etapasconversion_id: 8,
-            created_by: userId,
+            vin: cot.sku,
+            marca_id: cot.marca_id,
+            modelo_id: cot.modelo_id,
+            version_id: cot.version_id,
+            anio: cot.anio,
+            color_externo: cot.color_externo,
+            color_interno: cot.color_interno,
           }),
         });
-      } catch (etapaError) {
-        console.warn("Advertencia al cambiar etapa:", etapaError);
+      } catch (vinError) {
+        console.warn("Advertencia al registrar VIN:", vinError);
       }
-
-      toast.success("Reserva creada correctamente");
-      
-      // ✅ REFRESH AUTOMÁTICO después de 1 segundo
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-    } catch (error) {
-      console.error("Error creando reserva:", error);
-      toast.error("Error: " + error.message);
-    } finally {
-      setCreatingReserva(false);
     }
+
+    // 3️⃣ Crear reserva
+    const resReserva = await fetch("/api/reservas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        oportunidad_id: cot.oportunidad_id,
+        created_by: userId,
+        vin: cot.sku,
+      }),
+    });
+
+    if (!resReserva.ok) {
+      const errorData = await resReserva.json();
+      throw new Error(errorData.message || "Error creando reserva");
+    }
+
+    const dataReserva = await resReserva.json();
+    
+    // 4️⃣ Cambiar etapa de oportunidad a "Reserva" (etapa 8)
+    try {
+      await fetch(`/api/oportunidades-oportunidades/${cot.oportunidad_id}/etapa`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          etapasconversion_id: 8,
+          created_by: userId,
+        }),
+      });
+    } catch (etapaError) {
+      console.warn("Advertencia al cambiar etapa:", etapaError);
+    }
+
+    toast.success("Nota de pedido enviada y reserva creada");
+    
+    // 5️⃣ Redirigir a la reserva después de 1.5 segundos
+    setTimeout(() => {
+      router.push(`/reservas/${dataReserva.id}`);
+    }, 1500);
+  } catch (error) {
+    console.error("Error:", error);
+    toast.error("Error: " + error.message);
+  } finally {
+    setCreatingReserva(false);
   }
+}
 
   // ✅ ENVIAR NOTA DE PEDIDO - CAMBIAR ESTADO A "ENVIADA" Y CREAR RESERVA
   async function handleEnviarNotaPedido() {

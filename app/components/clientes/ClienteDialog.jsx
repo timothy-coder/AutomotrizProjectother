@@ -99,7 +99,7 @@ export default function ClienteDialog({
     if (!form.apellido.trim()) {
       newErrors.apellido = "Apellido requerido";
     }
-    
+
     // Validar email
     if (!form.email.trim()) {
       newErrors.email = "Email requerido";
@@ -156,8 +156,8 @@ export default function ClienteDialog({
         celular: form.celular.trim(),
         tipo_identificacion: form.tipo_identificacion,
         identificacion_fiscal: form.identificacion_fiscal.trim(),
-        nombre_comercial: form.tipo_identificacion === "RUC" 
-          ? form.nombre_comercial.trim() 
+        nombre_comercial: form.tipo_identificacion === "RUC"
+          ? form.nombre_comercial.trim()
           : null,
       };
 
@@ -183,7 +183,7 @@ export default function ClienteDialog({
               email: "email",
               celular: "celular",
             };
-            
+
             const errorField = fieldMap[data.field] || data.field;
             setErrors((p) => ({ ...p, [errorField]: data.message }));
             toast.error(data.message);
@@ -206,7 +206,7 @@ export default function ClienteDialog({
   }
 
   // Campos requeridos para crear
-  const isFormValid = 
+  const isFormValid =
     form.nombre.trim() &&
     form.apellido.trim() &&
     form.email.trim() &&
@@ -231,7 +231,7 @@ export default function ClienteDialog({
             {/* Nombre */}
             <div className="space-y-1">
               <Label className="flex items-center gap-1 text-[#5d16ec]">
-                Nombre 
+                Nombre
                 <span className="text-red-500">*</span>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -259,7 +259,7 @@ export default function ClienteDialog({
             {/* Apellido */}
             <div className="space-y-1">
               <Label className="flex items-center gap-1 text-[#5d16ec]">
-                Apellido 
+                Apellido
                 <span className="text-red-500">*</span>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -287,7 +287,7 @@ export default function ClienteDialog({
             {/* Email */}
             <div className="space-y-1">
               <Label className="flex items-center gap-1 text-[#5d16ec]">
-                Email 
+                Email
                 <span className="text-red-500">*</span>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -316,7 +316,7 @@ export default function ClienteDialog({
             {/* Celular */}
             <div className="space-y-1">
               <Label className="flex items-center gap-1 text-[#5d16ec]">
-                Celular 
+                Celular
                 <span className="text-red-500">*</span>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -376,6 +376,11 @@ export default function ClienteDialog({
                       RUC - Razón Social
                     </span>
                   </SelectItem>
+                  <SelectItem value="PASAPORTE">
+                    <span className="flex items-center gap-2">
+                      PASAPORTE
+                    </span>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -383,15 +388,15 @@ export default function ClienteDialog({
             {/* Identificación Fiscal */}
             <div className="space-y-1">
               <Label className="flex items-center gap-1 text-[#5d16ec]">
-                N° Documento 
+                Documento  de Identidad
                 <span className="text-red-500">*</span>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <AlertCircle size={14} className="text-gray-400 cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent side="top">
-                    {form.tipo_identificacion === "RUC" 
-                      ? "RUC: 11 dígitos (no puede repetirse)" 
+                    {form.tipo_identificacion === "RUC"
+                      ? "RUC: 11 dígitos (no puede repetirse)"
                       : "DNI: 8 dígitos (no puede repetirse)"
                     }
                   </TooltipContent>
@@ -400,10 +405,22 @@ export default function ClienteDialog({
               <Input
                 value={form.identificacion_fiscal}
                 onChange={(e) => updateField("identificacion_fiscal", e.target.value)}
-                placeholder={form.tipo_identificacion === "RUC" ? "20123456789" : "12345678"}
+                placeholder={
+                  form.tipo_identificacion === "RUC"
+                    ? "20123456789"
+                    : form.tipo_identificacion === "DNI"
+                      ? "12345678"
+                      : "A123456789"
+                }
                 className={errors.identificacion_fiscal ? "border-red-500 focus:ring-red-500" : ""}
                 disabled={isSaving}
-                maxLength={form.tipo_identificacion === "RUC" ? 11 : 8}
+                maxLength={
+                  form.tipo_identificacion === "RUC"
+                    ? 11
+                    : form.tipo_identificacion === "DNI"
+                      ? 8
+                      : 20
+                }
               />
               {errors.identificacion_fiscal && (
                 <p className="text-xs text-red-500 flex items-center gap-1">
@@ -416,7 +433,7 @@ export default function ClienteDialog({
             {form.tipo_identificacion === "RUC" && (
               <div className="space-y-1 md:col-span-2">
                 <Label className="flex items-center gap-1 text-[#5d16ec]">
-                  Nombre Comercial 
+                  Nombre Comercial
                   <span className="text-red-500">*</span>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -445,8 +462,8 @@ export default function ClienteDialog({
           </div>
 
           <DialogFooter className="mt-6">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={isSaving}
             >
@@ -455,7 +472,7 @@ export default function ClienteDialog({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button 
+                <Button
                   onClick={handleSave}
                   disabled={!isFormValid || isSaving}
                   className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"

@@ -52,7 +52,7 @@ export async function POST(req) {
       return NextResponse.json({ message: "Nombre requerido" }, { status: 400 });
     }
 
-    if (tipo_identificacion && !["DNI", "RUC"].includes(tipo_identificacion)) {
+    if (tipo_identificacion && !["DNI", "RUC","PASAPORTE"].includes(tipo_identificacion)) {
       return NextResponse.json({ message: "tipo_identificacion inválido" }, { status: 400 });
     }
 

@@ -20,6 +20,7 @@ export async function GET(request, { params }) {
         r.created_by,
         r.created_at,
         r.updated_at,
+        r.estado,
         u.fullname as created_by_name,
         oo.oportunidad_id as oportunidad_codigo,
         oo.cliente_id,

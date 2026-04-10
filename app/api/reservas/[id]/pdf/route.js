@@ -21,6 +21,7 @@ export async function GET(request, { params }) {
         r.created_by,
         r.created_at,
         r.updated_at,
+        r.estado,
         u.fullname as created_by_name,
         oo.oportunidad_id as oportunidad_codigo,
         oo.cliente_id,
@@ -122,6 +123,22 @@ export async function GET(request, { params }) {
     const detalle = detalles[0];
     const fechaFormato = new Date(reserva.created_at).toLocaleDateString("es-ES");
 
+    // ✅ Obtener usuario que creó la reserva (para firma)
+    const [usuarioCreador] = await db.query(
+  `SELECT id, fullname FROM usuarios WHERE id = ?`,
+  [reserva.created_by]
+);
+
+// ✅ Obtener JEFE DE VENTAS - CAMBIO AQUÍ
+const [jefeVentas] = await db.query(
+  `SELECT u.id, u.fullname FROM usuarios u
+  JOIN roles r ON u.role_id = r.id
+  WHERE r.name = 'JEFE DE VENTAS' LIMIT 1`
+);
+
+const creador = usuarioCreador[0] || {};
+const jefe = jefeVentas[0] || {};
+
     // ✅ Crear PDF con jsPDF
     const doc = new jsPDF({
       orientation: "portrait",
@@ -136,9 +153,10 @@ export async function GET(request, { params }) {
     let yPosition = margin;
 
     // Colores
-    const primaryColor = [93, 22, 236]; // #5d16ec
+    const primaryColor = [93, 22, 236];
     const secondaryColor = [100, 100, 100];
     const textColor = [50, 50, 50];
+    const warningColor = [220, 53, 69];
 
     // Función para agregar línea separadora
     const addSeparator = () => {
@@ -167,6 +185,28 @@ export async function GET(request, { params }) {
     doc.text(`Reserva #${reserva.id}`, pageWidth / 2, yPosition, { align: "center" });
     yPosition += 7;
 
+    // ✅ MARCA DE AGUA según estado
+    if (reserva.estado === "observado" || reserva.estado === "subsanado" ) {
+      doc.setFontSize(60);
+      doc.setTextColor(220, 220, 220);
+      doc.setFont("helvetica", "bold");
+      
+      if (reserva.estado === "observado") {
+        doc.text("OBSERVADO", pageWidth / 2, pageHeight / 2, { 
+          align: "center", 
+          angle: 45 
+        });
+      } else if (reserva.estado === "subsanado") {
+        doc.text("SUBSANADO", pageWidth / 2, pageHeight / 2, { 
+          align: "center", 
+          angle: 45 
+        });
+      }
+      
+      doc.setTextColor(...textColor);
+      doc.setFontSize(10);
+    }
+
     addSeparator();
 
     // Función para agregar sección
@@ -181,6 +221,18 @@ export async function GET(request, { params }) {
       doc.text(title, margin, yPosition);
       yPosition += 5;
       addSeparator();
+    };
+
+    // Función para convertir a número y dar formato
+    const formatCurrency = (value) => {
+      if (value === null || value === undefined || value === "") {
+        return "0.00";
+      }
+      const num = parseFloat(value);
+      if (isNaN(num)) {
+        return "0.00";
+      }
+      return num.toFixed(2);
     };
 
     // Función para agregar campo
@@ -243,14 +295,14 @@ export async function GET(request, { params }) {
 
     // DESCUENTOS Y MONTOS
     addSection("DESCUENTOS Y MONTOS");
-    addField("Precio Base", `S/ ${detalle.precio_base?.toFixed(2) || "0.00"}`);
-    addField("Descuento Crédito Nissan", `S/ ${detalle.dsctocredinissan?.toFixed(2) || "0.00"}`);
-    addField("Descuento Tienda", `S/ ${detalle.dsctotienda?.toFixed(2) || "0.00"}`);
-    addField("Bono Retoma", `S/ ${detalle.dsctobonoretoma?.toFixed(2) || "0.00"}`);
-    addField("Descuento NPER", `S/ ${detalle.dsctonper?.toFixed(2) || "0.00"}`);
-    addField("Flete", `S/ ${detalle.flete?.toFixed(2) || "0.00"}`);
-    addField("Tarjeta Placa", `S/ ${detalle.tarjetaplaca?.toFixed(2) || "0.00"}`);
-    addField("GLP", `S/ ${detalle.glp?.toFixed(2) || "0.00"}`);
+    addField("Precio Base", `S/ ${formatCurrency(detalle.precio_base)}`);
+    addField("Descuento Crédito Nissan", `S/ ${formatCurrency(detalle.dsctocredinissan)}`);
+    addField("Descuento Tienda", `S/ ${formatCurrency(detalle.dsctotienda)}`);
+    addField("Bono Retoma", `S/ ${formatCurrency(detalle.dsctobonoretoma)}`);
+    addField("Descuento NPER", `S/ ${formatCurrency(detalle.dsctonper)}`);
+    addField("Flete", `S/ ${formatCurrency(detalle.flete)}`);
+    addField("Tarjeta Placa", `S/ ${formatCurrency(detalle.tarjetaplaca)}`);
+    addField("GLP", `S/ ${formatCurrency(detalle.glp)}`);
     addField("T.C. Referencial", detalle.tc_referencial?.toString() || "-");
     yPosition += 5;
 
@@ -264,7 +316,7 @@ export async function GET(request, { params }) {
     doc.setTextColor(...primaryColor);
     doc.text("TOTAL:", margin, yPosition);
     doc.setFontSize(16);
-    doc.text(`S/ ${detalle.total?.toFixed(2) || "0.00"}`, pageWidth - margin - 20, yPosition, {
+    doc.text(`S/ ${formatCurrency(detalle.total)}`, pageWidth - margin - 20, yPosition, {
       align: "right",
     });
     yPosition += 10;
@@ -280,17 +332,108 @@ export async function GET(request, { params }) {
       yPosition += wrappedObs.length * 4;
     }
 
-    // Pie de página
-    yPosition = pageHeight - 10;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(...secondaryColor);
-    doc.text(
-      `Este documento fue generado el ${fechaFormato} por el sistema de gestión de Nissan.`,
-      pageWidth / 2,
-      yPosition,
-      { align: "center" }
-    );
+    // ✅ FIRMAS según estado
+   // ✅ FIRMAS según estado
+if (yPosition > pageHeight - 60) {
+  doc.addPage();
+  yPosition = margin;
+}
+
+yPosition += 15;
+
+if (reserva.estado === "borrador") {
+  // No mostrar firmas en borrador
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(9);
+  doc.setTextColor(...secondaryColor);
+  doc.text("Documento en estado borrador - Sin firmas requeridas", margin, yPosition);
+} else if (reserva.estado === "enviado_firma") {
+  // Campo en blanco para firma del cliente y firma de creador
+  yPosition += 10;
+  
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...textColor);
+  doc.text("FIRMA DEL CLIENTE:", margin, yPosition);
+  
+  yPosition += 10;
+  doc.setDrawColor(...secondaryColor);
+  doc.line(margin, yPosition, margin + 50, yPosition);
+  yPosition += 8;
+  doc.setFontSize(8);
+  doc.text("Firma del Cliente", margin, yPosition);
+  
+  yPosition += 15;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...textColor);
+  doc.text("FIRMA AUTORIZADO:", margin, yPosition);
+  
+  yPosition += 10;
+  doc.setDrawColor(...secondaryColor);
+  doc.line(margin, yPosition, margin + 50, yPosition);
+  yPosition += 8;
+  doc.setFontSize(8);
+  doc.text(creador.fullname || "Usuario", margin, yPosition);
+} else if (reserva.estado === "firmado") {
+  // Mostrar firma del cliente (en blanco) + firma de creador + nombre jefe de ventas
+  yPosition += 10;
+  
+  // Firma del cliente
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...textColor);
+  doc.text("FIRMA DEL CLIENTE:", margin, yPosition);
+  
+  yPosition += 10;
+  doc.setDrawColor(...secondaryColor);
+  doc.line(margin, yPosition, margin + 50, yPosition);
+  yPosition += 8;
+  doc.setFontSize(8);
+  doc.text("Firma del Cliente", margin, yPosition);
+  
+  // Firma de quien creó
+  yPosition += 15;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...textColor);
+  doc.text("AUTORIZADO POR:", margin, yPosition);
+  
+  yPosition += 10;
+  doc.setDrawColor(...secondaryColor);
+  doc.line(margin, yPosition, margin + 50, yPosition);
+  yPosition += 8;
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.text((creador.fullname || "Usuario").toUpperCase(), margin, yPosition);
+  
+  // Jefe de Ventas
+  yPosition += 12;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...textColor);
+  doc.text("JEFE DE VENTAS:", margin, yPosition);
+  
+  yPosition += 10;
+  doc.setDrawColor(...secondaryColor);
+  doc.line(margin, yPosition, margin + 50, yPosition);
+  yPosition += 8;
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.text((jefe.fullname || "No asignado").toUpperCase(), margin, yPosition);
+}
+
+// Pie de página
+yPosition = pageHeight - 10;
+doc.setFont("helvetica", "normal");
+doc.setFontSize(8);
+doc.setTextColor(...secondaryColor);
+doc.text(
+  `Este documento fue generado el ${fechaFormato} por el sistema de gestión de Nissan.`,
+  pageWidth / 2,
+  yPosition,
+  { align: "center" }
+);
 
     // Generar PDF
     const pdfBuffer = Buffer.from(doc.output("arraybuffer"));

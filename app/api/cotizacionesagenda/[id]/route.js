@@ -8,10 +8,12 @@ export async function GET(req, { params }) {
     const { id } = await params;
 
     const [cotizaciones] = await db.query(
-      `SELECT c.*, m.name as marca, mo.name as modelo 
+      `SELECT c.*, m.name as marca, mo.name as modelo, v.nombre as version, u.fullname
        FROM cotizacionesagenda c
        LEFT JOIN marcas m ON c.marca_id = m.id
        LEFT JOIN modelos mo ON c.modelo_id = mo.id
+       LEFT JOIN versiones v ON c.version_id = v.id
+       left join usuarios u on c.created_by = u.id
        WHERE c.id = ?`,
       [id]
     );

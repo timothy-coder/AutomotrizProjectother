@@ -46,7 +46,7 @@ export async function PUT(req, { params }) {
     const nombre_comercial = (body.nombre_comercial || "").trim();
 
     if (!nombre) return NextResponse.json({ message: "Nombre requerido" }, { status: 400 });
-    if (tipo_identificacion && !["DNI", "RUC"].includes(tipo_identificacion)) {
+    if (tipo_identificacion && !["DNI", "RUC","PASAPORTE"].includes(tipo_identificacion)) {
       return NextResponse.json({ message: "tipo_identificacion inválido" }, { status: 400 });
     }
 
