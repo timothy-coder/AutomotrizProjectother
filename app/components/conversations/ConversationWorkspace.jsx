@@ -1063,19 +1063,19 @@ export default function ConversationWorkspace({
               />
               {/* Respuestas rápidas */}
               <Popover open={cannedOpen} onOpenChange={setCannedOpen}>
-                <PopoverTrigger asChild>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <PopoverTrigger asChild>
                       <button
                         type="button"
                         className="absolute right-2.5 bottom-2.5 text-gray-400 hover:text-indigo-500 transition-colors"
                       >
                         <MessageSquarePlus className="w-4 h-4" />
                       </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">Respuestas rápidas predefinidas</TooltipContent>
-                  </Tooltip>
-                </PopoverTrigger>
+                    </PopoverTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Respuestas rápidas predefinidas</TooltipContent>
+                </Tooltip>
                 <PopoverContent align="end" side="top" className="w-72 p-2 space-y-1">
                   <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide px-1 pb-1">Respuestas rápidas</p>
                   {CANNED_RESPONSES.map((r) => (
