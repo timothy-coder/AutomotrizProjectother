@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -7,15 +8,19 @@ import {
   Clock,
   FileText,
   CornerUpLeft,
+  LayoutTemplate,
   Lock,
   MessageSquarePlus,
   Paperclip,
   Send,
+  Smile,
   Tag,
   UserCheck,
   Users,
   X,
 } from "lucide-react";
+
+const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -55,6 +60,7 @@ function mapSession(session) {
     source_channel: session.source_channel ?? channelFromInbox(session.meta?.channel ?? session.channel ?? session.inbox?.channel_type),
     assignment_status: session.assignment_status ?? session.status ?? "open",
     contact_id: session.contact_id ?? session.meta?.sender?.id ?? null,
+    inbox_id: session.inbox_id ?? session.inbox?.id ?? null,
     resumen: session.resumen ?? "",
   };
 }
@@ -181,6 +187,10 @@ export default function ConversationWorkspace({
   const [isPrivateNote, setIsPrivateNote] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const fileInputRef = useRef(null);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [templates, setTemplates] = useState([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
   const [labels, setLabels] = useState([]);
   const [agents, setAgents] = useState([]);
   const [teams, setTeams] = useState([]);
@@ -262,6 +272,24 @@ export default function ConversationWorkspace({
     } catch (err) {
       console.error("Error cargando equipos:", err.message);
       setError("No se pudo cargar la lista de equipos");
+    }
+  }
+
+  async function loadTemplates() {
+    if (!sess?.inbox_id) return;
+    setTemplatesLoading(true);
+    try {
+      const token = getAuthToken();
+      const res = await fetch(`/api/chatwoot/templates?inbox_id=${sess.inbox_id}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setTemplates(Array.isArray(data.templates) ? data.templates : []);
+    } catch (err) {
+      console.error("Error cargando plantillas:", err.message);
+    } finally {
+      setTemplatesLoading(false);
     }
   }
 
@@ -1011,6 +1039,94 @@ export default function ConversationWorkspace({
                 setSelectedFile(f);
               }}
             />
+
+            {/* Selector de emojis */}
+            <Popover open={emojiOpen} onOpenChange={setEmojiOpen}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border bg-white border-gray-200 text-gray-500 hover:border-gray-300 transition-colors"
+                    >
+                      <Smile className="w-3 h-3" />
+                      Emoji
+                    </button>
+                  </PopoverTrigger>
+                </TooltipTrigger>
+                <TooltipContent>Insertar emoji</TooltipContent>
+              </Tooltip>
+              <PopoverContent align="start" side="top" className="w-auto p-0 border-0 shadow-xl">
+                <EmojiPicker
+                  onEmojiClick={(emojiData) => {
+                    setNewMessage((prev) => prev + emojiData.emoji);
+                    setEmojiOpen(false);
+                    composerRef.current?.focus();
+                  }}
+                  lazyLoadEmojis
+                  skinTonesDisabled
+                  searchDisabled={false}
+                  height={350}
+                  width={300}
+                />
+              </PopoverContent>
+            </Popover>
+
+            {/* Plantillas WhatsApp — solo cuando el canal es WhatsApp */}
+            {channelToSend === "whatsapp" && (
+              <Popover
+                open={templatesOpen}
+                onOpenChange={(open) => {
+                  setTemplatesOpen(open);
+                  if (open && templates.length === 0) loadTemplates();
+                }}
+              >
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full border bg-white border-gray-200 text-gray-500 hover:border-gray-300 transition-colors"
+                      >
+                        <LayoutTemplate className="w-3 h-3" />
+                        Plantillas
+                      </button>
+                    </PopoverTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>Plantillas de mensaje de WhatsApp Business</TooltipContent>
+                </Tooltip>
+                <PopoverContent align="start" side="top" className="w-80 p-2 space-y-1">
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide px-1 pb-1">
+                    Plantillas de WhatsApp
+                  </p>
+                  {templatesLoading && (
+                    <p className="text-xs text-muted-foreground text-center py-4">Cargando...</p>
+                  )}
+                  {!templatesLoading && templates.length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-4">
+                      No hay plantillas disponibles para este inbox.
+                    </p>
+                  )}
+                  {templates.map((t) => (
+                    <button
+                      key={t.id ?? t.name}
+                      type="button"
+                      onClick={() => {
+                        setNewMessage(t.body ?? t.content ?? "");
+                        setTemplatesOpen(false);
+                        composerRef.current?.focus();
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-green-50 transition-colors"
+                    >
+                      <p className="text-xs font-semibold text-gray-700">{t.name}</p>
+                      <p className="text-[10px] text-gray-400 line-clamp-2 mt-0.5">
+                        {t.body ?? t.content ?? ""}
+                      </p>
+                    </button>
+                  ))}
+                </PopoverContent>
+              </Popover>
+            )}
           </div>
 
           {/* Preview del archivo seleccionado */}
