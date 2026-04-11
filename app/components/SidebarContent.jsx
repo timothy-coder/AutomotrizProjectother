@@ -10,7 +10,6 @@ import { filterNavTree } from "@/lib/navFilter";
 import { useAuth } from "@/context/AuthContext";
 import { hasPermission } from "@/lib/permissions";
 
-
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -170,11 +169,17 @@ export default function SidebarContent({ onNavigate, isMobile = false }) {
               </div>
             )}
 
-            {/* ✅ User menu */}
+            {/* ✅ User menu - CAMBIO: Prevenir cierre del sidebar */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost"
-                  className="w-full justify-start gap-2 text-left hover:bg-white/10">
+                <Button 
+                  variant="ghost"
+                  className="w-full justify-start gap-2 text-left hover:bg-white/10"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                  }}
+                >
 
                   <Avatar className="h-8 w-8">
                     <AvatarFallback className="bg-indigo-600 text-white">
@@ -213,10 +218,7 @@ export default function SidebarContent({ onNavigate, isMobile = false }) {
 
                 <DropdownMenuSeparator />
 
-                <DropdownMenuItem onClick={() => {
-                  onNavigate?.();
-                  handleLogout();
-                }}>
+                <DropdownMenuItem onClick={handleLogout}>
                   <LogOut className="h-4 w-4 mr-2" />
                   Cerrar sesión
                 </DropdownMenuItem>
@@ -305,6 +307,10 @@ export default function SidebarContent({ onNavigate, isMobile = false }) {
                   size="icon"
                   className="w-full hover:bg-white/10"
                   title={user.fullname}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                  }}
                 >
                   <Avatar className="h-8 w-8">
                     <AvatarFallback className="bg-indigo-600 text-white text-xs">
@@ -343,10 +349,7 @@ export default function SidebarContent({ onNavigate, isMobile = false }) {
 
                 <DropdownMenuSeparator />
 
-                <DropdownMenuItem onClick={() => {
-                  onNavigate?.();
-                  handleLogout();
-                }}>
+                <DropdownMenuItem onClick={handleLogout}>
                   <LogOut className="h-4 w-4 mr-2" />
                   Cerrar sesión
                 </DropdownMenuItem>
@@ -451,8 +454,14 @@ export default function SidebarContent({ onNavigate, isMobile = false }) {
           {/* ✅ User menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost"
-                className="w-full justify-start gap-2 text-left hover:bg-white/10">
+              <Button 
+                variant="ghost"
+                className="w-full justify-start gap-2 text-left hover:bg-white/10"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
+              >
 
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="bg-indigo-600 text-white">
@@ -491,10 +500,7 @@ export default function SidebarContent({ onNavigate, isMobile = false }) {
 
               <DropdownMenuSeparator />
 
-              <DropdownMenuItem onClick={() => {
-                onNavigate?.();
-                handleLogout();
-              }}>
+              <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Cerrar sesión
               </DropdownMenuItem>

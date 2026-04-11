@@ -44,7 +44,7 @@ export default function ClienteDialog({
     nombre: "",
     apellido: "",
     email: "",
-    celular: "",
+    celular: "", // Solo los 9 dígitos
     tipo_identificacion: "DNI",
     identificacion_fiscal: "",
     nombre_comercial: "",
@@ -58,11 +58,17 @@ export default function ClienteDialog({
     if (!open) return;
 
     if (cliente) {
+      // ✅ CAMBIO: Extraer solo los últimos 9 dígitos del celular
+      let celularFormato = cliente.celular ?? "";
+      if (celularFormato.startsWith("51")) {
+        celularFormato = celularFormato.slice(2); // Remover "51"
+      }
+
       setForm({
         nombre: cliente.nombre ?? "",
         apellido: cliente.apellido ?? "",
         email: cliente.email ?? "",
-        celular: cliente.celular ?? "",
+        celular: celularFormato,
         tipo_identificacion: cliente.tipo_identificacion ?? "DNI",
         identificacion_fiscal: cliente.identificacion_fiscal ?? "",
         nombre_comercial: cliente.nombre_comercial ?? "",
@@ -82,6 +88,14 @@ export default function ClienteDialog({
   }, [open, cliente]);
 
   function updateField(key, value) {
+    // ✅ CAMBIO: Validar que celular solo tenga 9 dígitos
+    if (key === "celular") {
+      // Solo permitir números
+      value = value.replace(/\D/g, "");
+      // Limitar a 9 dígitos
+      value = value.slice(0, 9);
+    }
+
     setForm((p) => ({ ...p, [key]: value }));
     // Limpiar error del campo cuando empieza a escribir
     if (errors[key]) {
@@ -110,11 +124,11 @@ export default function ClienteDialog({
       }
     }
 
-    // Validar celular
+    // Validar celular - Solo 9 dígitos
     if (!form.celular.trim()) {
       newErrors.celular = "Celular requerido";
-    } else if (!/^\d{7,15}$/.test(form.celular.trim())) {
-      newErrors.celular = "Celular debe contener entre 7 y 15 dígitos";
+    } else if (!/^\d{9}$/.test(form.celular.trim())) {
+      newErrors.celular = "Celular debe contener exactamente 9 dígitos";
     }
 
     if (!form.identificacion_fiscal.trim()) {
@@ -153,7 +167,7 @@ export default function ClienteDialog({
         nombre: form.nombre.trim(),
         apellido: form.apellido.trim(),
         email: form.email.trim(),
-        celular: form.celular.trim(),
+        celular: "51" + form.celular.trim(), // ✅ CAMBIO: Agregar "51" al enviar
         tipo_identificacion: form.tipo_identificacion,
         identificacion_fiscal: form.identificacion_fiscal.trim(),
         nombre_comercial: form.tipo_identificacion === "RUC"
@@ -323,17 +337,24 @@ export default function ClienteDialog({
                     <AlertCircle size={14} className="text-gray-400 cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent side="top">
-                    Número de celular (7 a 15 dígitos, no puede repetirse)
+                    Número de celular (9 dígitos, no puede repetirse)
                   </TooltipContent>
                 </Tooltip>
               </Label>
-              <Input
-                value={form.celular}
-                onChange={(e) => updateField("celular", e.target.value)}
-                placeholder="999999999"
-                className={errors.celular ? "border-red-500 focus:ring-red-500" : ""}
-                disabled={isSaving}
-              />
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-600 bg-gray-100 px-3 py-2 rounded">
+                  +51
+                </span>
+                <Input
+                  value={form.celular}
+                  onChange={(e) => updateField("celular", e.target.value)}
+                  placeholder="999999999"
+                  className={errors.celular ? "border-red-500 focus:ring-red-500" : ""}
+                  disabled={isSaving}
+                  maxLength="9"
+                  inputMode="numeric"
+                />
+              </div>
               {errors.celular && (
                 <p className="text-xs text-red-500 flex items-center gap-1">
                   <AlertCircle size={12} /> {errors.celular}
@@ -388,7 +409,7 @@ export default function ClienteDialog({
             {/* Identificación Fiscal */}
             <div className="space-y-1">
               <Label className="flex items-center gap-1 text-[#5d16ec]">
-                Documento  de Identidad
+                Documento de Identidad
                 <span className="text-red-500">*</span>
                 <Tooltip>
                   <TooltipTrigger asChild>

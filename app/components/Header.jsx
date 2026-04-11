@@ -19,6 +19,15 @@ import NotificacionesBell from "./NotificacionesBell";
 export default function Header() {
   const { user } = useAuth();
 
+  // ✅ CAMBIO: Callback que cierra el Sheet solo cuando navega
+  const handleNavigate = () => {
+    // El cierre será manejado por SheetClose dentro de SidebarContent
+    const closeButton = document.querySelector('[data-sidebar-close]');
+    if (closeButton) {
+      closeButton.click();
+    }
+  };
+
   return (
     <header className="sticky top-0 z-40 border-b bg-[#13223F] text-white md:hidden">
       <div className="w-full px-4 py-3 flex items-center gap-3">
@@ -38,10 +47,12 @@ export default function Header() {
               Menú navegación
             </SheetTitle>
 
+            {/* ✅ CAMBIO: No envolver con SheetClose, pasar callback */}
+            <SidebarContent onNavigate={handleNavigate} isMobile={true} />
+            
+            {/* ✅ Botón oculto para cerrar desde SidebarContent */}
             <SheetClose asChild>
-              <div>
-                <SidebarContent onNavigate={() => {}} isMobile={true} />
-              </div>
+              <button data-sidebar-close style={{ display: 'none' }} />
             </SheetClose>
           </SheetContent>
         </Sheet>
