@@ -5,8 +5,8 @@ import { db } from "@/lib/db";
  * GET /api/ventas/catalogo
  *
  * Endpoint para el agente n8n de Ventas IA.
- * Devuelve modelos con versiones/precios desde precios_region_version,
- * promociones vigentes y configuración general de ventas.
+ * Devuelve modelos con versiones/precios desde ventas_versiones (fuente única),
+ * promociones vigentes, especificaciones técnicas y configuración general.
  *
  * Header requerido: x-ventas-webhook-secret
  * Nota: usa un secret separado (VENTAS_WEBHOOK_SECRET) porque este endpoint
@@ -32,24 +32,16 @@ export async function GET(req) {
        ORDER BY ma.name ASC, m.name ASC`
     );
 
-    // Precios + stock desde precios_region_version, con nombre de versión
-    const [preciosVersiones] = await db.query(
-      `SELECT prv.modelo_id, prv.version_id, prv.precio_base,
-              prv.en_stock, prv.tiempo_entrega_dias,
-              v.nombre AS nombre_version,
-              prv.marca_id
-       FROM precios_region_version prv
-       JOIN versiones v ON v.id = prv.version_id
-       WHERE prv.precio_base > 0 OR prv.en_stock = 1
-       ORDER BY prv.modelo_id ASC, v.nombre ASC`
-    );
-
-    // Descripción de equipamiento por version desde ventas_versiones (opcional)
-    const [ventasVersiones] = await db.query(
-      `SELECT modelo_id, nombre_version, descripcion_equipamiento,
-              descuento_porcentaje, colores_disponibles
-       FROM ventas_versiones
-       WHERE is_active = 1`
+    // Versiones activas con precio, stock y equipamiento (fuente única: ventas_versiones)
+    const [versiones] = await db.query(
+      `SELECT vv.id AS version_id, vv.modelo_id, vv.nombre_version,
+              vv.precio_lista, vv.moneda, vv.descuento_porcentaje,
+              vv.en_stock, vv.tiempo_entrega_dias,
+              vv.colores_disponibles, vv.descripcion_equipamiento
+       FROM ventas_versiones vv
+       WHERE vv.is_active = 1
+         AND (vv.precio_lista > 0 OR vv.en_stock > 0)
+       ORDER BY vv.modelo_id ASC, vv.nombre_version ASC`
     );
 
     // Especificaciones técnicas por modelo (excluye media: full, imagen, video)
@@ -61,18 +53,11 @@ export async function GET(req) {
        ORDER BY me.modelo_id ASC, e.nombre ASC`
     );
 
-    // Mapa de specs: modelo_id → { spec_nombre: valor, ... }
+    // Mapa de specs: modelo_id -> { spec_nombre: valor, ... }
     const specsMap = {};
     for (const row of especRows) {
       if (!specsMap[row.modelo_id]) specsMap[row.modelo_id] = {};
       specsMap[row.modelo_id][row.spec_nombre] = row.valor;
-    }
-
-    // Mapa de enrichment: modelo_id + nombre_version (lowercase) → datos extra
-    const enrichMap = {};
-    for (const vv of ventasVersiones) {
-      const k = `${vv.modelo_id}_${vv.nombre_version.toLowerCase().trim()}`;
-      enrichMap[k] = vv;
     }
 
     // Promociones vigentes
@@ -84,7 +69,7 @@ export async function GET(req) {
        ORDER BY modelo_id ASC, fecha_fin ASC`
     );
 
-    // Configuración general
+    // Configuracion general
     const [configRows] = await db.query(
       "SELECT seccion, contenido FROM ventas_configuracion"
     );
@@ -105,20 +90,23 @@ export async function GET(req) {
       };
     }
 
-    // Anidar versiones con precio+stock, enriquecidas con ventas_versiones si existe
-    for (const pv of preciosVersiones) {
-      if (!modelosMap[pv.modelo_id]) continue;
-      const enrichKey = `${pv.modelo_id}_${pv.nombre_version.toLowerCase().trim()}`;
-      const extra = enrichMap[enrichKey] || {};
-      modelosMap[pv.modelo_id].versiones.push({
-        version_id: pv.version_id,
-        nombre_version: pv.nombre_version,
-        precio_lista: pv.precio_base,
-        descuento_porcentaje: extra.descuento_porcentaje ?? 0,
-        en_stock: Boolean(pv.en_stock),
-        tiempo_entrega_dias: pv.tiempo_entrega_dias,
-        colores_disponibles: extra.colores_disponibles ?? [],
-        descripcion_equipamiento: extra.descripcion_equipamiento ?? null,
+    // Anidar versiones directamente (sin cruce de tablas)
+    for (const vv of versiones) {
+      if (!modelosMap[vv.modelo_id]) continue;
+      let colores = vv.colores_disponibles;
+      if (typeof colores === "string") {
+        try { colores = JSON.parse(colores); } catch { colores = []; }
+      }
+      modelosMap[vv.modelo_id].versiones.push({
+        version_id: vv.version_id,
+        nombre_version: vv.nombre_version,
+        precio_lista: vv.precio_lista,
+        moneda: vv.moneda || "USD",
+        descuento_porcentaje: vv.descuento_porcentaje ?? 0,
+        en_stock: vv.en_stock ?? 0,
+        tiempo_entrega_dias: vv.tiempo_entrega_dias,
+        colores_disponibles: Array.isArray(colores) ? colores : [],
+        descripcion_equipamiento: vv.descripcion_equipamiento ?? null,
       });
     }
 
@@ -132,7 +120,7 @@ export async function GET(req) {
       }
     }
 
-    // Solo devolver modelos que tengan al menos una versión con precio
+    // Solo devolver modelos que tengan al menos una version con precio
     const modelosConVersiones = Object.values(modelosMap).filter(
       (m) => m.versiones.length > 0
     );

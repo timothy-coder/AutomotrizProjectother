@@ -15,6 +15,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -29,33 +37,27 @@ function formatPrice(value, moneda = "PEN") {
 
 function TabButton({ label, active, onClick }) {
   return (
-    <button
+    <Button
+      variant="ghost"
       onClick={onClick}
-      className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+      className={`rounded-none px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
         active
           ? "border-blue-600 text-blue-600"
           : "border-transparent text-gray-500 hover:text-gray-700"
       }`}
     >
       {label}
-    </button>
+    </Button>
   );
 }
 
-function Badge({ text, color = "gray" }) {
-  const colors = {
-    gray: "bg-gray-100 text-gray-700",
-    blue: "bg-blue-100 text-blue-700",
-    green: "bg-green-100 text-green-700",
-    amber: "bg-amber-100 text-amber-700",
-    red: "bg-red-100 text-red-700",
-  };
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colors[color] || colors.gray}`}>
-      {text}
-    </span>
-  );
-}
+const BADGE_COLORS = {
+  gray: "bg-gray-100 text-gray-700",
+  blue: "bg-blue-100 text-blue-700",
+  green: "bg-green-100 text-green-700",
+  amber: "bg-amber-100 text-amber-700",
+  red: "bg-red-100 text-red-700",
+};
 
 const TIPOS_PROMO = ["descuento", "financiamiento_preferencial", "regalo", "otro"];
 
@@ -70,7 +72,7 @@ function VersionModal({ version, modelos, onClose, onSaved }) {
     moneda: version?.moneda || "PEN",
     descripcion_equipamiento: version?.descripcion_equipamiento || "",
     descuento_porcentaje: version?.descuento_porcentaje || "0",
-    en_stock: version?.en_stock !== 0,
+    en_stock: version?.en_stock ?? 0,
     tiempo_entrega_dias: version?.tiempo_entrega_dias || "0",
     colores_disponibles: Array.isArray(version?.colores_disponibles)
       ? version.colores_disponibles.join(", ")
@@ -95,7 +97,7 @@ function VersionModal({ version, modelos, onClose, onSaved }) {
       moneda: form.moneda,
       descripcion_equipamiento: form.descripcion_equipamiento.trim() || null,
       descuento_porcentaje: Number(form.descuento_porcentaje) || 0,
-      en_stock: form.en_stock,
+      en_stock: Number(form.en_stock) || 0,
       tiempo_entrega_dias: Number(form.tiempo_entrega_dias) || 0,
       colores_disponibles: form.colores_disponibles
         .split(",")
@@ -106,7 +108,7 @@ function VersionModal({ version, modelos, onClose, onSaved }) {
 
     try {
       const url = isNew ? "/api/ventas/versiones" : `/api/ventas/versiones/${version.id}`;
-      const method = isNew ? "POST" : "PATCH";
+      const method = isNew ? "POST" : "PUT";
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
@@ -133,15 +135,16 @@ function VersionModal({ version, modelos, onClose, onSaved }) {
         <div className="grid grid-cols-2 gap-3 mt-2">
           <div className="col-span-2">
             <label className="block text-xs font-medium text-gray-600 mb-1">Modelo *</label>
-            <select
-              value={form.modelo_id}
-              onChange={(e) => set("modelo_id", e.target.value)}
-              className="w-full border rounded-md px-3 py-2 text-sm bg-white"
-            >
-              {modelos.map((m) => (
-                <option key={m.id} value={m.id}>{m.nombre_completo || m.nombre}</option>
-              ))}
-            </select>
+            <Select value={String(form.modelo_id)} onValueChange={(v) => set("modelo_id", v)}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Seleccionar modelo" />
+              </SelectTrigger>
+              <SelectContent>
+                {modelos.map((m) => (
+                  <SelectItem key={m.id} value={String(m.id)}>{m.nombre_completo || m.nombre}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="col-span-2">
@@ -166,14 +169,15 @@ function VersionModal({ version, modelos, onClose, onSaved }) {
 
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Moneda</label>
-            <select
-              value={form.moneda}
-              onChange={(e) => set("moneda", e.target.value)}
-              className="w-full border rounded-md px-3 py-2 text-sm bg-white"
-            >
-              <option value="PEN">PEN (Soles)</option>
-              <option value="USD">USD (Dólares)</option>
-            </select>
+            <Select value={form.moneda} onValueChange={(v) => set("moneda", v)}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="PEN">PEN (Soles)</SelectItem>
+                <SelectItem value="USD">USD (Dolares)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
@@ -189,15 +193,14 @@ function VersionModal({ version, modelos, onClose, onSaved }) {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">En stock</label>
-            <select
-              value={form.en_stock ? "1" : "0"}
-              onChange={(e) => set("en_stock", e.target.value === "1")}
-              className="w-full border rounded-md px-3 py-2 text-sm bg-white"
-            >
-              <option value="1">Disponible</option>
-              <option value="0">Bajo pedido</option>
-            </select>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Stock (unidades)</label>
+            <Input
+              type="number"
+              min={0}
+              placeholder="0 = bajo pedido"
+              value={form.en_stock}
+              onChange={(e) => set("en_stock", e.target.value)}
+            />
           </div>
 
           <div>
@@ -212,14 +215,15 @@ function VersionModal({ version, modelos, onClose, onSaved }) {
 
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Estado</label>
-            <select
-              value={form.is_active ? "1" : "0"}
-              onChange={(e) => set("is_active", e.target.value === "1")}
-              className="w-full border rounded-md px-3 py-2 text-sm bg-white"
-            >
-              <option value="1">Activo</option>
-              <option value="0">Inactivo</option>
-            </select>
+            <Select value={form.is_active ? "1" : "0"} onValueChange={(v) => set("is_active", v === "1")}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Activo</SelectItem>
+                <SelectItem value="0">Inactivo</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="col-span-2">
@@ -301,7 +305,7 @@ function PromoModal({ promo, modelos, onClose, onSaved }) {
         if (!res.ok) throw new Error(data.message || "Error al guardar");
       } else {
         const res = await fetch("/api/ventas/promociones", {
-          method: "PATCH",
+          method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: promo.id, ...payload }),
         });
@@ -329,20 +333,21 @@ function PromoModal({ promo, modelos, onClose, onSaved }) {
             <label className="block text-xs font-medium text-gray-600 mb-1">
               Modelo <span className="text-gray-400">(vacío = aplica a todos)</span>
             </label>
-            <select
-              value={form.modelo_id}
-              onChange={(e) => set("modelo_id", e.target.value)}
-              className="w-full border rounded-md px-3 py-2 text-sm bg-white"
-            >
-              <option value="">— General (todos los modelos) —</option>
-              {modelos.map((m) => (
-                <option key={m.id} value={m.id}>{m.nombre_completo || m.nombre}</option>
-              ))}
-            </select>
+            <Select value={String(form.modelo_id)} onValueChange={(v) => set("modelo_id", v)}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="General (todos los modelos)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">General (todos los modelos)</SelectItem>
+                {modelos.map((m) => (
+                  <SelectItem key={m.id} value={String(m.id)}>{m.nombre_completo || m.nombre}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="col-span-2">
-            <label className="block text-xs font-medium text-gray-600 mb-1">Descripción *</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Descripcion *</label>
             <Textarea
               value={form.descripcion}
               onChange={(e) => set("descripcion", e.target.value)}
@@ -353,20 +358,21 @@ function PromoModal({ promo, modelos, onClose, onSaved }) {
 
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
-            <select
-              value={form.tipo}
-              onChange={(e) => set("tipo", e.target.value)}
-              className="w-full border rounded-md px-3 py-2 text-sm bg-white"
-            >
-              {TIPOS_PROMO.map((t) => (
-                <option key={t} value={t}>
-                  {t === "descuento" ? "Descuento"
-                    : t === "financiamiento_preferencial" ? "Financiamiento preferencial"
-                    : t === "regalo" ? "Regalo / Adicional"
-                    : "Otro"}
-                </option>
-              ))}
-            </select>
+            <Select value={form.tipo} onValueChange={(v) => set("tipo", v)}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TIPOS_PROMO.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t === "descuento" ? "Descuento"
+                      : t === "financiamiento_preferencial" ? "Financiamiento preferencial"
+                      : t === "regalo" ? "Regalo / Adicional"
+                      : "Otro"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
@@ -390,14 +396,13 @@ function PromoModal({ promo, modelos, onClose, onSaved }) {
 
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Estado</label>
-            <select
-              value={form.is_active ? "1" : "0"}
-              onChange={(e) => set("is_active", e.target.value === "1")}
-              className="w-full border rounded-md px-3 py-2 text-sm bg-white"
-            >
-              <option value="1">Activa</option>
-              <option value="0">Inactiva</option>
-            </select>
+            <Select value={form.is_active ? "1" : "0"} onValueChange={(v) => set("is_active", v === "1")}>
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Activa</SelectItem>
+                <SelectItem value="0">Inactiva</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -420,48 +425,52 @@ export default function VentasCatalogoPage() {
   const [modelos, setModelos] = useState([]);
   const [versiones, setVersiones] = useState([]);
   const [promociones, setPromociones] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const [versionModal, setVersionModal] = useState(null);
   const [promoModal, setPromoModal] = useState(null);
 
-  const fetchModelos = useCallback(async () => {
-    setLoading(true);
+  const fetchModelos = useCallback(async (signal) => {
     try {
-      const res = await fetch("/api/ventas/modelos?activos=0");
+      const res = await fetch("/api/ventas/modelos?activos=0", { signal });
       const data = await res.json();
       setModelos(data.modelos || []);
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      if (err.name !== "AbortError") toast.error("Error cargando modelos");
     }
   }, []);
 
-  const fetchVersiones = useCallback(async () => {
-    setLoading(true);
+  const fetchVersiones = useCallback(async (signal) => {
     try {
-      const res = await fetch("/api/ventas/versiones?activos=0");
+      const res = await fetch("/api/ventas/versiones?activos=0", { signal });
       const data = await res.json();
       setVersiones(data.versiones || []);
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      if (err.name !== "AbortError") toast.error("Error cargando versiones");
     }
   }, []);
 
-  const fetchPromociones = useCallback(async () => {
-    setLoading(true);
+  const fetchPromociones = useCallback(async (signal) => {
     try {
-      const res = await fetch("/api/ventas/promociones?activas=0");
+      const res = await fetch("/api/ventas/promociones?activas=0", { signal });
       const data = await res.json();
       setPromociones(data.promociones || []);
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      if (err.name !== "AbortError") toast.error("Error cargando promociones");
     }
   }, []);
 
   useEffect(() => {
-    if (tab === "modelos") fetchModelos();
-    else if (tab === "versiones") { fetchModelos(); fetchVersiones(); }
-    else if (tab === "promociones") { fetchModelos(); fetchPromociones(); }
+    const ac = new AbortController();
+    setLoading(true);
+
+    let fetches;
+    if (tab === "modelos") fetches = [fetchModelos(ac.signal)];
+    else if (tab === "versiones") fetches = [fetchModelos(ac.signal), fetchVersiones(ac.signal)];
+    else fetches = [fetchModelos(ac.signal), fetchPromociones(ac.signal)];
+
+    Promise.all(fetches).finally(() => setLoading(false));
+    return () => ac.abort();
   }, [tab, fetchModelos, fetchVersiones, fetchPromociones]);
 
   // ─── Tab: Modelos ─────────────────────────────────────────────────────────
@@ -493,7 +502,7 @@ export default function VentasCatalogoPage() {
                     </p>
                   </div>
                 </div>
-                <Badge text={m.marca_nombre} color="blue" />
+                <Badge className={BADGE_COLORS.blue}>{m.marca_nombre}</Badge>
               </div>
             </div>
           ))}
@@ -536,7 +545,7 @@ export default function VentasCatalogoPage() {
               <div className="px-4 py-2 bg-gray-50 border-b flex items-center gap-2">
                 <Car className="w-4 h-4 text-gray-400" />
                 <span className="font-medium text-sm">{m.nombre}</span>
-                <Badge text={m.tipo} color="blue" />
+                <Badge className={BADGE_COLORS.blue}>{m.tipo}</Badge>
               </div>
 
               {(byModelo[m.id] || []).length === 0 ? (
@@ -551,17 +560,19 @@ export default function VentasCatalogoPage() {
                           {formatPrice(v.precio_lista, v.moneda)}
                           {v.descuento_porcentaje > 0 && ` · ${v.descuento_porcentaje}% dto`}
                           {" · "}
-                          {v.en_stock ? "En stock" : `Bajo pedido (${v.tiempo_entrega_dias} días)`}
+                          {v.en_stock > 0 ? `${v.en_stock} uds en stock` : `Bajo pedido (${v.tiempo_entrega_dias} días)`}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge text={v.is_active ? "Activa" : "Inactiva"} color={v.is_active ? "green" : "gray"} />
-                        <button
+                        <Badge className={v.is_active ? BADGE_COLORS.green : BADGE_COLORS.gray}>{v.is_active ? "Activa" : "Inactiva"}</Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={() => setVersionModal(v)}
-                          className="p-1 text-blue-500 hover:text-blue-700"
+                          className="h-7 w-7 text-blue-500 hover:text-blue-700"
                         >
                           <Edit2 className="w-4 h-4" />
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -607,20 +618,17 @@ export default function VentasCatalogoPage() {
                   <Tag className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
                   <div>
                     <div className="flex flex-wrap gap-1.5 mb-1">
-                      <Badge
-                        text={
-                          p.tipo === "descuento" ? "Descuento"
+                      <Badge className={p.tipo === "descuento" ? BADGE_COLORS.amber : p.tipo === "regalo" ? BADGE_COLORS.blue : BADGE_COLORS.gray}>
+                        {p.tipo === "descuento" ? "Descuento"
                           : p.tipo === "financiamiento_preferencial" ? "Financiamiento"
                           : p.tipo === "regalo" ? "Regalo"
-                          : "Otro"
-                        }
-                        color={p.tipo === "descuento" ? "amber" : p.tipo === "regalo" ? "blue" : "gray"}
-                      />
+                          : "Otro"}
+                      </Badge>
                       {p.modelo_nombre
-                        ? <Badge text={p.modelo_nombre} color="blue" />
-                        : <Badge text="Todos los modelos" color="gray" />}
-                      {!p.is_active && <Badge text="Inactiva" color="red" />}
-                      {expirada && <Badge text="Expirada" color="red" />}
+                        ? <Badge className={BADGE_COLORS.blue}>{p.modelo_nombre}</Badge>
+                        : <Badge className={BADGE_COLORS.gray}>Todos los modelos</Badge>}
+                      {!p.is_active && <Badge className={BADGE_COLORS.red}>Inactiva</Badge>}
+                      {expirada && <Badge className={BADGE_COLORS.red}>Expirada</Badge>}
                     </div>
                     <p className="text-sm">{p.descripcion}</p>
                     {p.valor && <p className="text-xs font-medium text-green-700 mt-0.5">{p.valor}</p>}
@@ -633,12 +641,14 @@ export default function VentasCatalogoPage() {
                     )}
                   </div>
                 </div>
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => setPromoModal(p)}
-                  className="p-1 text-blue-500 hover:text-blue-700 shrink-0"
+                  className="h-7 w-7 text-blue-500 hover:text-blue-700 shrink-0"
                 >
                   <Edit2 className="w-4 h-4" />
-                </button>
+                </Button>
               </div>
             );
           })}

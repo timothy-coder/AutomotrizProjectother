@@ -85,8 +85,8 @@ function authenticateWebhook(req) {
 
 ## Error handling
 
-- API routes: wrap DB calls in try/catch, return `500` with a generic message (don't leak internals).
-- Client components: show user-friendly error messages, log errors to console in dev.
+- API routes: wrap DB calls in try/catch, return `500` with a generic message (don't leak internals). `console.error` in catch blocks is **required** for server-side logging — do NOT flag it.
+- Client components: show user-friendly error messages via toast. Do NOT use `console.error` in client components.
 - Never swallow errors silently.
 
 ---
@@ -96,7 +96,7 @@ function authenticateWebhook(req) {
 - No SQL string concatenation — ever.
 - No secrets in client-side code.
 - Validate `agent_key` / enum params against an allowlist before querying.
-- Webhook endpoints must validate `x-conversations-webhook-secret`.
+- Webhook endpoints must validate `x-conversations-webhook-secret`. Exception: endpoints consumed by separate n8n workflows (e.g. Ventas IA) may use their own secret header if documented in a JSDoc comment.
 
 ---
 
@@ -104,9 +104,9 @@ function authenticateWebhook(req) {
 
 - DB query without auth check above it
 - SQL built with string concatenation
-- `console.log` left in production code
+- `console.log` left in production code (note: `console.error` in API route catch blocks is OK — it is server-side logging, not debug output)
 - `any` type (if TypeScript is ever introduced)
 - Missing error handling in async functions
 - Hardcoded secrets or credentials
-- `useEffect` without cleanup for event listeners
+- `useEffect` without cleanup for event listeners or fetch calls (note: user-triggered fetches from button clicks or modal callbacks do NOT need AbortController — only `useEffect` fetches need cleanup)
 - Fetching inside render without loading/error state handling
