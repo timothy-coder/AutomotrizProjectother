@@ -7,6 +7,7 @@ export async function GET(req, { params }) {
   try {
     const { id } = await params;
 
+    // ✅ CAMBIO: Incluir campos de descuento del vehículo
     const [cotizaciones] = await db.query(
       `SELECT c.*, m.name as marca, mo.name as modelo, v.nombre as version, u.fullname
        FROM cotizacionesagenda c
@@ -40,7 +41,7 @@ export async function PUT(req, { params }) {
     const { id } = await params;
     const body = await req.json();
 
-    // ✅ Extraer solo los campos enviados
+    // ✅ CAMBIO: Extraer campos incluyendo descuentos del vehículo
     const {
       sku,
       color_externo,
@@ -50,11 +51,13 @@ export async function PUT(req, { params }) {
       marca_id,
       modelo_id,
       estado,
+      descuento_vehículo,
+      descuento_vehículo_porcentaje,
       descuento_total_accesorios,
       descuento_total_regalos,
     } = body;
 
-    // ✅ Construir dinámicamente los campos a actualizar
+    // ✅ CAMBIO: Construir dinámicamente los campos a actualizar
     const updates = [];
     const values = [];
 
@@ -90,6 +93,16 @@ export async function PUT(req, { params }) {
       updates.push("estado = ?");
       values.push(estado);
     }
+    // ✅ NUEVO: Descuento del vehículo en monto
+    if (descuento_vehículo !== undefined) {
+      updates.push("descuento_vehículo = ?");
+      values.push(descuento_vehículo || 0.00);
+    }
+    // ✅ NUEVO: Descuento del vehículo en porcentaje
+    if (descuento_vehículo_porcentaje !== undefined) {
+      updates.push("descuento_vehículo_porcentaje = ?");
+      values.push(descuento_vehículo_porcentaje || 0.00);
+    }
     if (descuento_total_accesorios !== undefined) {
       updates.push("descuento_total_accesorios = ?");
       values.push(descuento_total_accesorios);
@@ -117,12 +130,14 @@ export async function PUT(req, { params }) {
       values
     );
 
-    // ✅ Retornar la cotización actualizada
+    // ✅ CAMBIO: Retornar la cotización actualizada con todos los campos
     const [cotizaciones] = await db.query(
-      `SELECT c.*, m.name as marca, mo.name as modelo 
+      `SELECT c.*, m.name as marca, mo.name as modelo, v.nombre as version, u.fullname
        FROM cotizacionesagenda c
        LEFT JOIN marcas m ON c.marca_id = m.id
        LEFT JOIN modelos mo ON c.modelo_id = mo.id
+       LEFT JOIN versiones v ON c.version_id = v.id
+       LEFT JOIN usuarios u ON c.created_by = u.id
        WHERE c.id = ?`,
       [id]
     );

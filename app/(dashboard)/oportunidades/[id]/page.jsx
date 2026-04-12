@@ -1416,7 +1416,7 @@ export default function OportunidadDetailPage() {
                 <CardTitle className="text-lg">Información General</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <p className="text-xs text-slate-600 font-semibold uppercase">Cliente</p>
                     <p className="text-slate-900 font-medium">{oportunidad.cliente_nombre}</p>
@@ -1437,17 +1437,6 @@ export default function OportunidadDetailPage() {
                     <p className="text-xs text-slate-600 font-semibold uppercase">Asignado a</p>
                     <p className="text-slate-900">{oportunidad.asignado_a_nombre || "Sin asignar"}</p>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* INFORMACIÓN ADICIONAL */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Información Adicional</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <p className="text-xs text-slate-600 font-semibold uppercase">Correo</p>
                     <p className="text-slate-900">{oportunidad.cliente_email || "-"}</p>
@@ -1465,8 +1454,10 @@ export default function OportunidadDetailPage() {
                     <p className="text-slate-900">{oportunidad.cliente_dni || "-"}</p>
                   </div>
                 </div>
+                
               </CardContent>
             </Card>
+
 
             {/* DETALLES DE AGENDA */}
             <Card>

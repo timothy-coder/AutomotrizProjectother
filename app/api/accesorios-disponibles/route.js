@@ -1,3 +1,4 @@
+// app/api/accesorios-disponibles/route.js
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
@@ -44,15 +45,20 @@ export async function GET(req) {
     const [rows] = await db.query(sql, params);
 
     // ✅ Formatear la respuesta con cálculos
+    // SI HAY impuesto_id, el precio_venta YA INCLUYE el impuesto
     const accesoriosFormateados = rows.map(acc => ({
       ...acc,
       precio: parseFloat(acc.precio),
       precio_venta: acc.precio_venta ? parseFloat(acc.precio_venta) : null,
       impuesto_porcentaje: acc.impuesto_porcentaje ? parseFloat(acc.impuesto_porcentaje) : 0,
-      // ✅ Calcular precio con impuesto
-      precio_con_impuesto: acc.precio_venta 
-        ? parseFloat(acc.precio_venta) + (parseFloat(acc.precio_venta) * (acc.impuesto_porcentaje || 0) / 100)
-        : null,
+      // ✅ Si hay impuesto_id, el precio_venta YA INCLUYE IGV
+      // Si NO hay impuesto_id, calcular el precio con impuesto
+      precio_con_impuesto: acc.impuesto_id
+        ? acc.precio_venta ? parseFloat(acc.precio_venta) : null
+        : acc.precio_venta 
+          ? parseFloat(acc.precio_venta) + (parseFloat(acc.precio_venta) * (acc.impuesto_porcentaje || 0) / 100)
+          : null,
+      tiene_impuesto: acc.impuesto_id ? true : false,
     }));
 
     return NextResponse.json(accesoriosFormateados);
@@ -123,7 +129,7 @@ export async function POST(req) {
   }
 }
 
-// ✅ NUEVO: PUT para actualizar accesorio
+// ✅ PUT para actualizar accesorio
 export async function PUT(req) {
   try {
     const {
@@ -198,7 +204,7 @@ export async function PUT(req) {
   }
 }
 
-// ✅ NUEVO: DELETE para eliminar accesorio
+// ✅ DELETE para eliminar accesorio
 export async function DELETE(req) {
   try {
     const { searchParams } = new URL(req.url);

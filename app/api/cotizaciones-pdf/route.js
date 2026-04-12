@@ -2,6 +2,8 @@
 
 import { NextResponse } from 'next/server';
 import jsPDF from 'jspdf';
+import fs from 'fs';
+import path from 'path';
 
 export async function POST(req) {
   try {
@@ -12,6 +14,19 @@ export async function POST(req) {
         { error: 'cotizacion_id es requerido' },
         { status: 400 }
       );
+    }
+
+    // ✅ CARGAR FUENTE TTF
+    const fontPath = path.join(process.cwd(), 'public/fonts/Autography.ttf');
+    const fontData = fs.readFileSync(fontPath);
+    const fontBase64 = fontData.toString('base64');
+
+    // ✅ CARGAR PLANTILLA
+    const plantillaPath = path.join(process.cwd(), 'public/plantilla-pdf.json');
+    let plantilla = {};
+    if (fs.existsSync(plantillaPath)) {
+      const plantillaData = fs.readFileSync(plantillaPath, 'utf-8');
+      plantilla = JSON.parse(plantillaData);
     }
 
     // 1. Obtener datos
@@ -62,17 +77,66 @@ export async function POST(req) {
     );
     const especificaciones = resEspec.ok ? await resEspec.json() : [];
 
-    // 2. Cálculos (SIN REGALOS)
-    const precioVehiculo = precioActual ? parseFloat(precioActual.precio_base) : 0;
-    
-    const subtotalAcc = accesorios.reduce((sum, a) => sum + parseFloat(a.subtotal || 0), 0);
-    const descuentosAcc = accesorios.reduce((sum, a) => sum + parseFloat(a.descuento_monto || 0), 0);
+    // Obtener IGV
+    const resIgv = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/impuestos`,
+      { cache: 'no-store' }
+    );
+    const impuestos = resIgv.ok ? await resIgv.json() : [];
+    const igvData = impuestos.find((imp) => imp.nombre === 'IGV');
+    const IGV_RATE = igvData ? parseFloat(igvData.porcentaje) / 100 : 0.18;
 
-    const subtotal = precioVehiculo + subtotalAcc;
-    const descuentos = descuentosAcc;
-    const subtotalSinIgv = subtotal - descuentos;
-    const igv = subtotalSinIgv * 0.18;
-    const granTotal = subtotalSinIgv + igv;
+    // ✅ 2. Cálculos (CON PRECIOS QUE YA INCLUYEN IGV)
+    const precioVehiculoConIgv = precioActual ? parseFloat(precioActual.precio_base) : 0;
+    const precioVehiculoSinIgv = precioVehiculoConIgv / (1 + IGV_RATE);
+    const igvVehiculo = precioVehiculoConIgv - precioVehiculoSinIgv;
+    
+    // Descuento vehículo
+    const descuentoVehiculoConIgv = 
+      parseFloat(cotizacion.descuento_vehículo) > 0
+        ? parseFloat(cotizacion.descuento_vehículo)
+        : precioVehiculoConIgv * (parseFloat(cotizacion.descuento_vehículo_porcentaje) / 100 || 0);
+    
+    const descuentoVehiculoSinIgv = descuentoVehiculoConIgv / (1 + IGV_RATE);
+    
+    const precioVehiculoConDescuentoSinIgv = precioVehiculoSinIgv - descuentoVehiculoSinIgv;
+    const precioVehiculoConDescuentoConIgv = precioVehiculoConDescuentoSinIgv * (1 + IGV_RATE);
+
+    // ✅ Accesorios (YA INCLUYEN IGV EN SUS TOTALES)
+    const accesoriosSubtotalConIgv = accesorios.reduce((sum, a) => sum + parseFloat(a.subtotal || 0), 0);
+    const accesoriosDescuentoItems = accesorios.reduce((sum, a) => sum + parseFloat(a.descuento_monto || 0), 0);
+    const accesoriosTotalConIgv = accesorios.reduce((sum, a) => sum + parseFloat(a.total || 0), 0);
+    const accesoriosTotalSinIgv = accesoriosTotalConIgv / (1 + IGV_RATE);
+    const accesoriosIgv = accesoriosTotalConIgv - accesoriosTotalSinIgv;
+    
+    // Descuento general accesorios
+    const descuentoAccConIgv = parseFloat(cotizacion.descuento_total_accesorios || 0);
+    const descuentoAccSinIgv = descuentoAccConIgv / (1 + IGV_RATE);
+
+    // ✅ Regalos (YA INCLUYEN IGV EN SUS TOTALES)
+    const regalosSubtotalConIgv = regalos.reduce((sum, r) => sum + parseFloat(r.subtotal || 0), 0);
+    const regalosDescuentoItems = regalos.reduce((sum, r) => sum + parseFloat(r.descuento_monto || 0), 0);
+    const regalosTotalConIgv = regalos.reduce((sum, r) => sum + parseFloat(r.total || 0), 0);
+    const regalosTotalSinIgv = regalosTotalConIgv / (1 + IGV_RATE);
+    const regalosIgv = regalosTotalConIgv - regalosTotalSinIgv;
+    
+    // Descuento general regalos
+    const descuentoRegConIgv = parseFloat(cotizacion.descuento_total_regalos || 0);
+    const descuentoRegSinIgv = descuentoRegConIgv / (1 + IGV_RATE);
+
+    // ✅ Totales generales SIN IGV
+    const subtotalSinIgv = 
+      precioVehiculoConDescuentoSinIgv + 
+      accesoriosTotalSinIgv + 
+      regalosTotalSinIgv - 
+      descuentoAccSinIgv - 
+      descuentoRegSinIgv;
+
+    // ✅ IGV total
+    const igvTotal = subtotalSinIgv * IGV_RATE;
+
+    // ✅ Gran total
+    const granTotal = subtotalSinIgv + igvTotal;
 
     // 3. Crear PDF
     const doc = new jsPDF({
@@ -81,79 +145,115 @@ export async function POST(req) {
       format: 'a4'
     });
 
+    // ✅ REGISTRAR FUENTE TTF
+    doc.addFileToVFS('Autography.ttf', fontBase64);
+    doc.addFont('Autography.ttf', 'Autography', 'normal');
+
     let yPosition = 15;
 
-    // Header
-    doc.setFontSize(24);
-    doc.setFont(undefined, 'bold');
-    doc.text('COTIZACIÓN', 105, yPosition, { align: 'center' });
-
-    yPosition += 15;
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'normal');
-    doc.text(`Q-${String(cotizacion_id).padStart(6, '0')}`, 105, yPosition, { align: 'center' });
-
-    yPosition += 20;
-
-    // Cliente
-    doc.setFontSize(11);
-    doc.setFont(undefined, 'bold');
-    doc.text('CLIENTE:', 15, yPosition);
-
-    yPosition += 7;
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-    doc.text(oportunidad.cliente_nombre || 'N/A', 15, yPosition);
-
-    yPosition += 5;
-    doc.setFontSize(9);
-    doc.text(oportunidad.cliente_email || 'N/A', 15, yPosition);
-
-    yPosition += 15;
-
-    // Vehículo
-    doc.setFontSize(11);
-    doc.setFont(undefined, 'bold');
-    doc.text('VEHÍCULO:', 15, yPosition);
-
-    yPosition += 7;
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-    doc.text(
-      `${cotizacion.marca} ${cotizacion.modelo} ${cotizacion.version || ''} (${cotizacion.anio})`,
-      15,
-      yPosition
-    );
-
-    yPosition += 5;
-    doc.setFontSize(9);
-    doc.text(`Color Externo: ${cotizacion.color_externo || 'N/A'}`, 15, yPosition);
-
-    yPosition += 5;
-    doc.text(`Color Interno: ${cotizacion.color_interno || 'N/A'}`, 15, yPosition);
-
-    // Precio del vehículo
-    yPosition += 8;
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'bold');
-    doc.text('Precio Base:', 15, yPosition);
-
-    if (precioActual) {
-      doc.setFont(undefined, 'normal');
-      doc.setTextColor(46, 204, 113);
-      doc.text(`$${precioVehiculo.toFixed(2)}`, 60, yPosition);
-      doc.setTextColor(0, 0, 0);
-    } else {
-      doc.text('N/A', 60, yPosition);
+    // ✅ ENCABEZADO CON PLANTILLA
+    if (plantilla.encabezado?.logo_url) {
+      try {
+        const logoPath = path.join(process.cwd(), 'public', plantilla.encabezado.logo_url);
+        if (fs.existsSync(logoPath)) {
+          const logoData = fs.readFileSync(logoPath);
+          const logoBase64 = logoData.toString('base64');
+          const ext = plantilla.encabezado.logo_url.split('.').pop().toUpperCase();
+          doc.addImage(logoBase64, ext, 15, yPosition, 50, 20);
+          yPosition += 25;
+        }
+      } catch (err) {
+        console.log('Error cargando logo:', err);
+      }
     }
 
-    yPosition += 15;
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    
+    // ✅ Convertir color hex a RGB
+    const colorHex = plantilla.encabezado?.color_titulo || '#2ecc71';
+    const r = parseInt(colorHex.slice(1, 3), 16);
+    const g = parseInt(colorHex.slice(3, 5), 16);
+    const b = parseInt(colorHex.slice(5, 7), 16);
+    doc.setTextColor(r, g, b);
+    
+    doc.text(plantilla.encabezado?.titulo || 'COTIZACIÓN', 105, yPosition, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
 
-    // Especificaciones
-    if (especificaciones.length > 0) {
+    yPosition += 15;
+    
+    if (plantilla.encabezado?.mostrar_numero !== false) {
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Q-${String(cotizacion_id).padStart(6, '0')}`, 105, yPosition, { align: 'center' });
+      yPosition += 20;
+    } else {
+      yPosition += 5;
+    }
+
+    // ✅ CLIENTE (USAR PLANTILLA)
+    if (plantilla.cliente?.mostrar !== false) {
       doc.setFontSize(11);
-      doc.setFont(undefined, 'bold');
-      doc.text('ESPECIFICACIONES:', 15, yPosition);
+      doc.setFont('helvetica', 'bold');
+      doc.text(plantilla.cliente?.titulo || 'CLIENTE:', 15, yPosition);
+
+      yPosition += 7;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(oportunidad.cliente_nombre || 'N/A', 15, yPosition);
+
+      yPosition += 5;
+      doc.setFontSize(9);
+      doc.text(oportunidad.cliente_email || 'N/A', 15, yPosition);
+
+      yPosition += 15;
+    }
+
+    // ✅ VEHÍCULO (USAR PLANTILLA)
+    if (plantilla.vehiculo?.mostrar !== false) {
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text(plantilla.vehiculo?.titulo || 'VEHÍCULO:', 15, yPosition);
+
+      yPosition += 7;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(
+        `${cotizacion.marca} ${cotizacion.modelo} ${cotizacion.version || ''} (${cotizacion.anio})`,
+        15,
+        yPosition
+      );
+
+      yPosition += 5;
+      doc.setFontSize(9);
+      doc.text(`Color Externo: ${cotizacion.color_externo || 'N/A'}`, 15, yPosition);
+
+      yPosition += 5;
+      doc.text(`Color Interno: ${cotizacion.color_interno || 'N/A'}`, 15, yPosition);
+
+      yPosition += 8;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Precio Base:', 15, yPosition);
+
+      if (precioActual) {
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(46, 204, 113);
+        doc.text(`$${precioVehiculoConIgv.toFixed(2)}`, 60, yPosition);
+        doc.setTextColor(0, 0, 0);
+      } else {
+        doc.setFont('helvetica', 'normal');
+        doc.text('N/A', 60, yPosition);
+      }
+
+      yPosition += 15;
+    }
+
+    // ✅ ESPECIFICACIONES (USAR PLANTILLA)
+    if (plantilla.especificaciones?.mostrar !== false && especificaciones.length > 0) {
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text(plantilla.especificaciones?.titulo || 'ESPECIFICACIONES:', 15, yPosition);
 
       yPosition += 10;
       doc.setFontSize(9);
@@ -163,8 +263,7 @@ export async function POST(req) {
       let especYPos = yPosition;
       let especXPos = 15;
 
-      especificaciones.forEach((espec, index) => {
-        // Saltar a siguiente página si es necesario
+      especificaciones.forEach((espec) => {
         if (especYPos > 260) {
           doc.addPage();
           especYPos = 15;
@@ -172,9 +271,7 @@ export async function POST(req) {
           especIndex = 0;
         }
 
-        // Procesar especificaciones
         if (espec.tipo_dato === 'media' && espec.valor) {
-          // Mostrar imagen
           try {
             doc.addImage(
               espec.valor,
@@ -185,47 +282,28 @@ export async function POST(req) {
               30
             );
             doc.setFontSize(8);
+            doc.setFont('helvetica', 'normal');
             doc.text(espec.especificacion_nombre.toUpperCase(), especXPos, especYPos + 32);
             especYPos += 40;
           } catch (err) {
             console.log('Error cargando imagen:', espec.valor);
             doc.setFontSize(8);
+            doc.setFont('helvetica', 'normal');
             doc.text(`${espec.especificacion_nombre}: [Imagen no disponible]`, especXPos, especYPos);
             especYPos += 8;
           }
         } else if (espec.tipo_dato === 'texto' && espec.valor.includes('http')) {
-          // URL - intentar cargar como imagen
-          try {
-            doc.addImage(
-              espec.valor,
-              'JPEG',
-              especXPos,
-              especYPos,
-              50,
-              30
-            );
-            doc.setFontSize(8);
-            doc.text(espec.especificacion_nombre.toUpperCase(), especXPos, especYPos + 32);
-            especYPos += 40;
-          } catch (err) {
-            // Si no es imagen, mostrar como link
-            doc.setTextColor(0, 102, 204);
-            doc.setFont(undefined, 'underline');
-            doc.text('Ver ' + espec.especificacion_nombre, especXPos, especYPos);
-            doc.textWithLink(espec.valor, especXPos + 20, especYPos, {
-              pageNumber: 1,
-              url: espec.valor
-            });
-            doc.setFont(undefined, 'normal');
-            doc.setTextColor(0, 0, 0);
-            especYPos += 8;
-          }
-        } else if (espec.tipo_dato === 'texto') {
-          // Texto normal
+          doc.setTextColor(0, 102, 204);
+          doc.setFont('helvetica', 'normal');
           doc.setFontSize(8);
-          doc.setFont(undefined, 'bold');
+          doc.text('Ver ' + espec.especificacion_nombre, especXPos, especYPos);
+          doc.setTextColor(0, 0, 0);
+          especYPos += 8;
+        } else if (espec.tipo_dato === 'texto') {
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'bold');
           doc.text(`${espec.especificacion_nombre}:`, especXPos, especYPos);
-          doc.setFont(undefined, 'normal');
+          doc.setFont('helvetica', 'normal');
           doc.text(espec.valor, especXPos, especYPos + 5);
           especYPos += 15;
         }
@@ -243,25 +321,25 @@ export async function POST(req) {
       yPosition = especYPos + 15;
     }
 
-    // Accesorios
-    if (accesorios.length > 0) {
+    // ✅ ACCESORIOS (USAR PLANTILLA)
+    if (plantilla.accesorios?.mostrar !== false && accesorios.length > 0) {
       if (yPosition > 230) {
         doc.addPage();
         yPosition = 15;
       }
 
       doc.setFontSize(11);
-      doc.setFont(undefined, 'bold');
-      doc.text('ACCESORIOS', 15, yPosition);
+      doc.setFont('helvetica', 'bold');
+      doc.text(plantilla.accesorios?.titulo || 'ACCESORIOS', 15, yPosition);
 
       yPosition += 10;
       doc.setFontSize(9);
-      doc.setFont(undefined, 'bold');
+      doc.setFont('helvetica', 'bold');
 
       doc.text('Descripción', 15, yPosition);
       doc.text('Cant.', 115, yPosition, { align: 'center' });
       doc.text('Unitario', 135, yPosition, { align: 'right' });
-      doc.text('Subtotal', 160, yPosition, { align: 'right' });
+      doc.text('Desc.', 160, yPosition, { align: 'right' });
       doc.text('Total', 190, yPosition, { align: 'right' });
 
       yPosition += 5;
@@ -269,7 +347,7 @@ export async function POST(req) {
       doc.line(15, yPosition, 195, yPosition);
 
       yPosition += 5;
-      doc.setFont(undefined, 'normal');
+      doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
 
       accesorios.forEach((acc) => {
@@ -278,14 +356,14 @@ export async function POST(req) {
           yPosition = 15;
         }
 
-        const totalSinIgv = parseFloat(acc.subtotal) - parseFloat(acc.descuento_monto || 0);
-        const totalConIgv = totalSinIgv * 1.18;
+        const descuentoMonto = parseFloat(acc.descuento_monto || 0);
+        const totalConDesc = parseFloat(acc.total || 0);
 
         doc.text(acc.detalle.substring(0, 50), 15, yPosition);
         doc.text(String(acc.cantidad), 115, yPosition, { align: 'center' });
         doc.text(`$${parseFloat(acc.precio_unitario).toFixed(2)}`, 135, yPosition, { align: 'right' });
-        doc.text(`$${parseFloat(acc.subtotal).toFixed(2)}`, 160, yPosition, { align: 'right' });
-        doc.text(`$${totalConIgv.toFixed(2)}`, 190, yPosition, { align: 'right' });
+        doc.text(`-$${descuentoMonto.toFixed(2)}`, 160, yPosition, { align: 'right' });
+        doc.text(`$${totalConDesc.toFixed(2)}`, 190, yPosition, { align: 'right' });
 
         yPosition += 6;
       });
@@ -293,31 +371,32 @@ export async function POST(req) {
       yPosition += 5;
     }
 
-    // Regalos (solo mostrar, sin sumar)
-    if (regalos.length > 0) {
+    // ✅ REGALOS (USAR PLANTILLA)
+    if (plantilla.regalos?.mostrar !== false && regalos.length > 0) {
       if (yPosition > 230) {
         doc.addPage();
         yPosition = 15;
       }
 
       doc.setFontSize(11);
-      doc.setFont(undefined, 'bold');
-      doc.text('REGALOS INCLUIDOS', 15, yPosition);
+      doc.setFont('helvetica', 'bold');
+      doc.text(plantilla.regalos?.titulo || 'REGALOS INCLUIDOS', 15, yPosition);
 
       yPosition += 10;
       doc.setFontSize(9);
-      doc.setFont(undefined, 'bold');
+      doc.setFont('helvetica', 'bold');
 
       doc.text('Descripción', 15, yPosition);
       doc.text('Cant.', 115, yPosition, { align: 'center' });
-      doc.text('Lote', 160, yPosition, { align: 'right' });
+      doc.text('Desc.', 160, yPosition, { align: 'right' });
+      doc.text('Total', 190, yPosition, { align: 'right' });
 
       yPosition += 5;
       doc.setDrawColor(200);
       doc.line(15, yPosition, 195, yPosition);
 
       yPosition += 5;
-      doc.setFont(undefined, 'normal');
+      doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
 
       regalos.forEach((regalo) => {
@@ -326,9 +405,13 @@ export async function POST(req) {
           yPosition = 15;
         }
 
+        const descuentoMonto = parseFloat(regalo.descuento_monto || 0);
+        const totalConDesc = parseFloat(regalo.total || 0);
+
         doc.text(regalo.detalle.substring(0, 70), 15, yPosition);
         doc.text(String(regalo.cantidad), 115, yPosition, { align: 'center' });
-        doc.text(regalo.lote || '-', 160, yPosition, { align: 'right' });
+        doc.text(`-$${descuentoMonto.toFixed(2)}`, 160, yPosition, { align: 'right' });
+        doc.text(`$${totalConDesc.toFixed(2)}`, 190, yPosition, { align: 'right' });
 
         yPosition += 6;
       });
@@ -343,71 +426,102 @@ export async function POST(req) {
 
     yPosition += 10;
 
-    // Totales (sin regalos)
-    doc.setFontSize(11);
-    doc.setFont(undefined, 'bold');
-    doc.text('RESUMEN:', 15, yPosition);
+    // ✅ RESUMEN (USAR PLANTILLA)
+    if (plantilla.resumen?.mostrar !== false) {
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text(plantilla.resumen?.titulo || 'RESUMEN:', 15, yPosition);
 
-    yPosition += 8;
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-    doc.text(`Precio Vehículo:`, 120, yPosition, { align: 'right' });
-    doc.text(`$${precioVehiculo.toFixed(2)}`, 190, yPosition, { align: 'right' });
+      yPosition += 8;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      
+      doc.text(`Vehículo (c/IGV):`, 120, yPosition, { align: 'right' });
+      doc.text(`$${precioVehiculoConIgv.toFixed(2)}`, 190, yPosition, { align: 'right' });
 
-    yPosition += 6;
-    doc.text(`Accesorios:`, 120, yPosition, { align: 'right' });
-    doc.text(`$${subtotalAcc.toFixed(2)}`, 190, yPosition, { align: 'right' });
+      yPosition += 6;
+      if (descuentoVehiculoConIgv > 0) {
+        doc.text(`Desc. Vehículo:`, 120, yPosition, { align: 'right' });
+        doc.text(`-$${descuentoVehiculoConIgv.toFixed(2)}`, 190, yPosition, { align: 'right' });
+        yPosition += 6;
+      }
 
-    yPosition += 6;
-    doc.text(`Subtotal:`, 120, yPosition, { align: 'right' });
-    doc.text(`$${subtotal.toFixed(2)}`, 190, yPosition, { align: 'right' });
+      doc.text(`Accesorios (c/IGV):`, 120, yPosition, { align: 'right' });
+      doc.text(`$${accesoriosTotalConIgv.toFixed(2)}`, 190, yPosition, { align: 'right' });
 
-    yPosition += 6;
-    doc.text(`Descuentos:`, 120, yPosition, { align: 'right' });
-    doc.text(`-$${descuentos.toFixed(2)}`, 190, yPosition, { align: 'right' });
+      yPosition += 6;
+      if (descuentoAccConIgv > 0) {
+        doc.text(`Desc. Accesorios:`, 120, yPosition, { align: 'right' });
+        doc.text(`-$${descuentoAccConIgv.toFixed(2)}`, 190, yPosition, { align: 'right' });
+        yPosition += 6;
+      }
 
-    yPosition += 6;
-    doc.text(`IGV (18%):`, 120, yPosition, { align: 'right' });
-    doc.text(`+$${igv.toFixed(2)}`, 190, yPosition, { align: 'right' });
+      if (regalosTotalConIgv > 0) {
+        doc.text(`Regalos (c/IGV):`, 120, yPosition, { align: 'right' });
+        doc.text(`$${regalosTotalConIgv.toFixed(2)}`, 190, yPosition, { align: 'right' });
 
-    yPosition += 8;
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'bold');
-    doc.setTextColor(46, 204, 113);
-    doc.text(`TOTAL: $${granTotal.toFixed(2)}`, 190, yPosition, { align: 'right' });
-    doc.setTextColor(0, 0, 0);
+        yPosition += 6;
+        if (descuentoRegConIgv > 0) {
+          doc.text(`Desc. Regalos:`, 120, yPosition, { align: 'right' });
+          doc.text(`-$${descuentoRegConIgv.toFixed(2)}`, 190, yPosition, { align: 'right' });
+          yPosition += 6;
+        }
+      }
 
-    yPosition += 20;
+      yPosition += 2;
+      doc.text(`Subtotal (S/IGV):`, 120, yPosition, { align: 'right' });
+      doc.text(`$${subtotalSinIgv.toFixed(2)}`, 190, yPosition, { align: 'right' });
 
-    // Vigencia
+      yPosition += 6;
+      doc.text(`IGV (${(IGV_RATE * 100).toFixed(0)}%):`, 120, yPosition, { align: 'right' });
+      doc.text(`+$${igvTotal.toFixed(2)}`, 190, yPosition, { align: 'right' });
+
+      yPosition += 8;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(r, g, b);
+      doc.text(`TOTAL: $${granTotal.toFixed(2)}`, 190, yPosition, { align: 'right' });
+      doc.setTextColor(0, 0, 0);
+
+      yPosition += 20;
+    }
+
+    // ✅ PIE DE PÁGINA (USAR PLANTILLA)
     doc.setFontSize(9);
-    doc.setFont(undefined, 'normal');
-    doc.text('Vigencia: 30 días', 15, yPosition);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Vigencia: ${plantilla.pie?.vigencia || '30 días'}`, 15, yPosition);
 
     yPosition += 15;
 
-    // Firma con nombre desde fullname
-    doc.setFontSize(11);
-    doc.setFont(undefined, 'bold');
-    doc.text('Autorizado por:', 15, yPosition);
+    // ✅ FIRMA (USAR PLANTILLA)
+    if (plantilla.pie?.mostrar_firma !== false) {
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text(plantilla.pie?.texto_firma || 'Autorizado por:', 15, yPosition);
 
-    yPosition += 15;
-    doc.setFontSize(14);
-    doc.setFont(undefined, 'bold');
-    doc.text((cotizacion.fullname || 'Usuario').toUpperCase(), 15, yPosition);
+      yPosition += 15;
+      doc.setFontSize(28);
+      doc.setFont('Autography', 'normal');
+      doc.text((cotizacion.fullname || 'Usuario'), 15, yPosition);
 
-    // Línea de firma
-    yPosition += 8;
-    doc.setDrawColor(0);
-    doc.line(15, yPosition, 80, yPosition);
+      yPosition += 14;
+      doc.setDrawColor(0);
+      doc.line(15, yPosition, 80, yPosition);
 
-    yPosition += 5;
-    doc.setFontSize(8);
-    doc.setFont(undefined, 'normal');
-    doc.text(`Fecha: ${new Date().toLocaleDateString('es-ES')}`, 15, yPosition);
+      yPosition += 5;
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Fecha: ${new Date().toLocaleDateString('es-ES')}`, 15, yPosition);
+    }
 
-    // Generar PDF
-    const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+    // ✅ GENERAR PDF
+    const pdfBytes = doc.output('arraybuffer');
+
+    if (!pdfBytes) {
+      throw new Error('Error al generar el buffer del PDF');
+    }
+
+    const pdfBuffer = Buffer.from(pdfBytes);
 
     return new NextResponse(pdfBuffer, {
       headers: {
