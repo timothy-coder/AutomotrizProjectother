@@ -82,6 +82,32 @@ function formatMsgTime(dateStr) {
   return new Date(dateStr).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
 }
 
+function formatMsgDateTime(dateStr) {
+  if (!dateStr) return "";
+  return new Date(dateStr).toLocaleString("es-AR", {
+    weekday: "short", day: "2-digit", month: "short",
+    year: "numeric", hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function formatDaySeparator(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today - 86400000);
+  const msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  if (msgDay.getTime() === today.getTime()) return "Hoy";
+  if (msgDay.getTime() === yesterday.getTime()) return "Ayer";
+  return d.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
+}
+
+function getMsgDayKey(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
 const STATUS_ICONS = {
   sent: "✓",
   delivered: "✓✓",
@@ -883,8 +909,19 @@ export default function ConversationWorkspace({
             </div>
           )}
 
-          {messages.map((m) => (
+          {messages.map((m, i) => {
+            const dayKey = getMsgDayKey(m.created_at);
+            const prevDayKey = getMsgDayKey(messages[i - 1]?.created_at);
+            const showDaySep = dayKey !== prevDayKey;
+            return (
             <div key={m.id} className="space-y-2">
+              {showDaySep && (
+                <div className="flex items-center gap-3 my-2">
+                  <div className="flex-1 h-px bg-gray-100" />
+                  <span className="text-[11px] text-gray-400 font-medium">{formatDaySeparator(m.created_at)}</span>
+                  <div className="flex-1 h-px bg-gray-100" />
+                </div>
+              )}
               {/* Mensaje del cliente — izquierda */}
               {m.message_direction === "inbound" && (m.pregunta || m.attachments?.length > 0) && (
                 <div className="flex items-end gap-2 max-w-[80%] group/msg">
@@ -901,7 +938,12 @@ export default function ConversationWorkspace({
                       </div>
                     )}
                     <div className="flex items-center gap-2 mt-0.5 ml-1">
-                      <p className="text-[10px] text-gray-400">{formatMsgTime(m.created_at)}</p>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className="text-[10px] text-gray-400 cursor-default">{formatMsgTime(m.created_at)}</p>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">{formatMsgDateTime(m.created_at)}</TooltipContent>
+                      </Tooltip>
                       {m.pregunta && (
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -957,18 +999,24 @@ export default function ConversationWorkspace({
                           <TooltipContent side="left">Citar este mensaje</TooltipContent>
                         </Tooltip>
                       )}
-                      <p className="text-[10px] text-gray-400">
-                        {formatMsgTime(m.created_at)}{" "}
-                        <span className={m.message_status === "read" ? "text-blue-500" : ""}>
-                          {STATUS_ICONS[m.message_status] || ""}
-                        </span>
-                      </p>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className="text-[10px] text-gray-400 cursor-default">
+                            {formatMsgTime(m.created_at)}{" "}
+                            <span className={m.message_status === "read" ? "text-blue-500" : ""}>
+                              {STATUS_ICONS[m.message_status] || ""}
+                            </span>
+                          </p>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">{formatMsgDateTime(m.created_at)}</TooltipContent>
+                      </Tooltip>
                     </div>
                   </div>
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* ── Compositor — solo usuarios con permiso write ──────── */}
