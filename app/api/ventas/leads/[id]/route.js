@@ -22,7 +22,8 @@ export async function GET(req, { params }) {
       return NextResponse.json({ message: "Lead no encontrado" }, { status: 404 });
     }
     return NextResponse.json({ lead: rows[0] });
-  } catch {
+  } catch (err) {
+    console.error("Error obteniendo lead:", err.message);
     return NextResponse.json({ message: "Error interno del servidor" }, { status: 500 });
   }
 }
@@ -34,7 +35,7 @@ export async function PUT(req, { params }) {
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
 
-  const estadosValidos = ["nuevo", "contactado", "negociando", "cerrado", "perdido"];
+  const estadosValidos = ["nuevo", "en_gestion", "vendido", "perdido"];
 
   const fields = [];
   const values = [];
@@ -65,7 +66,8 @@ export async function PUT(req, { params }) {
       values
     );
     return NextResponse.json({ message: "Lead actualizado" });
-  } catch {
+  } catch (err) {
+    console.error("Error actualizando lead:", err.message);
     return NextResponse.json({ message: "Error interno del servidor" }, { status: 500 });
   }
 }
@@ -86,7 +88,8 @@ export async function DELETE(req, { params }) {
       return NextResponse.json({ message: "Lead no encontrado" }, { status: 404 });
     }
     return NextResponse.json({ message: "Lead eliminado" });
-  } catch {
+  } catch (err) {
+    console.error("Error eliminando lead:", err.message);
     return NextResponse.json({ message: "Error interno del servidor" }, { status: 500 });
   }
 }

@@ -16,6 +16,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -26,14 +32,13 @@ function getAuthHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-const ESTADOS = ["nuevo", "contactado", "negociando", "cerrado", "perdido"];
+const ESTADOS = ["nuevo", "en_gestion", "vendido", "perdido"];
 
 const ESTADO_CONFIG = {
-  nuevo: { label: "Nuevo", color: "bg-blue-100 text-blue-700" },
-  contactado: { label: "Contactado", color: "bg-yellow-100 text-yellow-700" },
-  negociando: { label: "Negociando", color: "bg-purple-100 text-purple-700" },
-  cerrado: { label: "Cerrado", color: "bg-green-100 text-green-700" },
-  perdido: { label: "Perdido", color: "bg-red-100 text-red-700" },
+  nuevo:      { label: "Nuevo",       color: "bg-blue-100 text-blue-700",   tooltip: "Cotización recién capturada por el agente. Ningún asesor la revisó todavía." },
+  en_gestion: { label: "En gestión",  color: "bg-yellow-100 text-yellow-700", tooltip: "El asesor está trabajando activamente este lead: contactó al cliente, enviando propuestas o evaluando financiamiento." },
+  vendido:    { label: "Vendido",     color: "bg-green-100 text-green-700",  tooltip: "La venta se concretó. El lead se convirtió en cliente." },
+  perdido:    { label: "Perdido",     color: "bg-red-100 text-red-700",      tooltip: "El lead no prosperó: el cliente no respondió, compró en otro lugar o descartó la compra." },
 };
 
 function formatPrice(value, moneda = "PEN") {
@@ -57,11 +62,20 @@ function formatDate(value) {
 }
 
 function EstadoBadge({ estado }) {
-  const cfg = ESTADO_CONFIG[estado] || { label: estado, color: "bg-gray-100 text-gray-700" };
+  const cfg = ESTADO_CONFIG[estado] || { label: estado, color: "bg-gray-100 text-gray-700", tooltip: "" };
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cfg.color}`}>
-      {cfg.label}
-    </span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium cursor-default ${cfg.color}`}>
+          {cfg.label}
+        </span>
+      </TooltipTrigger>
+      {cfg.tooltip && (
+        <TooltipContent side="top" className="max-w-48 text-center">
+          {cfg.tooltip}
+        </TooltipContent>
+      )}
+    </Tooltip>
   );
 }
 
@@ -262,7 +276,7 @@ export default function VentasLeadsPage() {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({ total: 0, page: 1, pages: 1 });
-  const [estadoCounts, setEstadoCounts] = useState({ nuevo: 0, contactado: 0, negociando: 0, cerrado: 0, perdido: 0 });
+  const [estadoCounts, setEstadoCounts] = useState({ nuevo: 0, en_gestion: 0, vendido: 0, perdido: 0 });
   const [selectedLead, setSelectedLead] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -275,7 +289,7 @@ export default function VentasLeadsPage() {
 
   const setFilter = (k, v) => setFilters((f) => ({ ...f, [k]: v, page: 1 }));
 
-  const fetchLeads = useCallback(async () => {
+  const fetchLeads = useCallback(async (signal) => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -285,19 +299,24 @@ export default function VentasLeadsPage() {
       params.set("page", filters.page);
       params.set("limit", "50");
 
-      const res = await fetch(`/api/ventas/leads?${params}`, { headers: getAuthHeaders() });
+      const res = await fetch(`/api/ventas/leads?${params}`, { headers: getAuthHeaders(), signal });
       const data = await res.json();
       setLeads(data.leads || []);
       setPagination(data.pagination || { total: 0, page: 1, pages: 1 });
       if (data.estado_counts) setEstadoCounts(data.estado_counts);
-    } catch {
+    } catch (err) {
+      if (err?.name === "AbortError") return;
       toast.error("Error al cargar los leads");
     } finally {
       setLoading(false);
     }
   }, [filters]);
 
-  useEffect(() => { fetchLeads(); }, [fetchLeads]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchLeads(controller.signal);
+    return () => controller.abort();
+  }, [fetchLeads]);
 
   function handleEstadoChanged(updated) {
     setLeads((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
@@ -313,6 +332,7 @@ export default function VentasLeadsPage() {
   const activeFilters = [filters.estado, filters.desde, filters.hasta].filter(Boolean).length;
 
   return (
+    <TooltipProvider>
     <div className="flex h-full">
       {/* Lista principal */}
       <div className="flex-1 p-6 overflow-y-auto">
@@ -385,26 +405,32 @@ export default function VentasLeadsPage() {
         )}
 
         {/* Resumen por estado */}
-        <div className="grid grid-cols-5 gap-2 mb-4">
-          {ESTADOS.map((e) => {
-            const count = estadoCounts[e] ?? 0;
-            const cfg = ESTADO_CONFIG[e];
-            return (
-              <button
-                key={e}
-                onClick={() => setFilter("estado", filters.estado === e ? "" : e)}
-                className={`text-center p-2 rounded-lg border text-xs transition-all ${
-                  filters.estado === e ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white hover:bg-gray-50"
-                }`}
-              >
-                <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium mb-1 ${cfg.color}`}>
-                  {cfg.label}
-                </span>
-                <p className="font-bold text-gray-800">{count}</p>
-              </button>
-            );
-          })}
-        </div>
+        <div className="grid grid-cols-4 gap-2 mb-4">
+            {ESTADOS.map((e) => {
+              const count = estadoCounts[e] ?? 0;
+              const cfg = ESTADO_CONFIG[e];
+              return (
+                <Tooltip key={e}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setFilter("estado", filters.estado === e ? "" : e)}
+                      className={`text-center p-2 rounded-lg border text-xs transition-all ${
+                        filters.estado === e ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white hover:bg-gray-50"
+                      }`}
+                    >
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium mb-1 ${cfg.color}`}>
+                        {cfg.label}
+                      </span>
+                      <p className="font-bold text-gray-800">{count}</p>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-48 text-center">
+                    {cfg.tooltip}
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+          </div>
 
         {/* Tabla */}
         {loading ? (
@@ -504,5 +530,6 @@ export default function VentasLeadsPage() {
         />
       )}
     </div>
+    </TooltipProvider>
   );
 }

@@ -3,8 +3,14 @@ import { randomUUID } from "crypto";
 import { db } from "@/lib/db";
 import { authorizeConversation } from "@/lib/conversationsAuth";
 
+/**
+ * Autenticación dual para el endpoint POST /api/ventas/leads.
+ * Consumido por el workflow "Bot Ventas IA" en n8n, que envía cotizaciones
+ * completadas por el agente. Usa x-ventas-webhook-secret (VENTAS_WEBHOOK_SECRET)
+ * en vez de x-conversations-webhook-secret porque es un dominio de negocio separado
+ * (ventas), no mensajes/conversaciones.
+ */
 function authenticateRequest(req) {
-  // Acepta tanto JWT de usuario del CRM como secret del webhook de n8n
   const webhookSecret = req.headers.get("x-ventas-webhook-secret") || "";
   const expectedSecret = process.env.VENTAS_WEBHOOK_SECRET || "";
 
@@ -33,7 +39,7 @@ export async function GET(req) {
   const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") || 50)));
   const offset = (page - 1) * limit;
 
-  const estadosValidos = ["nuevo", "contactado", "negociando", "cerrado", "perdido"];
+  const estadosValidos = ["nuevo", "en_gestion", "vendido", "perdido"];
   const estadoFiltro = estado && estadosValidos.includes(estado) ? estado : null;
   const modeloFiltro = modeloId ? Number(modeloId) : null;
   const desdeFiltro = desde || null;
@@ -61,7 +67,7 @@ export async function GET(req) {
        GROUP BY l.estado`,
       [modeloFiltro, modeloFiltro, desdeFiltro, desdeFiltro, hastaFiltro, hastaFiltro]
     );
-    const estadoCounts = { nuevo: 0, contactado: 0, negociando: 0, cerrado: 0, perdido: 0 };
+    const estadoCounts = { nuevo: 0, en_gestion: 0, vendido: 0, perdido: 0 };
     for (const row of estadoRows) {
       if (row.estado in estadoCounts) estadoCounts[row.estado] = Number(row.cnt);
     }
@@ -92,7 +98,8 @@ export async function GET(req) {
       estado_counts: estadoCounts,
       pagination: { total, page, limit, pages: Math.ceil(total / limit) },
     });
-  } catch {
+  } catch (err) {
+    console.error("Error obteniendo leads:", err.message);
     return NextResponse.json({ message: "Error obteniendo leads" }, { status: 500 });
   }
 }
@@ -173,7 +180,8 @@ export async function POST(req) {
       );
       clienteId = ins.insertId;
     }
-  } catch {
+  } catch (err) {
+    console.error("Error procesando cliente del lead:", err.message);
     return NextResponse.json({ message: "Error procesando datos del cliente" }, { status: 500 });
   }
 
@@ -285,8 +293,9 @@ export async function POST(req) {
     }
 
     await conn.commit();
-  } catch {
+  } catch (err) {
     if (conn) await conn.rollback();
+    console.error("Error en transacción al guardar lead:", err.message);
     return NextResponse.json({ message: "Error al guardar el lead" }, { status: 500 });
   } finally {
     if (conn) conn.release();
