@@ -317,15 +317,15 @@ export async function GET(request, context) {
     yPosition += 3;
 
     addSection("DESCUENTOS Y MONTOS");
-    addField("Precio Base", `S/ ${formatCurrency(detalle.precio_base)}`);
-    addField("Descuento Tienda", `S/ ${formatCurrency(detalle.dsctotienda)}`);
-    addField("Bono Retoma", `S/ ${formatCurrency(detalle.dsctobonoretoma)}`);
-    addField("Descuento NPER", `S/ ${formatCurrency(detalle.dsctonper)}`);
-    addField("Flete", `S/ ${formatCurrency(detalle.flete)}`);
-    addField("Tarjeta Placa", `S/ ${formatCurrency(detalle.tarjetaplaca)}`);
-    addField("GLP", `S/ ${formatCurrency(detalle.glp)}`);
+    addField("Precio Base", `$ ${formatCurrency(detalle.precio_base)}`);
+    addField("Descuento Tienda", `$ ${formatCurrency(detalle.dsctotienda)}`);
+    addField("Bono Retoma", `$ ${formatCurrency(detalle.dsctobonoretoma)}`);
+    addField("Descuento NPER", `$ ${formatCurrency(detalle.dsctonper)}`);
+    addField("Flete", `$ ${formatCurrency(detalle.flete)}`);
+    addField("Tarjeta Placa", `$ ${formatCurrency(detalle.tarjetaplaca)}`);
+    addField("GLP", `$ ${formatCurrency(detalle.glp)}`);
     addField("T.C. Referencial", detalle.tc_referencial?.toString() || "-");
-    addField("Total", `S/ ${formatCurrency(detalle.total)}`);
+    addField("Total", `$ ${formatCurrency(detalle.total)}`);
     yPosition += 5;
 
     // Accesorios
@@ -333,10 +333,10 @@ export async function GET(request, context) {
       addSection("ACCESORIOS");
       accesorios.forEach((acc, index) => {
         const accName = getDisponibleName("acc", acc.detalle) || acc.detalle || `Accesorio ${index + 1}`;
-        const desc = acc.descuento_monto ? ` | Desc.: S/ ${formatCurrency(acc.descuento_monto)}` : "";
+        const desc = acc.descuento_monto ? ` | Desc.: $ ${formatCurrency(acc.descuento_monto)}` : "";
         addField(
           accName,
-          `Cant: ${acc.cantidad || 0} | P.Unit: S/ ${formatCurrency(acc.precio_unitario)}${desc} | Total: S/ ${formatCurrency(acc.total)}`
+          `Cant: ${acc.cantidad || 0} | P.Unit: $ ${formatCurrency(acc.precio_unitario)}${desc} | Total: $ ${formatCurrency(acc.total)}`
         );
       });
       yPosition += 3;
@@ -347,10 +347,10 @@ export async function GET(request, context) {
       addSection("REGALOS");
       regalos.forEach((reg, index) => {
         const regName = getDisponibleName("reg", reg.detalle) || reg.detalle || `Regalo ${index + 1}`;
-        const desc = reg.descuento_monto ? ` | Desc.: S/ ${formatCurrency(reg.descuento_monto)}` : "";
+        const desc = reg.descuento_monto ? ` | Desc.: $ ${formatCurrency(reg.descuento_monto)}` : "";
         addField(
           regName,
-          `Cant: ${reg.cantidad || 0} | P.Unit: S/ ${formatCurrency(reg.precio_unitario)}${desc} | Total: S/ ${formatCurrency(reg.total)}`
+          `Cant: ${reg.cantidad || 0} | P.Unit: $ ${formatCurrency(reg.precio_unitario)}${desc} | Total: $ ${formatCurrency(reg.total)}`
         );
       });
       yPosition += 3;
@@ -365,16 +365,16 @@ const totalAccRegFinal = (totalAccesorios + totalRegalos) - descuentosAccesorios
 const totalGeneralFinal = parseFloat(detalle.total || 0) + totalAccRegFinal;
 
     addSection("RESUMEN ACCESORIOS Y REGALOS");
-    addField("Total Accesorios", `S/ ${formatCurrency(totalAccesorios)}`);
-    addField("Total Regalos", `S/ ${formatCurrency(totalRegalos)}`);
-    addField("Descuentos Accesorios", `S/ ${formatCurrency(descuentosAccesorios)}`);
-    addField("Descuentos Regalos", `S/ ${formatCurrency(descuentosRegalos)}`);
-    addField("Total Accesorios + Regalos", `S/ ${formatCurrency(totalAccRegFinal)}`);
+    addField("Total Accesorios", `$ ${formatCurrency(totalAccesorios)}`);
+    addField("Total Regalos", `$ ${formatCurrency(totalRegalos)}`);
+    addField("Descuentos Accesorios", `$ ${formatCurrency(descuentosAccesorios)}`);
+    addField("Descuentos Regalos", `$ ${formatCurrency(descuentosRegalos)}`);
+    addField("Total Accesorios + Regalos", `$ ${formatCurrency(totalAccRegFinal)}`);
 
     addSection("RESUMEN FINAL");
-addField("Total Nota de Pedido", `S/ ${formatCurrency(detalle.total)}`);
-addField("Total Accesorios y Regalos", `S/ ${formatCurrency(totalAccRegFinal)}`);
-addField("TOTAL GENERAL", `S/ ${formatCurrency(totalGeneralFinal)}`);
+addField("Total Nota de Pedido", `$ ${formatCurrency(detalle.total)}`);
+addField("Total Accesorios y Regalos", `$ ${formatCurrency(totalAccRegFinal)}`);
+addField("TOTAL GENERAL", `$ ${formatCurrency(totalGeneralFinal)}`);
 
     if (yPosition > pageHeight - 80) {
       doc.addPage();
