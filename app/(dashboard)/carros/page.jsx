@@ -47,20 +47,22 @@ export default function PreciosPage() {
   const saveTimers = useRef({});
 
   // Cargar datos
-  async function loadData() {
+  async function loadData(signal) {
     try {
       setLoading(true);
 
       const [m, mo, v, p] = await Promise.all([
-        fetch("/api/marcas", { cache: "no-store" }).then((r) => r.json()),
-        fetch("/api/modelos", { cache: "no-store" }).then((r) => r.json()),
-        fetch("/api/versiones?limit=1000", { cache: "no-store" }).then(
+        fetch("/api/marcas", { cache: "no-store", signal }).then((r) => r.json()),
+        fetch("/api/modelos", { cache: "no-store", signal }).then((r) => r.json()),
+        fetch("/api/versiones?limit=1000", { cache: "no-store", signal }).then(
           (r) => r.json()
         ),
-        fetch("/api/precios-region-version", { cache: "no-store" }).then(
+        fetch("/api/precios-region-version", { cache: "no-store", signal }).then(
           (r) => r.json()
         ),
       ]);
+
+      if (signal?.aborted) return;
 
       const marcasData = Array.isArray(m) ? m : [];
       const modelosData = Array.isArray(mo) ? mo : [];
@@ -86,6 +88,7 @@ export default function PreciosPage() {
         preciosData
       );
     } catch (e) {
+      if (e.name === "AbortError") return;
       console.error(e);
       toast.error("Error cargando datos");
     } finally {
@@ -117,6 +120,7 @@ export default function PreciosPage() {
           estructura[key][version.id] = {
             precio_base: precio?.precio_base ?? "",
             en_stock: precio ? Boolean(Number(precio.en_stock)) : true,
+            existe: precio ? Boolean(Number(precio.existe)) : true,
             tiempo_entrega_dias: precio?.tiempo_entrega_dias ?? 0,
           };
         });
@@ -129,7 +133,9 @@ export default function PreciosPage() {
   }
 
   useEffect(() => {
-    loadData();
+    const controller = new AbortController();
+    loadData(controller.signal);
+    return () => controller.abort();
   }, []);
 
   async function handleDownloadTemplate() {
@@ -260,6 +266,21 @@ export default function PreciosPage() {
     scheduleAutoSave(marcaId, modeloId, versionId, key);
   }
 
+  function handleExisteChange(marcaId, modeloId, versionId, checked) {
+    const key = `${marcaId}_${modeloId}`;
+    setPreciosPorMarcaModeloVersion((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        [versionId]: {
+          ...(prev[key]?.[versionId] || {}),
+          existe: checked,
+        },
+      },
+    }));
+    scheduleAutoSave(marcaId, modeloId, versionId, key);
+  }
+
   function handleDiasChange(marcaId, modeloId, versionId, value) {
     const key = `${marcaId}_${modeloId}`;
     setPreciosPorMarcaModeloVersion((prev) => ({
@@ -292,7 +313,7 @@ export default function PreciosPage() {
   async function savePrice(marcaId, modeloId, versionId, cell) {
     try {
       const res = await fetch("/api/precios-region-version", {
-        method: "POST",
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           marca_id: marcaId,
@@ -300,6 +321,7 @@ export default function PreciosPage() {
           version_id: versionId,
           precio_base: cell.precio_base ?? 0,
           en_stock: cell.en_stock !== false,
+          existe: cell.existe !== false,
           tiempo_entrega_dias: cell.tiempo_entrega_dias ?? 0,
         }),
       });
@@ -715,14 +737,14 @@ export default function PreciosPage() {
                       <Tooltip key={version.id}>
                         <TooltipTrigger asChild>
                           <th
-                            colSpan={3}
-                            className="border-r border-slate-300 p-3 text-center font-bold bg-blue-100 text-blue-900 min-w-[220px] cursor-help hover:bg-blue-200 transition-colors"
+                            colSpan={4}
+                            className="border-r border-slate-300 p-3 text-center font-bold bg-blue-100 text-blue-900 min-w-[280px] cursor-help hover:bg-blue-200 transition-colors"
                           >
                             {version.nombre}
                           </th>
                         </TooltipTrigger>
                         <TooltipContent side="top">
-                          Precio, Stock y Días de entrega para {version.nombre}
+                          Precio, Stock, Existe y Días de entrega para {version.nombre}
                         </TooltipContent>
                       </Tooltip>
                     ))}
@@ -738,6 +760,9 @@ export default function PreciosPage() {
                         </th>
                         <th className="border-r border-slate-200 p-2 text-center text-xs font-semibold text-green-700 bg-green-50 w-[60px]">
                           Stock
+                        </th>
+                        <th className="border-r border-slate-200 p-2 text-center text-xs font-semibold text-purple-700 bg-purple-50 w-[60px]">
+                          Existe
                         </th>
                         <th className="border-r border-slate-300 p-2 text-center text-xs font-semibold text-orange-700 bg-orange-50 w-[65px]">
                           Días
@@ -838,6 +863,35 @@ export default function PreciosPage() {
                                             {cell.en_stock !== false
                                               ? "En stock — clic para marcar sin stock"
                                               : "Sin stock — clic para marcar en stock"}
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </td>
+                                      <td className="border-r border-slate-200 p-1.5 text-center bg-purple-50/30">
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                handleExisteChange(
+                                                  modelo.marca_id,
+                                                  modelo.id,
+                                                  version.id,
+                                                  !(cell.existe !== false)
+                                                )
+                                              }
+                                              className={`w-8 h-8 rounded-md flex items-center justify-center mx-auto transition-all border-2 ${
+                                                cell.existe !== false
+                                                  ? "bg-purple-500 border-purple-600 text-white hover:bg-purple-600"
+                                                  : "bg-white border-slate-300 text-slate-400 hover:bg-slate-50"
+                                              }`}
+                                            >
+                                              <CheckCircle className="w-4 h-4" />
+                                            </button>
+                                          </TooltipTrigger>
+                                          <TooltipContent side="top">
+                                            {cell.existe !== false
+                                              ? "Existe en esta región — clic para marcar como no disponible"
+                                              : "No existe en esta región — clic para marcar como disponible"}
                                           </TooltipContent>
                                         </Tooltip>
                                       </td>

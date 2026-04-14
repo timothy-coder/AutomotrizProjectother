@@ -23,7 +23,6 @@ export async function PUT(req, { params }) {
     descripcion_equipamiento: "descripcion_equipamiento = ?",
     descuento_porcentaje:   "descuento_porcentaje = ?",
     en_stock:               "en_stock = ?",
-    existe:                 "existe = ?",
     tiempo_entrega_dias:    "tiempo_entrega_dias = ?",
     is_active:              "is_active = ?",
   };

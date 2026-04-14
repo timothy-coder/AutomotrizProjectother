@@ -36,11 +36,10 @@ export async function GET(req) {
     const [versiones] = await db.query(
       `SELECT vv.id AS version_id, vv.modelo_id, vv.nombre_version,
               vv.precio_lista, vv.moneda, vv.descuento_porcentaje,
-              vv.en_stock, vv.existe, vv.tiempo_entrega_dias,
+              vv.en_stock, vv.tiempo_entrega_dias,
               vv.colores_disponibles, vv.descripcion_equipamiento
        FROM ventas_versiones vv
        WHERE vv.is_active = 1
-         AND vv.existe = 1
          AND vv.precio_lista > 0
        ORDER BY vv.modelo_id ASC, vv.nombre_version ASC`
     );
@@ -105,7 +104,6 @@ export async function GET(req) {
         moneda: vv.moneda || "USD",
         descuento_porcentaje: vv.descuento_porcentaje ?? 0,
         en_stock: Boolean(vv.en_stock),
-        existe: Boolean(vv.existe),
         tiempo_entrega_dias: vv.tiempo_entrega_dias,
         colores_disponibles: Array.isArray(colores) ? colores : [],
         descripcion_equipamiento: vv.descripcion_equipamiento ?? null,

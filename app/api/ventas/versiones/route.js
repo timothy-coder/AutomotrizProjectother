@@ -33,7 +33,7 @@ export async function GET(req) {
               CONCAT(ma.name, ' ', m.name) AS modelo_nombre,
               v.nombre_version, v.precio_lista, v.moneda,
               v.descripcion_equipamiento, v.descuento_porcentaje,
-              v.en_stock, v.existe, v.tiempo_entrega_dias, v.colores_disponibles,
+              v.en_stock, v.tiempo_entrega_dias, v.colores_disponibles,
               v.is_active, v.created_at, v.updated_at
        FROM ventas_versiones v
        LEFT JOIN modelos m ON m.id = v.modelo_id
@@ -63,7 +63,6 @@ export async function POST(req) {
     descripcion_equipamiento,
     descuento_porcentaje = 0,
     en_stock = 0,
-    existe = 1,
     tiempo_entrega_dias = 0,
     colores_disponibles = [],
   } = body;
@@ -79,8 +78,8 @@ export async function POST(req) {
     const [result] = await db.query(
       `INSERT INTO ventas_versiones
          (modelo_id, nombre_version, precio_lista, moneda, descripcion_equipamiento,
-          descuento_porcentaje, en_stock, existe, tiempo_entrega_dias, colores_disponibles)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          descuento_porcentaje, en_stock, tiempo_entrega_dias, colores_disponibles)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         Number(modelo_id),
         nombre_version.trim(),
@@ -89,7 +88,6 @@ export async function POST(req) {
         descripcion_equipamiento?.trim() || null,
         Number(descuento_porcentaje),
         en_stock ? 1 : 0,
-        existe ? 1 : 0,
         Number(tiempo_entrega_dias),
         JSON.stringify(Array.isArray(colores_disponibles) ? colores_disponibles : []),
       ]
