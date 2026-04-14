@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-// Autenticación por webhook secret (mismo que ventas/leads)
+/**
+ * @webhook x-ventas-webhook-secret — consumido por el workflow "Bot Ventas IA" en n8n.
+ * Usa un secret propio (VENTAS_WEBHOOK_SECRET) en vez de x-conversations-webhook-secret
+ * porque es un dominio de negocio separado (ventas), no mensajes/conversaciones.
+ */
 function authenticate(req) {
   const secret = req.headers.get("x-ventas-webhook-secret") || "";
   const expected = process.env.VENTAS_WEBHOOK_SECRET || "";
@@ -25,46 +29,59 @@ export async function POST(req) {
 
   const telefonoClean = telefono.trim();
 
-  // Buscar si ya existe
-  const [[existente]] = await db.query(
-    "SELECT id, nombre, apellido, email FROM clientes WHERE celular = ? LIMIT 1",
-    [telefonoClean]
-  );
-
-  if (existente) {
-    // Actualizar solo campos que faltan y ahora tenemos
-    const updates = [];
-    const values = [];
-
-    const nombreDb = [existente.nombre, existente.apellido].filter(Boolean).join(" ").trim();
-    if (!nombreDb && nombre_cliente?.trim()) {
-      const partes = nombre_cliente.trim().split(" ");
-      updates.push("nombre = ?", "apellido = ?");
-      values.push(partes[0] || null, partes.slice(1).join(" ") || null);
-    }
-    if (!existente.email && email?.trim()) {
-      updates.push("email = ?");
-      values.push(email.trim());
-    }
-
-    if (updates.length > 0) {
-      values.push(existente.id);
-      await db.query(`UPDATE clientes SET ${updates.join(", ")} WHERE id = ?`, values);
-    }
-
-    return NextResponse.json({ id: existente.id, cliente_nuevo: false, message: "Cliente actualizado" });
+  // En IG/FB el "phone" del canal es sender_id (15+ digitos), no un celular real.
+  // No creamos clientes con identificadores basura: los clientes reales se crean
+  // en /api/ventas/leads cuando el agente IA obtiene un celular validado del cliente.
+  const CELULAR_RE = /^\+?\d{7,15}$/;
+  if (!CELULAR_RE.test(telefonoClean)) {
+    return NextResponse.json(
+      { skipped: true, reason: "telefono no es un celular valido (se espera 7-15 digitos)" },
+      { status: 200 }
+    );
   }
 
-  // Crear cliente nuevo — con solo teléfono si no hay nombre aún
-  const partes = nombre_cliente?.trim()?.split(" ") || [];
-  const nombre = partes[0] || null;
-  const apellido = partes.slice(1).join(" ") || null;
+  try {
+    const [[existente]] = await db.query(
+      "SELECT id, nombre, apellido, email FROM clientes WHERE celular = ? LIMIT 1",
+      [telefonoClean]
+    );
 
-  const [ins] = await db.query(
-    `INSERT INTO clientes (nombre, apellido, email, celular, created_at)
-     VALUES (?, ?, ?, ?, CURDATE())`,
-    [nombre, apellido, email?.trim() || null, telefonoClean]
-  );
+    if (existente) {
+      const updates = [];
+      const values = [];
 
-  return NextResponse.json({ id: ins.insertId, cliente_nuevo: true, message: "Cliente registrado" }, { status: 201 });
+      const nombreDb = [existente.nombre, existente.apellido].filter(Boolean).join(" ").trim();
+      if (!nombreDb && nombre_cliente?.trim()) {
+        const partes = nombre_cliente.trim().split(" ");
+        updates.push("nombre = ?", "apellido = ?");
+        values.push(partes[0] || null, partes.slice(1).join(" ") || null);
+      }
+      if (!existente.email && email?.trim()) {
+        updates.push("email = ?");
+        values.push(email.trim());
+      }
+
+      if (updates.length > 0) {
+        values.push(existente.id);
+        await db.query(`UPDATE clientes SET ${updates.join(", ")} WHERE id = ?`, values);
+      }
+
+      return NextResponse.json({ id: existente.id, cliente_nuevo: false, message: "Cliente actualizado" });
+    }
+
+    const partes = nombre_cliente?.trim()?.split(" ") || [];
+    const nombre = partes[0] || null;
+    const apellido = partes.slice(1).join(" ") || null;
+
+    const [ins] = await db.query(
+      `INSERT INTO clientes (nombre, apellido, email, celular, created_at)
+       VALUES (?, ?, ?, ?, CURDATE())`,
+      [nombre, apellido, email?.trim() || null, telefonoClean]
+    );
+
+    return NextResponse.json({ id: ins.insertId, cliente_nuevo: true, message: "Cliente registrado" }, { status: 201 });
+  } catch (err) {
+    console.error("Error en POST /api/ventas/clientes-whatsapp:", err.message);
+    return NextResponse.json({ message: "Error interno" }, { status: 500 });
+  }
 }
