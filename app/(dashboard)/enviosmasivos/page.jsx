@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Check, Circle, RefreshCw, Send, Upload, X } from "lucide-react";
+import { AlertTriangle, Check, RefreshCw, Send, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -568,71 +568,108 @@ export default function EnviosMasivosPage() {
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      <div className="flex items-center justify-between gap-3">
+      {/* ── Header ─────────────────────────────────────────── */}
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold">Envíos masivos WhatsApp</h1>
           <p className="text-sm text-muted-foreground">
             Campañas de WhatsApp para ventas y postventa con programación y seguimiento.
           </p>
-          <p className="text-xs text-muted-foreground">
-            Atenciones CTA: interacciones de clientes sobre botones de campana (contacto o detener promociones).
-          </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={syncInteresesVentas} disabled={syncingInterests}>
-            {syncingInterests ? "Sincronizando..." : "Sincronizar intereses ventas"}
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={syncInteresesVentas} disabled={syncingInterests}>
+            {syncingInterests ? "Sincronizando..." : "Sincronizar intereses"}
           </Button>
-          <Button variant="outline" onClick={loadRows} disabled={loading}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          <Button size="sm" variant="outline" onClick={loadRows} disabled={loading}>
+            <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
             Actualizar
           </Button>
           <Button
+            size="sm"
             onClick={() => {
               resetWizardState();
               setWizardOpen(true);
             }}
           >
-            Nuevo envío masivo
+            + Nuevo envío
           </Button>
         </div>
       </div>
 
-      <p className="-mt-4 text-xs text-muted-foreground">
-        El boton "Sincronizar intereses ventas" carga/actualiza intereses desde oportunidades para que el filtro de campanas de ventas impacte al publico correcto.
-      </p>
-
-      <section className="rounded-lg border bg-white p-4 shadow-sm">
-        <h2 className="mb-4 text-base font-semibold">Lista de envíos masivos</h2>
-
+      {/* ── Table section ──────────────────────────────────── */}
+      <section className="rounded-xl border bg-white shadow-sm">
+        <div className="border-b px-4 py-3">
+          <h2 className="text-sm font-semibold">Lista de envíos masivos</h2>
+        </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-215 text-left text-sm">
+          <table className="w-full min-w-[900px] text-left text-sm">
             <thead>
-              <tr className="border-b text-xs uppercase text-muted-foreground">
-                <th className="px-3 py-2">Nombre</th>
-                <th className="px-3 py-2">Tipo</th>
-                <th className="px-3 py-2">Fecha de envío</th>
-                <th className="px-3 py-2">Fecha de término</th>
-                <th className="px-3 py-2">Indicadores</th>
-                <th className="px-3 py-2">Estatus</th>
-                <th className="px-3 py-2 text-right">Acciones</th>
+              <tr className="border-b bg-slate-50 text-xs uppercase text-muted-foreground">
+                <th className="px-4 py-2.5">Nombre</th>
+                <th className="px-4 py-2.5">Tipo</th>
+                <th className="px-4 py-2.5">Fecha envío</th>
+                <th className="px-4 py-2.5">Fin</th>
+                <th className="px-4 py-2.5">Métricas</th>
+                <th className="px-4 py-2.5">Estado</th>
+                <th className="px-4 py-2.5 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.id} className="border-b">
-                  <td className="px-3 py-2 font-medium">{row.campaign_name}</td>
-                  <td className="px-3 py-2 capitalize">{row.campaign_type}</td>
-                  <td className="px-3 py-2">{row.send_now ? "Inmediato" : formatLocalDate(row.scheduled_at)}</td>
-                  <td className="px-3 py-2">{formatLocalDate(row.finished_at)}</td>
-                  <td className="px-3 py-2">
-                    <div>Enviados: {Number(row.sent_count || 0)}</div>
-                    <div>Entregados: {Number(row.delivered_count || 0)}</div>
-                    <div>Respondieron: {Number(row.responded_count || 0)}</div>
-                    <div>Contacto CTA: {Number(row.contact_cta_count || 0)}</div>
-                    <div>Baja CTA: {Number(row.stop_cta_count || 0)}</div>
+                <tr key={row.id} className="border-b hover:bg-slate-50/60">
+                  <td className="px-4 py-3 font-medium">{row.campaign_name}</td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                      row.campaign_type === "ventas"
+                        ? "bg-orange-100 text-orange-700"
+                        : "bg-blue-100 text-blue-700"
+                    }`}>
+                      {row.campaign_type === "ventas" ? "Ventas" : "Postventa"}
+                    </span>
                   </td>
-                  <td className="px-3 py-2">{getStatusLabel(row.status)}</td>
-                  <td className="px-3 py-2 text-right">
+                  <td className="px-4 py-3 text-xs">{row.send_now ? "Inmediato" : formatLocalDate(row.scheduled_at)}</td>
+                  <td className="px-4 py-3 text-xs">{formatLocalDate(row.finished_at) || "—"}</td>
+                  <td className="px-4 py-3">
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs text-slate-600">
+                      <span><span className="text-slate-400">Env:</span> {Number(row.sent_count || 0)}</span>
+                      <span><span className="text-slate-400">Entr:</span> {Number(row.delivered_count || 0)}</span>
+                      <span><span className="text-slate-400">Resp:</span> {Number(row.responded_count || 0)}</span>
+                      <span><span className="text-slate-400">CTA:</span> {Number(row.contact_cta_count || 0)}</span>
+                      <span><span className="text-slate-400">Baja:</span> {Number(row.stop_cta_count || 0)}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    {row.status === "running" && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
+                        En progreso
+                      </span>
+                    )}
+                    {row.status === "scheduled" && (
+                      <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
+                        Programado
+                      </span>
+                    )}
+                    {row.status === "completed" && (
+                      <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                        Completado
+                      </span>
+                    )}
+                    {row.status === "failed" && (
+                      <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700">
+                        Fallido
+                      </span>
+                    )}
+                    {row.status === "cancelled" && (
+                      <span className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-1 text-xs font-medium text-orange-700">
+                        Cancelado
+                      </span>
+                    )}
+                    {!["running", "scheduled", "completed", "failed", "cancelled"].includes(row.status) && (
+                      <span className="text-xs text-muted-foreground">{getStatusLabel(row.status)}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
                     <div className="flex justify-end gap-2">
                       <Button
                         size="sm"
@@ -649,17 +686,16 @@ export default function EnviosMasivosPage() {
                           onClick={() => dispatchCampaign(row.id)}
                           disabled={dispatchingId === row.id}
                         >
-                          {dispatchingId === row.id ? "Procesando..." : "Ejecutar ahora"}
+                          {dispatchingId === row.id ? "..." : "Ejecutar"}
                         </Button>
                       )}
                     </div>
                   </td>
                 </tr>
               ))}
-
               {!rows.length && (
                 <tr>
-                  <td className="px-3 py-6 text-sm text-muted-foreground" colSpan={7}>
+                  <td className="px-4 py-8 text-sm text-muted-foreground" colSpan={7}>
                     {loading ? "Cargando..." : "No hay campañas registradas"}
                   </td>
                 </tr>
@@ -669,6 +705,7 @@ export default function EnviosMasivosPage() {
         </div>
       </section>
 
+      {/* ── Wizard dialog ──────────────────────────────────── */}
       <Dialog
         open={wizardOpen}
         onOpenChange={(next) => {
@@ -676,38 +713,40 @@ export default function EnviosMasivosPage() {
           if (!next) resetWizardState();
         }}
       >
-        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-245">
+        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Nuevo envío masivo</DialogTitle>
-            <DialogDescription>
-              {getStepTitle(step)}
-            </DialogDescription>
+            <DialogDescription>{getStepTitle(step)}</DialogDescription>
           </DialogHeader>
 
-          <div className="mb-2 grid grid-cols-3 items-center gap-2">
-            {["Reglas de envío", "Plantilla de WhatsApp", "Vista preliminar"].map((label, index) => {
-              const reached = index <= step;
+          {/* Step indicator */}
+          <div className="mb-4 flex items-center">
+            {["Reglas de envío", "Plantilla", "Vista preliminar"].map((label, index) => {
+              const done = index < step;
               const active = index === step;
-
               return (
-                <div key={label} className="flex items-center gap-2">
-                  <div className={`flex h-5 w-5 items-center justify-center rounded-full ${active ? "bg-blue-600 text-white" : reached ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-600"}`}>
-                    {reached ? <Check className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
+                <div key={label} className="flex flex-1 items-center">
+                  <div className="flex flex-col items-center gap-1">
+                    <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${
+                      done ? "bg-emerald-500 text-white" : active ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-500"
+                    }`}>
+                      {done ? <Check className="h-3.5 w-3.5" /> : index + 1}
+                    </div>
+                    <span className={`text-[11px] leading-none ${active ? "font-semibold text-blue-700" : done ? "text-emerald-600" : "text-slate-400"}`}>
+                      {label}
+                    </span>
                   </div>
-                  <span className={`text-xs ${active ? "font-semibold text-blue-700" : "text-slate-600"}`}>{label}</span>
+                  {index < 2 && (
+                    <div className={`mx-1 mb-4 h-0.5 flex-1 transition-colors ${index < step ? "bg-emerald-400" : "bg-slate-200"}`} />
+                  )}
                 </div>
               );
             })}
           </div>
-          <div className="mb-4 h-1 overflow-hidden rounded bg-slate-200">
-            <div
-              className="h-full rounded bg-emerald-500 transition-all"
-              style={{ width: `${((step + 1) / 3) * 100}%` }}
-            />
-          </div>
 
+          {/* ── Step 0: Filtros ────────────────────────────── */}
           {step === 0 && (
-            <section className="space-y-4 rounded-md border p-4">
+            <section className="space-y-4 rounded-xl border p-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Nombre del envío *</label>
@@ -717,7 +756,6 @@ export default function EnviosMasivosPage() {
                     placeholder="Ingresa el nombre de tu nuevo envío masivo"
                   />
                 </div>
-
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Tipo de campaña *</label>
                   <select
@@ -733,22 +771,20 @@ export default function EnviosMasivosPage() {
 
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Tipo de envío *</label>
+                  <label className="text-sm font-medium">Tipo de envío</label>
                   <div className="h-10 rounded-md border bg-slate-50 px-3 text-sm leading-10 text-blue-700">
                     Personalizado
                   </div>
                 </div>
-
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Canal</label>
                   <div className="h-10 rounded-md border bg-slate-50 px-3 text-sm leading-10">
                     WhatsApp
                   </div>
                 </div>
-
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Enviar ahora</label>
-                  <label className="inline-flex h-10 items-center gap-2 rounded-md border px-3 text-sm">
+                  <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm">
                     <input
                       type="checkbox"
                       checked={form.send_now}
@@ -809,11 +845,9 @@ export default function EnviosMasivosPage() {
                   <label className="text-sm font-medium">{filterContext.modeloLabel}</label>
                   <div className="max-h-40 space-y-2 overflow-y-auto rounded-md border p-2">
                     {modelosFiltrados.map((modelo) => {
-                      const checked = Array.isArray(form.filters.modelo_ids)
-                        && form.filters.modelo_ids.includes(Number(modelo.id));
-
+                      const checked = Array.isArray(form.filters.modelo_ids) && form.filters.modelo_ids.includes(Number(modelo.id));
                       return (
-                        <label key={modelo.id} className="flex items-center gap-2 text-sm">
+                        <label key={modelo.id} className="flex cursor-pointer items-center gap-2 text-sm">
                           <input
                             type="checkbox"
                             checked={checked}
@@ -822,14 +856,7 @@ export default function EnviosMasivosPage() {
                               const next = e.target.checked
                                 ? [...current, Number(modelo.id)]
                                 : current.filter((id) => Number(id) !== Number(modelo.id));
-
-                              return {
-                                ...prev,
-                                filters: {
-                                  ...prev.filters,
-                                  modelo_ids: [...new Set(next)],
-                                },
-                              };
+                              return { ...prev, filters: { ...prev.filters, modelo_ids: [...new Set(next)] } };
                             })}
                           />
                           {modelo.name}
@@ -837,7 +864,7 @@ export default function EnviosMasivosPage() {
                       );
                     })}
                     {!modelosFiltrados.length && (
-                      <p className="text-xs text-muted-foreground">Selecciona una o más marcas para filtrar modelos.</p>
+                      <p className="text-xs text-muted-foreground">Seleccioná una o más marcas para filtrar modelos.</p>
                     )}
                   </div>
                 </div>
@@ -848,11 +875,9 @@ export default function EnviosMasivosPage() {
                       <label className="text-sm font-medium">{filterContext.etapasLabel}</label>
                       <div className="max-h-40 space-y-2 overflow-y-auto rounded-md border p-2">
                         {etapas.map((etapa) => {
-                          const checked = Array.isArray(form.filters.etapa_ids)
-                            && form.filters.etapa_ids.includes(Number(etapa.id));
-
+                          const checked = Array.isArray(form.filters.etapa_ids) && form.filters.etapa_ids.includes(Number(etapa.id));
                           return (
-                            <label key={etapa.id} className="flex items-center gap-2 text-sm">
+                            <label key={etapa.id} className="flex cursor-pointer items-center gap-2 text-sm">
                               <input
                                 type="checkbox"
                                 checked={checked}
@@ -861,14 +886,7 @@ export default function EnviosMasivosPage() {
                                   const next = e.target.checked
                                     ? [...current, Number(etapa.id)]
                                     : current.filter((id) => Number(id) !== Number(etapa.id));
-
-                                  return {
-                                    ...prev,
-                                    filters: {
-                                      ...prev.filters,
-                                      etapa_ids: [...new Set(next)],
-                                    },
-                                  };
+                                  return { ...prev, filters: { ...prev.filters, etapa_ids: [...new Set(next)] } };
                                 })}
                               />
                               {etapa.nombre}
@@ -901,27 +919,26 @@ export default function EnviosMasivosPage() {
                 <p>{filterContext.description}</p>
               </div>
 
-              <div className="rounded-md border bg-slate-50 p-3 text-sm">
-                <p className="font-medium">Clientes impactados</p>
-                <p className="text-muted-foreground">
-                  Total deduplicado: {preview.total} {previewing ? "(actualizando...)" : ""}
+              {/* Audience card */}
+              <div className="rounded-xl border bg-blue-50 p-4">
+                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-blue-600">Clientes impactados</p>
+                <p className="text-4xl font-bold text-blue-700">
+                  {previewing ? <span className="text-2xl text-blue-400">...</span> : preview.total}
                 </p>
                 {preview.sample.length > 0 && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Muestra: {preview.sample
-                      .slice(0, 5)
-                      .map((row) => row.recipient_name || row.phone)
-                      .join(", ")}
+                  <p className="mt-1.5 text-xs text-blue-500">
+                    Muestra: {preview.sample.slice(0, 5).map((r) => r.recipient_name || r.phone).join(", ")}
                   </p>
                 )}
               </div>
             </section>
           )}
 
+          {/* ── Step 1: Plantilla ─────────────────────────── */}
           {step === 1 && (
-            <section className="space-y-4 rounded-md border p-4">
-              {/* ── Aviso 24h ─────────────────────────────────────── */}
-              <div className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+            <section className="space-y-4 rounded-xl border p-4">
+              {/* 24h warning */}
+              <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                 <div>
                   <p className="font-semibold">Restricción de WhatsApp Business API</p>
@@ -929,26 +946,38 @@ export default function EnviosMasivosPage() {
                 </div>
               </div>
 
-              {/* ── Toggle fuente ─────────────────────────────────── */}
+              {/* Source toggle — card style */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Origen del mensaje *</label>
-                <div className="flex flex-wrap gap-4">
-                  <label className="inline-flex items-center gap-2 text-sm">
+                <div className="grid grid-cols-2 gap-3">
+                  <label className={`flex cursor-pointer flex-col gap-1 rounded-xl border-2 p-3 transition-colors ${
+                    form.content.template_source === "libre"
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-slate-200 hover:border-slate-300"
+                  }`}>
                     <input
                       type="radio"
                       name="template-source"
+                      className="sr-only"
                       checked={form.content.template_source === "libre"}
                       onChange={() => setForm((prev) => ({
                         ...prev,
                         content: { ...prev.content, template_source: "libre" },
                       }))}
                     />
-                    <span>Texto libre <span className="text-amber-600">(solo ventana 24h)</span></span>
+                    <span className="text-sm font-medium">Texto libre</span>
+                    <span className="text-xs text-amber-600">Solo ventana 24h — puede no llegar</span>
                   </label>
-                  <label className="inline-flex items-center gap-2 text-sm">
+
+                  <label className={`flex cursor-pointer flex-col gap-1 rounded-xl border-2 p-3 transition-colors ${
+                    form.content.template_source === "aprobada"
+                      ? "border-green-500 bg-green-50"
+                      : "border-slate-200 hover:border-slate-300"
+                  }`}>
                     <input
                       type="radio"
                       name="template-source"
+                      className="sr-only"
                       checked={form.content.template_source === "aprobada"}
                       onChange={() => {
                         setForm((prev) => ({
@@ -961,14 +990,15 @@ export default function EnviosMasivosPage() {
                         }
                       }}
                     />
-                    <span className="font-medium text-green-700">Plantilla aprobada por Meta <span className="font-normal text-muted-foreground">(siempre funciona)</span></span>
+                    <span className="text-sm font-medium text-green-700">Plantilla aprobada por Meta</span>
+                    <span className="text-xs text-green-600">Siempre funciona — garantizado</span>
                   </label>
                 </div>
               </div>
 
-              {/* ── Modo: plantilla aprobada ──────────────────────── */}
+              {/* Aprobada mode */}
               {form.content.template_source === "aprobada" && (
-                <div className="space-y-4 rounded-md border bg-slate-50 p-3">
+                <div className="space-y-4 rounded-xl border bg-slate-50 p-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Bandeja WhatsApp</label>
                     <select
@@ -1028,18 +1058,28 @@ export default function EnviosMasivosPage() {
 
                   {selectedTemplate && (
                     <div className="space-y-3">
-                      <div className="rounded-md border bg-white p-3 text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
-                        <p className="mb-1 font-medium text-slate-500">Vista previa de la plantilla:</p>
-                        {selectedTemplate.body}
+                      {/* WhatsApp bubble preview */}
+                      <div className="rounded-xl border bg-[#e5ddd5] p-3">
+                        <p className="mb-2 text-[11px] font-medium text-slate-500">Vista previa:</p>
+                        <div className="mx-auto max-w-xs space-y-1">
+                          <div className="rounded-lg rounded-tl-none bg-white p-3 text-xs leading-relaxed text-slate-800 shadow-sm whitespace-pre-wrap">
+                            {selectedTemplate.body}
+                          </div>
+                          {selectedTemplate.components?.find((c) => c.type === "BUTTONS")?.buttons?.map((btn, i) => (
+                            <button key={i} type="button" className="w-full rounded-lg bg-white py-1.5 text-xs font-semibold text-[#00a884] shadow-sm">
+                              {btn.text}
+                            </button>
+                          ))}
+                        </div>
                       </div>
 
                       {Array.isArray(form.content.whatsapp_template_variables) && form.content.whatsapp_template_variables.length > 0 && (
                         <div className="space-y-2">
                           <p className="text-sm font-medium">Variables de la plantilla</p>
-                          <p className="text-xs text-muted-foreground">Usá <code className="bg-slate-100 px-1 rounded">{"{{nombre_cliente}}"}</code> para insertar el nombre del destinatario automáticamente.</p>
+                          <p className="text-xs text-muted-foreground">Usá <code className="rounded bg-slate-100 px-1">{"{{nombre_cliente}}"}</code> para insertar el nombre del destinatario automáticamente.</p>
                           {form.content.whatsapp_template_variables.map((val, idx) => (
                             <div key={idx} className="flex items-center gap-2">
-                              <span className="w-16 text-xs text-muted-foreground shrink-0">{`{{${idx + 1}}}`}</span>
+                              <span className="w-16 shrink-0 text-xs text-muted-foreground">{`{{${idx + 1}}}`}</span>
                               <Input
                                 value={val}
                                 placeholder={`Variable ${idx + 1}`}
@@ -1077,7 +1117,7 @@ export default function EnviosMasivosPage() {
                 </div>
               )}
 
-              {/* ── Modo: texto libre ─────────────────────────────── */}
+              {/* Libre mode */}
               {form.content.template_source === "libre" && (
                 <>
                   <div className="space-y-2">
@@ -1175,7 +1215,7 @@ export default function EnviosMasivosPage() {
                         ...prev,
                         content: { ...prev.content, body: e.target.value },
                       }))}
-                      placeholder="Escribe el mensaje principal"
+                      placeholder="Escribí el mensaje principal"
                     />
                   </div>
 
@@ -1192,7 +1232,7 @@ export default function EnviosMasivosPage() {
                     />
                   </div>
 
-                  <label className="inline-flex items-center gap-2 text-sm">
+                  <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
                     <input
                       type="checkbox"
                       checked={Boolean(form.content.show_cta)}
@@ -1208,55 +1248,75 @@ export default function EnviosMasivosPage() {
             </section>
           )}
 
+          {/* ── Step 2: Vista preliminar ──────────────────── */}
           {step === 2 && (
-            <section className="space-y-4 rounded-md border p-4">
+            <section className="space-y-4 rounded-xl border p-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold">Resumen de envío</h3>
-                  <div className="rounded-md border p-3 text-sm">
-                    <p><span className="font-medium">Nombre:</span> {form.campaign_name || "-"}</p>
-                    <p><span className="font-medium">Tipo:</span> {form.campaign_type}</p>
-                    <p><span className="font-medium">Tipo de envío:</span> personalizado</p>
-                    <p><span className="font-medium">Fecha envío:</span> {form.send_now ? "Inmediato" : form.scheduled_at}</p>
-                    <p><span className="font-medium">Impactados:</span> {preview.total}</p>
+                  <div className="space-y-2 rounded-xl border p-3 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Nombre</span>
+                      <span className="font-medium">{form.campaign_name || "—"}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Tipo</span>
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                        form.campaign_type === "ventas" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"
+                      }`}>{form.campaign_type === "ventas" ? "Ventas" : "Postventa"}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Envío</span>
+                      <span className="font-medium">{form.send_now ? "Inmediato" : form.scheduled_at}</span>
+                    </div>
+                    <div className="flex items-center justify-between border-t pt-2">
+                      <span className="text-muted-foreground">Clientes impactados</span>
+                      <span className="text-2xl font-bold text-blue-700">{preview.total}</span>
+                    </div>
                   </div>
                 </div>
 
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold">Vista WhatsApp</h3>
                   {form.content.template_source === "aprobada" ? (
-                    <div className="rounded-md border border-green-200 bg-green-50 p-3 text-xs text-green-800 space-y-1">
-                      <p className="font-semibold">Plantilla aprobada seleccionada</p>
-                      <p>Nombre: <span className="font-mono">{form.content.whatsapp_template_name}</span></p>
-                      <p>Idioma: {form.content.whatsapp_template_language}</p>
-                      {selectedTemplate?.body && (
-                        <p className="mt-2 whitespace-pre-wrap text-slate-700 bg-white rounded p-2 border">{selectedTemplate.body}</p>
-                      )}
-                      <p className="mt-1 text-green-700">✓ Se enviará via API de plantillas — funciona fuera de la ventana de 24h</p>
+                    <div className="rounded-xl border bg-[#e5ddd5] p-3">
+                      <div className="mx-auto max-w-xs space-y-1">
+                        <div className="rounded-lg rounded-tl-none bg-white p-3 text-xs leading-relaxed text-slate-800 shadow-sm whitespace-pre-wrap">
+                          {selectedTemplate?.body || form.content.whatsapp_template_name || "Sin plantilla seleccionada"}
+                        </div>
+                        {selectedTemplate?.components?.find((c) => c.type === "BUTTONS")?.buttons?.map((btn, i) => (
+                          <button key={i} type="button" className="w-full rounded-lg bg-white py-1.5 text-xs font-semibold text-[#00a884] shadow-sm">
+                            {btn.text}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mt-2 text-center text-[11px] text-green-700">✓ Plantilla aprobada — funciona fuera de la ventana de 24h</p>
                     </div>
                   ) : (
-                    <div className="rounded-lg border bg-[#f5f0e8] p-3">
-                      <div className="mx-auto max-w-sm rounded-md bg-white p-3 text-xs shadow-sm">
-                        {form.content.template_mode === "imagen_texto" && form.content.image_url && (
-                          <img
-                            src={form.content.image_url}
-                            alt="Plantilla"
-                            className="mb-3 h-32 w-full rounded object-cover"
-                          />
-                        )}
-                        <p className="whitespace-pre-wrap text-[12px] leading-relaxed text-slate-700">
-                          {buildMessageFromTemplate(form.content) || "Sin contenido"}
-                        </p>
-                        {form.content.show_cta && (
-                          <div className="mt-3 space-y-1">
-                            <button type="button" className="w-full rounded border py-1 text-[11px] font-semibold text-blue-700">
-                              QUIERO QUE ME CONTACTEN
-                            </button>
-                            <button type="button" className="w-full rounded border py-1 text-[11px] font-semibold text-blue-700">
-                              DETENER PROMOCIONES
-                            </button>
-                          </div>
-                        )}
+                    <div className="rounded-xl border bg-[#e5ddd5] p-3">
+                      <div className="mx-auto max-w-xs">
+                        <div className="overflow-hidden rounded-lg rounded-tl-none bg-white shadow-sm">
+                          {form.content.template_mode === "imagen_texto" && form.content.image_url && (
+                            <img
+                              src={form.content.image_url}
+                              alt="Plantilla"
+                              className="h-36 w-full object-cover"
+                            />
+                          )}
+                          <p className="p-3 text-xs leading-relaxed text-slate-700 whitespace-pre-wrap">
+                            {buildMessageFromTemplate(form.content) || "Sin contenido"}
+                          </p>
+                          {form.content.show_cta && (
+                            <div className="space-y-1 border-t p-2">
+                              <button type="button" className="w-full rounded py-1 text-[11px] font-semibold text-[#00a884]">
+                                QUIERO QUE ME CONTACTEN
+                              </button>
+                              <button type="button" className="w-full rounded py-1 text-[11px] font-semibold text-[#00a884]">
+                                DETENER PROMOCIONES
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1269,19 +1329,14 @@ export default function EnviosMasivosPage() {
             <Button variant="outline" onClick={() => (step > 0 ? setStep(step - 1) : setWizardOpen(false))}>
               {step > 0 ? "Regresar" : "Cancelar"}
             </Button>
-
             {step === 0 && (
               <Button onClick={goToTemplateStep} disabled={previewing}>
                 {previewing ? "Calculando..." : "Continuar"}
               </Button>
             )}
-
             {step === 1 && (
-              <Button onClick={goToPreviewStep}>
-                Continuar
-              </Button>
+              <Button onClick={goToPreviewStep}>Continuar</Button>
             )}
-
             {step === 2 && (
               <Button onClick={createCampaign} disabled={saving}>
                 <Send className="mr-2 h-4 w-4" />
@@ -1292,6 +1347,7 @@ export default function EnviosMasivosPage() {
         </DialogContent>
       </Dialog>
 
+      {/* ── Detail dialog ──────────────────────────────────── */}
       <Dialog
         open={detailOpen}
         onOpenChange={(next) => {
@@ -1302,44 +1358,58 @@ export default function EnviosMasivosPage() {
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Detalle de envío masivo</DialogTitle>
-            <DialogDescription>
-              {campaignDetail?.campaign?.campaign_name || "Campaña"}
-            </DialogDescription>
+            <DialogDescription>{campaignDetail?.campaign?.campaign_name || "Campaña"}</DialogDescription>
           </DialogHeader>
 
+          {/* KPI cards */}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {[
+              { label: "Enviados", value: campaignDetail?.campaign?.sent_count ?? 0, color: "text-blue-700", bg: "bg-blue-50" },
+              { label: "Entregados", value: campaignDetail?.status_summary?.delivered ?? 0, color: "text-emerald-700", bg: "bg-emerald-50" },
+              { label: "Respondieron", value: campaignDetail?.status_summary?.responded ?? 0, color: "text-violet-700", bg: "bg-violet-50" },
+              { label: "Fallidos", value: campaignDetail?.status_summary?.failed ?? 0, color: "text-red-700", bg: "bg-red-50" },
+            ].map(({ label, value, color, bg }) => (
+              <div key={label} className={`rounded-xl border p-3 ${bg}`}>
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className={`text-3xl font-bold ${color}`}>{Number(value)}</p>
+              </div>
+            ))}
+          </div>
+
           <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-md border p-3 text-sm">
-              <p><span className="font-medium">Tipo:</span> {campaignDetail?.campaign?.campaign_type || "-"}</p>
-              <p><span className="font-medium">Estado:</span> {getStatusLabel(campaignDetail?.campaign?.status)}</p>
-              <p><span className="font-medium">Creado por:</span> {campaignDetail?.campaign?.created_by_name || "-"}</p>
-              <p><span className="font-medium">Creado:</span> {formatLocalDate(campaignDetail?.campaign?.created_at)}</p>
+            <div className="rounded-xl border p-3 text-sm">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Campaña</p>
+              <p><span className="text-muted-foreground">Tipo:</span> {campaignDetail?.campaign?.campaign_type || "—"}</p>
+              <p><span className="text-muted-foreground">Estado:</span> {getStatusLabel(campaignDetail?.campaign?.status)}</p>
+              <p><span className="text-muted-foreground">Creado por:</span> {campaignDetail?.campaign?.created_by_name || "—"}</p>
+              <p><span className="text-muted-foreground">Creado:</span> {formatLocalDate(campaignDetail?.campaign?.created_at)}</p>
             </div>
 
-            <div className="rounded-md border p-3 text-sm">
-              <p className="font-medium mb-1">Resumen por estado</p>
-              <p>Pendientes: {Number(campaignDetail?.status_summary?.pending || 0)}</p>
-              <p>En cola: {Number(campaignDetail?.status_summary?.queued || 0)}</p>
-              <p>Entregados: {Number(campaignDetail?.status_summary?.delivered || 0)}</p>
-              <p>Leídos: {Number(campaignDetail?.status_summary?.read || 0)}</p>
-              <p>Respondieron: {Number(campaignDetail?.status_summary?.responded || 0)}</p>
-              <p>Fallidos: {Number(campaignDetail?.status_summary?.failed || 0)}</p>
+            <div className="rounded-xl border p-3 text-sm">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Estados de entrega</p>
+              <p>Pendientes: <span className="font-medium">{Number(campaignDetail?.status_summary?.pending || 0)}</span></p>
+              <p>En cola: <span className="font-medium">{Number(campaignDetail?.status_summary?.queued || 0)}</span></p>
+              <p>Entregados: <span className="font-medium">{Number(campaignDetail?.status_summary?.delivered || 0)}</span></p>
+              <p>Leídos: <span className="font-medium">{Number(campaignDetail?.status_summary?.read || 0)}</span></p>
+              <p>Respondieron: <span className="font-medium">{Number(campaignDetail?.status_summary?.responded || 0)}</span></p>
+              <p>Fallidos: <span className="font-medium text-red-600">{Number(campaignDetail?.status_summary?.failed || 0)}</span></p>
             </div>
 
-            <div className="rounded-md border p-3 text-sm">
-              <p className="mb-1 font-medium">Acciones CTA</p>
-              <p>Solicitaron contacto: {Number(campaignDetail?.cta_summary?.contact || 0)}</p>
-              <p>Detener promociones: {Number(campaignDetail?.cta_summary?.stop_promotions || 0)}</p>
-              <p>Acciones no mapeadas: {Number(campaignDetail?.cta_summary?.unknown || 0)}</p>
-              <p>Total acciones: {Number(campaignDetail?.cta_summary?.total || 0)}</p>
+            <div className="rounded-xl border p-3 text-sm">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Acciones CTA</p>
+              <p>Solicitaron contacto: <span className="font-medium text-blue-700">{Number(campaignDetail?.cta_summary?.contact || 0)}</span></p>
+              <p>Detener promociones: <span className="font-medium text-orange-600">{Number(campaignDetail?.cta_summary?.stop_promotions || 0)}</span></p>
+              <p>No mapeadas: <span className="font-medium">{Number(campaignDetail?.cta_summary?.unknown || 0)}</span></p>
+              <p>Total acciones: <span className="font-bold">{Number(campaignDetail?.cta_summary?.total || 0)}</span></p>
             </div>
           </div>
 
-          <div className="rounded-md border">
-            <div className="border-b px-3 py-2 text-sm font-medium">Acciones CTA recientes</div>
+          <div className="rounded-xl border">
+            <div className="border-b px-3 py-2 text-sm font-semibold">Acciones CTA recientes</div>
             <div className="max-h-60 overflow-y-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b text-xs uppercase text-muted-foreground">
+                  <tr className="border-b bg-slate-50 text-xs uppercase text-muted-foreground">
                     <th className="px-3 py-2">Cliente</th>
                     <th className="px-3 py-2">Acción</th>
                     <th className="px-3 py-2">Teléfono</th>
@@ -1348,14 +1418,13 @@ export default function EnviosMasivosPage() {
                 </thead>
                 <tbody>
                   {(campaignDetail?.cta_actions_recent || []).map((action) => (
-                    <tr key={action.id} className="border-b">
-                      <td className="px-3 py-2">{action.recipient_name || [action.cliente_nombre, action.cliente_apellido].filter(Boolean).join(" ") || "-"}</td>
+                    <tr key={action.id} className="border-b hover:bg-slate-50">
+                      <td className="px-3 py-2">{action.recipient_name || [action.cliente_nombre, action.cliente_apellido].filter(Boolean).join(" ") || "—"}</td>
                       <td className="px-3 py-2 capitalize">{String(action.action_type || "unknown").replace("_", " ")}</td>
-                      <td className="px-3 py-2">{action.phone_normalized || "-"}</td>
+                      <td className="px-3 py-2">{action.phone_normalized || "—"}</td>
                       <td className="px-3 py-2">{formatLocalDate(action.created_at)}</td>
                     </tr>
                   ))}
-
                   {!Array.isArray(campaignDetail?.cta_actions_recent) || !campaignDetail?.cta_actions_recent.length ? (
                     <tr>
                       <td className="px-3 py-4 text-muted-foreground" colSpan={4}>Sin acciones CTA registradas.</td>
@@ -1366,12 +1435,12 @@ export default function EnviosMasivosPage() {
             </div>
           </div>
 
-          <div className="rounded-md border">
-            <div className="border-b px-3 py-2 text-sm font-medium">Destinatarios recientes</div>
+          <div className="rounded-xl border">
+            <div className="border-b px-3 py-2 text-sm font-semibold">Destinatarios recientes</div>
             <div className="max-h-72 overflow-y-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b text-xs uppercase text-muted-foreground">
+                  <tr className="border-b bg-slate-50 text-xs uppercase text-muted-foreground">
                     <th className="px-3 py-2">Cliente</th>
                     <th className="px-3 py-2">Teléfono</th>
                     <th className="px-3 py-2">Estado</th>
@@ -1380,11 +1449,11 @@ export default function EnviosMasivosPage() {
                 </thead>
                 <tbody>
                   {(campaignDetail?.recipients_recent || []).map((recipient) => (
-                    <tr key={recipient.id} className="border-b">
-                      <td className="px-3 py-2">{recipient.recipient_name || [recipient.cliente_nombre, recipient.cliente_apellido].filter(Boolean).join(" ") || "-"}</td>
-                      <td className="px-3 py-2">{recipient.phone_normalized || "-"}</td>
-                      <td className="px-3 py-2 capitalize">{recipient.status || "-"}</td>
-                      <td className="px-3 py-2">{recipient.responded_at ? formatLocalDate(recipient.responded_at) : "-"}</td>
+                    <tr key={recipient.id} className="border-b hover:bg-slate-50">
+                      <td className="px-3 py-2">{recipient.recipient_name || [recipient.cliente_nombre, recipient.cliente_apellido].filter(Boolean).join(" ") || "—"}</td>
+                      <td className="px-3 py-2">{recipient.phone_normalized || "—"}</td>
+                      <td className="px-3 py-2 capitalize">{recipient.status || "—"}</td>
+                      <td className="px-3 py-2">{recipient.responded_at ? formatLocalDate(recipient.responded_at) : "—"}</td>
                     </tr>
                   ))}
                 </tbody>
