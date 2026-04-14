@@ -7,13 +7,15 @@ import { db } from "@/lib/db";
  * Endpoint para el agente n8n de Ventas IA.
  *
  * Fuentes:
- *   - precios_region_version: precio, stock, existe, dias de entrega (autoridad)
+ *   - precios_region_version: stock, existe, dias de entrega (autoridad)
  *   - ventas_versiones:       equipamiento y colores (detalle de catalogo)
  *   - versiones / modelos / marcas: nombres
  *   - modelo_especificaciones: specs tecnicas por modelo
- *   - ventas_promociones / ventas_configuracion: promos y textos
+ *   - ventas_promociones / ventas_configuracion: promos (no monetarias) y textos
  *
- * Filtro: solo se devuelven versiones con prv.existe = 1 y precio > 0.
+ * Filtro: solo se devuelven versiones con prv.existe = 1 y precio > 0
+ * (el precio se usa como gate de "version configurada", pero NO se expone
+ * al agente — se omite del JSON para evitar que el LLM lo muestre al cliente).
  * Si existe = 0 en una region, esa version no se incluye en la respuesta.
  *
  * Header requerido: x-ventas-webhook-secret (VENTAS_WEBHOOK_SECRET).
@@ -117,9 +119,6 @@ export async function GET(req) {
       modelosMap[vv.modelo_id].versiones.push({
         version_id: vv.version_id,
         nombre_version: vv.nombre_version,
-        precio_lista: vv.precio_lista,
-        moneda: vv.moneda || "USD",
-        descuento_porcentaje: vv.descuento_porcentaje ?? 0,
         en_stock: Boolean(vv.en_stock),
         tiempo_entrega_dias: vv.tiempo_entrega_dias,
         colores_disponibles: Array.isArray(colores) ? colores : [],
