@@ -59,8 +59,7 @@ function FinanciamientoForm({ data, onSave }) {
       if (!res.ok) throw new Error("Error al guardar");
       toast.success("Configuración de financiamiento guardada");
       onSave(contenido);
-    } catch (err) {
-      console.error("[FinanciamientoForm] Error al guardar:", err);
+    } catch {
       toast.error("No se pudo guardar");
     } finally {
       setSaving(false);
@@ -185,8 +184,7 @@ function DocumentacionForm({ seccion, label, data, onSave }) {
       if (!res.ok) throw new Error("Error al guardar");
       toast.success(`Documentación para ${label} guardada`);
       onSave(contenido);
-    } catch (err) {
-      console.error("[DocumentacionForm] Error al guardar:", err);
+    } catch {
       toast.error("No se pudo guardar");
     } finally {
       setSaving(false);
@@ -270,8 +268,7 @@ function GarantiasForm({ data, onSave }) {
       if (!res.ok) throw new Error("Error al guardar");
       toast.success("Configuración de garantías guardada");
       onSave(contenido);
-    } catch (err) {
-      console.error("[GarantiasForm] Error al guardar:", err);
+    } catch {
       toast.error("No se pudo guardar");
     } finally {
       setSaving(false);
@@ -366,8 +363,7 @@ function ServiciosForm({ data, onSave }) {
       if (!res.ok) throw new Error("Error al guardar");
       toast.success("Servicios adicionales guardados");
       onSave(contenido);
-    } catch (err) {
-      console.error("[ServiciosForm] Error al guardar:", err);
+    } catch {
       toast.error("No se pudo guardar");
     } finally {
       setSaving(false);
@@ -559,41 +555,46 @@ F.ALTO RENDIMIENTO (9d): Todo Exclusivo + undercoating(chasis), zincado, pulido 
 === CONSIDERACIONES ADICIONALES (PRIORITARIAS) ===
 [Se inyectan desde el CRM en cada conversación]`,
 
-  ventas: `Eres un asesor de ventas IA de una concesionaria automotriz. Atiendes por WhatsApp con calidez, profesionalismo y emojis amigables. Tu objetivo es guiar al cliente hasta generar una cotización completa.
+  ventas: `Eres un asesor de ventas IA de una concesionaria automotriz. Atiendes por WhatsApp con calidez, profesionalismo y emojis amigables. Tu objetivo es perfilar al cliente, mostrarle los modelos que encajan con su necesidad y derivarlo a un asesor humano que cierre la cotización.
+
+=== REGLA DE ORO — PRECIOS OCULTOS ===
+NUNCA muestres precios, montos, cuotas, rangos ni estimaciones monetarias.
+El catálogo interno NO trae precios por decisión del negocio.
+Si el cliente pregunta por precio, cuota o cotización → action: escalate + alert_type: precio_exacto.
 
 === REGLA ABSOLUTA ===
-NUNCA inventes marcas, modelos, especificaciones ni precios.
+NUNCA inventes marcas, modelos, especificaciones ni equipamiento.
 Solo menciona vehículos de la sección VEHÍCULOS DISPONIBLES.
-Si piden una marca/modelo que NO está en el catálogo: di que no lo manejas y muestra los disponibles.
-Precios SOLO del catálogo, exactos, sin redondear ni estimar.
+Si piden una marca/modelo que NO está en el catálogo: decirlo con honestidad.
 
 === DATOS DEL CLIENTE ===
 [Nombre, teléfono y vehículos actuales se inyectan dinámicamente]
 
 === VEHÍCULOS DISPONIBLES ===
-[Catálogo completo con precios, colores y disponibilidad se inyecta dinámicamente]
+[Catálogo con stock, colores, entrega y equipamiento — SIN precios]
 
 === RESPUESTA: SIEMPRE JSON ESTRICTO ===
-{ "action": "continue"|"save_lead"|"escalate"|"redirect_taller", "paso_actual": 1-7, "message": "...", "lead_data": {...} }
+{ "action": "continue"|"save_lead"|"escalate"|"redirect_taller", "alert_type": "precio_exacto|documentos_financiamiento|test_drive|pedido_especial|null", "paso_actual": 1-7, "message": "...", "lead_data": {...} }
 
-=== FLUJO DE COTIZACIÓN (7 pasos) ===
-PASO 1 - SALUDO Y DATOS: Saluda, preséntate, pide nombre y correo.
-PASO 2 - NECESIDADES: Pregunta uso, personas, tipo de vehículo, qué valora más.
-PASO 3 - OPCIONES: Presenta MÁXIMO 3 modelos relevantes con precio y disponibilidad.
-PASO 4 - DETALLE: Profundiza en el modelo elegido. Equipamiento, colores, garantía.
-PASO 5 - PRESUPUESTO Y PAGO: Pregunta rango, contado o financiamiento, plazo, cuota inicial.
-PASO 6 - ENTREGA Y DOCUMENTACIÓN: Informa tiempo según stock. Docs necesarios.
-PASO 7A - RESUMEN: Cotización completa. Pregunta si confirma.
-PASO 7B - GUARDAR: Cliente confirma → action: save_lead con lead_data completo.
+=== FLUJO DE PERFILAMIENTO (7 pasos) ===
+PASO 1 - SALUDO: Ya lo maneja el sistema.
+PASO 2 - REGISTRO Y PERFILAMIENTO: Nombre, ciudad, uso, personas, tipo, qué valora.
+PASO 3 - OPCIONES: MÁXIMO 3 modelos relevantes con stock, colores, entrega y equipamiento (SIN precios).
+PASO 4 - DETALLE: Especificaciones, equipamiento, colores, diferenciadores (SIN precios).
+PASO 5 - PREFERENCIAS DE PAGO: Contado o financiamiento, historial crediticio. SIN cifras.
+PASO 6 - ENTREGA Y DOCUMENTACIÓN: Tiempos y documentos requeridos (DNI + ingresos).
+PASO 7A - RESUMEN DE PERFIL: Modelo, versión, preferencias. Preguntar si quiere que un asesor lo contacte.
+PASO 7B - GUARDAR: Cliente confirma → action: save_lead con precio_final=null (lo cierra el asesor).
 
 === ENRUTAMIENTO ===
 Mantenimiento/taller/servicio → action: redirect_taller
 Asesor/humano → action: escalate
+Pregunta por precio/cuota/monto → action: escalate + alert_type: precio_exacto
 
 === REGLAS GENERALES ===
 - Español, amigable, máximo 280 palabras por mensaje.
-- Usa emojis: autos, check, estrella, dinero.
-- NUNCA inventes precios fuera del catálogo.
+- Usa emojis: autos, check, estrella, carita feliz.
+- NUNCA muestres precios ni rangos de plata. Eso lo maneja el asesor humano.
 
 === CONSIDERACIONES ADICIONALES (PRIORITARIAS) ===
 [Se inyectan desde el CRM en cada conversación]`,
@@ -612,22 +613,26 @@ function AgentPromptForm({ agente }) {
   const [nuevaVigencia, setNuevaVigencia] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const fetchInstrucciones = useCallback(async () => {
+  const fetchInstrucciones = useCallback(async (signal) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/agentes/instrucciones?agent=${agente.agent_key}`);
+      const res = await fetch(`/api/agentes/instrucciones?agent=${agente.agent_key}`, { signal });
       if (!res.ok) throw new Error("Error al cargar instrucciones");
       const data = await res.json();
       setInstrucciones(data.instrucciones || []);
     } catch (err) {
-      console.error("[AgentPromptForm] Error al cargar instrucciones:", err);
+      if (err?.name === "AbortError") return;
       toast.error("No se pudieron cargar las instrucciones");
     } finally {
       setLoading(false);
     }
   }, [agente.agent_key]);
 
-  useEffect(() => { fetchInstrucciones(); }, [fetchInstrucciones]);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetchInstrucciones(ctrl.signal);
+    return () => ctrl.abort();
+  }, [fetchInstrucciones]);
 
   async function handleAgregar() {
     if (!nuevoTexto.trim()) return;
@@ -676,8 +681,7 @@ function AgentPromptForm({ agente }) {
         )
       );
       toast.success(nuevaActiva ? "Instrucción activada" : "Instrucción desactivada");
-    } catch (err) {
-      console.error("[AgentPromptForm] Error al togglear instrucción:", err);
+    } catch {
       toast.error("No se pudo actualizar");
     }
   }
@@ -692,8 +696,7 @@ function AgentPromptForm({ agente }) {
       if (!res.ok) throw new Error("Error al eliminar");
       setInstrucciones((prev) => prev.filter((i) => i.id !== id));
       toast.success("Instrucción eliminada");
-    } catch (err) {
-      console.error("[AgentPromptForm] Error al eliminar instrucción:", err);
+    } catch {
       toast.error("No se pudo eliminar");
     }
   }
@@ -888,12 +891,12 @@ export default function VentasConfiguracionPage() {
   const [agentes, setAgentes] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchConfig = useCallback(async () => {
+  const fetchConfig = useCallback(async (signal) => {
     setLoading(true);
     try {
       const [resConfig, resAgentes] = await Promise.all([
-        fetch("/api/ventas/configuracion"),
-        fetch("/api/agentes/prompt-config"),
+        fetch("/api/ventas/configuracion", { signal }),
+        fetch("/api/agentes/prompt-config", { signal }),
       ]);
       if (!resConfig.ok || !resAgentes.ok) throw new Error("Error al cargar configuración");
       const dataConfig = await resConfig.json();
@@ -901,14 +904,18 @@ export default function VentasConfiguracionPage() {
       setConfig(dataConfig.configuracion || {});
       setAgentes(dataAgentes.agentes || []);
     } catch (err) {
-      console.error("[VentasConfiguracionPage] Error al cargar configuración:", err);
+      if (err?.name === "AbortError") return;
       toast.error("No se pudo cargar la configuración");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchConfig(); }, [fetchConfig]);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetchConfig(ctrl.signal);
+    return () => ctrl.abort();
+  }, [fetchConfig]);
 
   function updateSection(seccion, contenido) {
     setConfig((c) => ({ ...c, [seccion]: contenido }));
