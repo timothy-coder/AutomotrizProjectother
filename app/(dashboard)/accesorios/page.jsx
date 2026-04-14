@@ -75,6 +75,7 @@ export default function AccesoriosPage() {
   const [marcas, setMarcas] = useState([]);
   const [modelos, setModelos] = useState([]);
   const [monedas, setMonedas] = useState([]);
+  const [impuestos, setImpuestos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -99,6 +100,7 @@ export default function AccesoriosPage() {
   const [openMarca, setOpenMarca] = useState(false);
   const [openModelo, setOpenModelo] = useState(false);
   const [openMoneda, setOpenMoneda] = useState(false);
+  const [openImpuesto, setOpenImpuesto] = useState(false);
 
   // Form
   const [form, setForm] = useState({
@@ -107,7 +109,9 @@ export default function AccesoriosPage() {
     detalle: "",
     numero_parte: "",
     precio: "",
+    precio_venta: "",
     moneda_id: "",
+    impuesto_id: "",
   });
 
   async function loadData() {
@@ -115,12 +119,13 @@ export default function AccesoriosPage() {
       setLoading(true);
       setError(null);
 
-      const [accesoriosRes, marcasRes, modelosRes, monedasRes] =
+      const [accesoriosRes, marcasRes, modelosRes, monedasRes, impuestosRes] =
         await Promise.all([
           fetch("/api/accesorios-disponibles", { cache: "no-store" }),
           fetch("/api/marcas", { cache: "no-store" }),
           fetch("/api/modelos", { cache: "no-store" }),
           fetch("/api/monedas", { cache: "no-store" }),
+          fetch("/api/impuestos", { cache: "no-store" }),
         ]);
 
       if (!accesoriosRes.ok) {
@@ -135,16 +140,21 @@ export default function AccesoriosPage() {
       if (!monedasRes.ok) {
         throw new Error(`Error al cargar monedas: ${monedasRes.status}`);
       }
+      if (!impuestosRes.ok) {
+        throw new Error(`Error al cargar impuestos: ${impuestosRes.status}`);
+      }
 
       const accesoriosData = await accesoriosRes.json();
       const marcasData = await marcasRes.json();
       const modelosData = await modelosRes.json();
       const monedasData = await monedasRes.json();
+      const impuestosData = await impuestosRes.json();
 
       setAccesorios(Array.isArray(accesoriosData) ? accesoriosData : []);
       setMarcas(Array.isArray(marcasData) ? marcasData : []);
       setModelos(Array.isArray(modelosData) ? modelosData : []);
       setMonedas(Array.isArray(monedasData) ? monedasData : []);
+      setImpuestos(Array.isArray(impuestosData) ? impuestosData : []);
     } catch (error) {
       console.error("Error completo:", error);
       setError(error.message);
@@ -153,6 +163,7 @@ export default function AccesoriosPage() {
       setMarcas([]);
       setModelos([]);
       setMonedas([]);
+      setImpuestos([]);
     } finally {
       setLoading(false);
     }
@@ -201,17 +212,34 @@ export default function AccesoriosPage() {
         !form.precio ||
         !form.moneda_id
       ) {
-        toast.warning("Completa todos los campos");
+        toast.warning("Completa los campos requeridos");
+        return;
+      }
+
+      // ✅ Validar que precio_venta sea mayor que precio
+      if (form.precio_venta && parseFloat(form.precio_venta) < parseFloat(form.precio)) {
+        toast.warning("El precio de venta debe ser mayor o igual que el precio de compra");
         return;
       }
 
       setSaving(true);
 
+      const payload = {
+        marca_id: form.marca_id,
+        modelo_id: form.modelo_id,
+        detalle: form.detalle,
+        numero_parte: form.numero_parte,
+        precio: form.precio,
+        precio_venta: form.precio_venta || null,
+        moneda_id: form.moneda_id,
+        impuesto_id: form.impuesto_id || null,
+      };
+
       if (selectedAccesorio) {
-        const res = await fetch(`/api/accesorios/${selectedAccesorio.id}`, {
+        const res = await fetch(`/api/accesorios-disponibles/${selectedAccesorio.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
+          body: JSON.stringify(payload),
         });
 
         const data = await res.json();
@@ -227,7 +255,7 @@ export default function AccesoriosPage() {
         const res = await fetch("/api/accesorios-disponibles", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
+          body: JSON.stringify(payload),
         });
 
         const data = await res.json();
@@ -241,7 +269,9 @@ export default function AccesoriosPage() {
             detalle: "",
             numero_parte: "",
             precio: "",
+            precio_venta: "",
             moneda_id: "",
+            impuesto_id: "",
           });
           loadData();
         } else {
@@ -289,7 +319,9 @@ export default function AccesoriosPage() {
       detalle: "",
       numero_parte: "",
       precio: "",
+      precio_venta: "",
       moneda_id: "",
+      impuesto_id: "",
     });
     setDialogOpen(true);
   }
@@ -302,7 +334,9 @@ export default function AccesoriosPage() {
       detalle: accesorio.detalle,
       numero_parte: accesorio.numero_parte,
       precio: accesorio.precio.toString(),
+      precio_venta: accesorio.precio_venta ? accesorio.precio_venta.toString() : "",
       moneda_id: accesorio.moneda_id.toString(),
+      impuesto_id: accesorio.impuesto_id ? accesorio.impuesto_id.toString() : "",
     });
     setDialogOpen(true);
   }
@@ -312,6 +346,11 @@ export default function AccesoriosPage() {
   const getMonedaLabel = (id) => {
     const m = monedas.find(mo => mo.id.toString() === id);
     return m ? `${m.nombre} (${m.simbolo})` : "Todas";
+  };
+  const getImpuestoLabel = (id) => {
+    if (!id) return "Sin impuesto";
+    const i = impuestos.find(imp => imp.id.toString() === id);
+    return i ? `${i.nombre} (${i.porcentaje}%)` : "Sin impuesto";
   };
 
   if (loading) {
@@ -382,7 +421,7 @@ export default function AccesoriosPage() {
         </div>
 
         {/* ESTADÍSTICAS */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-4">
           <Tooltip>
             <TooltipTrigger asChild>
               <Card className="cursor-help border-2" style={{ borderColor: `${BRAND_PRIMARY}30`, backgroundColor: `${BRAND_PRIMARY}08` }}>
@@ -448,7 +487,7 @@ export default function AccesoriosPage() {
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Card className="cursor-help border-2 col-span-2 sm:col-span-1" style={{ borderColor: '#fed7aa40', backgroundColor: '#fef3c710' }}>
+              <Card className="cursor-help border-2" style={{ borderColor: '#fed7aa40', backgroundColor: '#fef3c710' }}>
                 <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex-1 min-w-0">
@@ -464,6 +503,27 @@ export default function AccesoriosPage() {
             </TooltipTrigger>
             <TooltipContent side="top" className="text-xs">
               Monedas configuradas
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card className="cursor-help border-2" style={{ borderColor: '#fce7f340', backgroundColor: '#fffbeb60' }}>
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-yellow-600">Impuestos</p>
+                      <p className="text-lg sm:text-3xl font-bold mt-1 text-yellow-900">
+                        {impuestos.length}
+                      </p>
+                    </div>
+                    <span className="text-2xl sm:text-4xl flex-shrink-0">📊</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-xs">
+              Impuestos configurados
             </TooltipContent>
           </Tooltip>
         </div>
@@ -747,7 +807,9 @@ export default function AccesoriosPage() {
                       <TableHead className="font-semibold text-xs sm:text-sm hidden sm:table-cell">N° Parte</TableHead>
                       <TableHead className="font-semibold text-xs sm:text-sm hidden md:table-cell">Marca</TableHead>
                       <TableHead className="font-semibold text-xs sm:text-sm hidden lg:table-cell">Modelo</TableHead>
-                      <TableHead className="font-semibold text-xs sm:text-sm">Precio</TableHead>
+                      <TableHead className="font-semibold text-xs sm:text-sm">Precio Compra</TableHead>
+                      <TableHead className="font-semibold text-xs sm:text-sm hidden xl:table-cell">Precio Venta</TableHead>
+                      <TableHead className="font-semibold text-xs sm:text-sm hidden 2xl:table-cell">Impuesto</TableHead>
                       <TableHead className="font-semibold text-center text-xs sm:text-sm">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -781,6 +843,22 @@ export default function AccesoriosPage() {
                         </TableCell>
                         <TableCell className="font-semibold text-xs sm:text-sm text-green-600">
                           {acc.simbolo} {parseFloat(acc.precio).toFixed(2)}
+                        </TableCell>
+                        <TableCell className="hidden xl:table-cell">
+                          <span className="text-xs sm:text-sm font-semibold text-blue-600">
+                            {acc.precio_venta 
+                              ? `${acc.simbolo} ${parseFloat(acc.precio_venta).toFixed(2)}`
+                              : "-"
+                            }
+                          </span>
+                        </TableCell>
+                        <TableCell className="hidden 2xl:table-cell">
+                          <span className="text-xs sm:text-sm text-gray-600">
+                            {acc.impuesto_nombre 
+                              ? `${acc.impuesto_nombre} (${acc.impuesto_porcentaje}%)`
+                              : "-"
+                            }
+                          </span>
                         </TableCell>
                         <TableCell className="text-center">
                           <div className="flex items-center justify-center gap-1 sm:gap-2">
@@ -952,12 +1030,12 @@ export default function AccesoriosPage() {
             <div className="space-y-3 p-3 sm:p-4 rounded-lg border-2" style={{ backgroundColor: `${BRAND_PRIMARY}08`, borderColor: `${BRAND_PRIMARY}30` }}>
               <h3 className="font-semibold text-sm sm:text-base flex items-center gap-2" style={{ color: BRAND_PRIMARY }}>
                 <span className="w-6 h-6 rounded-full text-white text-xs flex items-center justify-center font-bold flex-shrink-0" style={{ backgroundColor: BRAND_PRIMARY }}>2</span>
-                <span>Precio</span>
+                <span>Precios e Impuestos</span>
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs sm:text-sm font-medium" style={{ color: BRAND_PRIMARY }}>Precio</label>
+                  <label className="text-xs sm:text-sm font-medium" style={{ color: BRAND_PRIMARY }}>Precio Compra *</label>
                   <Input
                     type="number"
                     value={form.precio}
@@ -971,7 +1049,23 @@ export default function AccesoriosPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs sm:text-sm font-medium" style={{ color: BRAND_PRIMARY }}>Moneda</label>
+                  <label className="text-xs sm:text-sm font-medium" style={{ color: BRAND_PRIMARY }}>Precio Venta</label>
+                  <Input
+                    type="number"
+                    value={form.precio_venta}
+                    onChange={(e) =>
+                      setForm({ ...form, precio_venta: e.target.value })
+                    }
+                    placeholder="0.00"
+                    step="0.01"
+                    className="mt-1 text-xs sm:text-sm h-8 sm:h-9"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs sm:text-sm font-medium" style={{ color: BRAND_PRIMARY }}>Moneda *</label>
                   <Select
                     value={form.moneda_id}
                     onValueChange={(value) =>
@@ -989,6 +1083,64 @@ export default function AccesoriosPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div>
+                  <label className="text-xs sm:text-sm font-medium" style={{ color: BRAND_PRIMARY }}>Impuesto</label>
+                  <Popover open={openImpuesto} onOpenChange={setOpenImpuesto}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={openImpuesto}
+                        className="w-full justify-between text-xs sm:text-sm h-8 sm:h-9 mt-1"
+                      >
+                        {getImpuestoLabel(form.impuesto_id)}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0">
+                      <Command>
+                        <CommandInput placeholder="Buscar impuesto..." className="text-xs" />
+                        <CommandList>
+                          <CommandEmpty>No encontrado</CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem
+                              value="sin-impuesto"
+                              onSelect={() => setForm({ ...form, impuesto_id: "" })}
+                              className="text-xs sm:text-sm cursor-pointer"
+                            >
+                              <Check
+                                className={`mr-2 h-4 w-4 ${
+                                  !form.impuesto_id ? "opacity-100" : "opacity-0"
+                                }`}
+                              />
+                              Sin impuesto
+                            </CommandItem>
+                            {impuestos.map((impuesto) => (
+                              <CommandItem
+                                key={impuesto.id}
+                                value={impuesto.id.toString()}
+                                onSelect={() =>
+                                  setForm({ ...form, impuesto_id: impuesto.id.toString() })
+                                }
+                                className="text-xs sm:text-sm cursor-pointer"
+                              >
+                                <Check
+                                  className={`mr-2 h-4 w-4 ${
+                                    form.impuesto_id === impuesto.id.toString()
+                                      ? "opacity-100"
+                                      : "opacity-0"
+                                  }`}
+                                />
+                                {impuesto.nombre} ({impuesto.porcentaje}%)
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
             </div>

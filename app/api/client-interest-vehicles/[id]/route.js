@@ -8,7 +8,8 @@ import { db } from "@/lib/db";
 
 export async function GET(req, { params }) {
   try {
-    const { id } = params;
+    // ✅ CAMBIO: Await params
+    const { id } = await params;
 
     const [rows] = await db.query(
       `SELECT 
@@ -38,7 +39,8 @@ export async function GET(req, { params }) {
 
 export async function PUT(req, { params }) {
   try {
-    const { id } = params;
+    // ✅ CAMBIO: Await params
+    const { id } = await params;
     const { marca_id, modelo_id, anio_interes, active } = await req.json();
 
     const [result] = await db.query(
@@ -64,7 +66,8 @@ export async function PUT(req, { params }) {
 
 export async function DELETE(req, { params }) {
   try {
-    const { id } = params;
+    // ✅ CAMBIO: Await params
+    const { id } = await params;
 
     const [result] = await db.query(
       "DELETE FROM client_interest_vehicles WHERE id = ?",

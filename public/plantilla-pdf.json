@@ -1,0 +1,40 @@
+{
+  "encabezado": {
+    "titulo": "COTIZACIÓN",
+    "logo_url": "/logos/1775969437342-logo.png",
+    "mostrar_logo": true,
+    "mostrar_numero": true,
+    "color_titulo": "#2ecc71"
+  },
+  "cliente": {
+    "mostrar": true,
+    "titulo": "CLIENTE:",
+    "posicion_y": 50
+  },
+  "vehiculo": {
+    "mostrar": true,
+    "titulo": "VEHÍCULO:",
+    "posicion_y": 80
+  },
+  "especificaciones": {
+    "mostrar": true,
+    "titulo": "ESPECIFICACIONES:"
+  },
+  "accesorios": {
+    "mostrar": true,
+    "titulo": "ACCESORIOS"
+  },
+  "regalos": {
+    "mostrar": true,
+    "titulo": "REGALOS INCLUIDOS"
+  },
+  "resumen": {
+    "mostrar": true,
+    "titulo": "RESUMEN:"
+  },
+  "pie": {
+    "vigencia": "30 días",
+    "mostrar_firma": true,
+    "texto_firma": "Firmado por:"
+  }
+}

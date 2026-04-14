@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Save, X, Edit2, Loader2, Plus, Trash2, Pencil, MessageSquare, Check, Calendar, FileText, Lock, History, ShoppingCart, Package, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { useAuth } from "@/context/AuthContext";
 import { es } from "date-fns/locale";
 import {
   Dialog,
@@ -38,6 +39,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { hasPermission } from "@/lib/permissions";
 import { useUserScope } from "@/hooks/useUserScope";
 import CotizacionDialog from "@/app/components/agenda/CotizacionDialog";
 import CotizacionesTable from "@/app/components/agenda/CotizacionesTable";
@@ -46,6 +48,9 @@ import AgregarAccesoriosDialog from "@/app/components/agenda/AgregarAccesoriosDi
 import PreviewCotizacionDialog from "@/app/components/agenda/PreviewCotizacionDialog";
 
 export default function OportunidadDetailPage() {
+
+  const { user, permissions } = useAuth();
+  const canViewAll = hasPermission(permissions, "oportunidades", "viewall");
   const router = useRouter();
   const params = useParams();
   const oportunidadId = params?.id;
@@ -752,7 +757,7 @@ export default function OportunidadDetailPage() {
   // CIERRE FUNCTIONS
   function openCreateCierre() {
     setEditingCierre(null);
-    setCierreFormData({ 
+    setCierreFormData({
       detalle: "",
       cierre_detalle_id: null,
     });
@@ -761,7 +766,7 @@ export default function OportunidadDetailPage() {
 
   function openEditCierre(cierre) {
     setEditingCierre(cierre);
-    setCierreFormData({ 
+    setCierreFormData({
       detalle: cierre.detalle,
       cierre_detalle_id: cierre.cierre_detalle_id || null,
     });
@@ -785,7 +790,7 @@ export default function OportunidadDetailPage() {
       const method = editingCierre ? "PUT" : "POST";
 
       const body = editingCierre
-        ? { 
+        ? {
           detalle: cierreFormData.detalle,
           cierre_detalle_id: cierreFormData.cierre_detalle_id || null,
         }
@@ -1206,713 +1211,9 @@ export default function OportunidadDetailPage() {
         </div>
 
         {/* CONTENT */}
-        <div className="p-6 max-w-7xl mx-auto">
-          <div className="grid grid-cols-3 gap-6">
-            {/* LEFT COLUMN */}
-            <div className="col-span-2 space-y-6">
-              {/* INFORMACIÓN GENERAL */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Información General</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-slate-600 font-semibold uppercase">Cliente</p>
-                      <p className="text-slate-900 font-medium">{oportunidad.cliente_nombre}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-600 font-semibold uppercase">Código</p>
-                      <p className="text-slate-900 font-mono font-medium">{oportunidad.oportunidad_id}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-600 font-semibold uppercase">Origen</p>
-                      <p className="text-slate-900">{oportunidad.origen_nombre}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-600 font-semibold uppercase">Suborigen</p>
-                      <p className="text-slate-900">{oportunidad.suborigen_nombre}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-600 font-semibold uppercase">Asignado a</p>
-                      <p className="text-slate-900">{oportunidad.asignado_a_nombre || "Sin asignar"}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* INFORMACIÓN ADICIONAL */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Información Adicional</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-xs text-slate-600 font-semibold uppercase">Correo</p>
-                      <p className="text-slate-900">{oportunidad.cliente_email || "-"}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-600 font-semibold uppercase">Teléfono</p>
-                      <p className="text-slate-900">{oportunidad.cliente_telefono || "-"}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-600 font-semibold uppercase">Celular</p>
-                      <p className="text-slate-900">{oportunidad.celular || "-"}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-600 font-semibold uppercase">DNI</p>
-                      <p className="text-slate-900">{oportunidad.cliente_dni || "-"}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* DETALLES DE AGENDA */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Calendar size={18} />
-                    Detalles de Agenda
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {detalles.length === 0 ? (
-                    <p className="text-slate-500 text-sm py-4">Sin detalles de agenda</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {detalles.map((detalle) => (
-                        <div
-                          key={detalle.id}
-                          className="flex items-start justify-between p-3 bg-blue-50 rounded-lg border border-blue-200 hover:border-blue-300 transition-colors"
-                        >
-                          <div>
-                            <p className="font-medium text-slate-900">
-                              📅 {new Date(detalle.fecha_agenda).toLocaleDateString("es-ES")}
-                            </p>
-                            <p className="text-sm text-slate-700 mt-1">
-                              🕐 {String(detalle.hora_agenda).substring(0, 5)}
-                            </p>
-                            <p className="text-xs text-slate-600 mt-1">
-                              {new Date(detalle.created_at).toLocaleString("es-ES")}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* VEHÍCULOS DE INTERÉS */}
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-lg">Vehículos de Interés</CardTitle>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button onClick={openCreateVehiculo} size="sm" className="gap-2">
-                        <Plus className="h-4 w-4" /> Agregar
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">Agregar vehículo de interés</TooltipContent>
-                  </Tooltip>
-                </CardHeader>
-                <CardContent>
-                  {vehiculosInteres.length === 0 ? (
-                    <p className="text-slate-500 text-sm py-4">Sin vehículos de interés</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {vehiculosInteres.map((vehiculo) => (
-                        <div
-                          key={vehiculo.id}
-                          className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors"
-                        >
-                          <div>
-                            <p className="font-medium text-slate-900">
-                              {vehiculo.marca || "Sin marca"} {vehiculo.modelo || ""}
-                            </p>
-                            <p className="text-xs text-slate-600">
-                              {vehiculo.anio_interes || "Sin año"} • {vehiculo.source}
-                            </p>
-                          </div>
-                          <div className="flex gap-2">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="outline"
-                                  onClick={() => openCotizacionVehiculo(vehiculo)}
-                                  className="h-8 w-8"
-                                >
-                                  <ShoppingCart size={14} />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">Crear cotización</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="outline"
-                                  onClick={() => openEditVehiculo(vehiculo)}
-                                  className="h-8 w-8"
-                                >
-                                  <Pencil size={14} />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">Editar</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="destructive"
-                                  onClick={() => openDeleteVehiculo(vehiculo)}
-                                  className="h-8 w-8"
-                                >
-                                  <Trash2 size={14} />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">Eliminar</TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* INFORMACIÓN DE ETAPA */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">
-                    Información de {etapaActualObj?.nombre}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {preguntas.length > 0 && (
-                    <div className="space-y-4 pt-4 border-t border-slate-200">
-                      <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-                        <MessageSquare size={18} />
-                        Preguntas de Atención
-                      </h3>
-
-                      {preguntas.map((pregunta) => (
-                        <div key={pregunta.id} className="border border-slate-200 rounded-lg p-3 bg-slate-50">
-                          <div className="flex items-center justify-between mb-2">
-                            <label className="text-sm font-medium text-slate-700 flex items-center gap-1 flex-1">
-                              {pregunta.pregunta}
-                              {pregunta.es_obligatoria && (
-                                <span className="text-red-500">*</span>
-                              )}
-                            </label>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  onClick={() => handleGuardarRespuestaPregunta(pregunta.id)}
-                                  disabled={guardandoPregunta === pregunta.id}
-                                  size="sm"
-                                  className="gap-2 ml-2"
-                                >
-                                  {guardandoPregunta === pregunta.id ? (
-                                    <>
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                      Guardando...
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Save className="h-4 w-4" />
-                                      Guardar
-                                    </>
-                                  )}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">Guardar respuesta</TooltipContent>
-                            </Tooltip>
-                          </div>
-                          {renderCampoPregunta(pregunta)}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* REGISTRAR ACTIVIDAD Y HISTORIAL */}
-              <div className="md:col-span-2 space-y-4 pt-6 border-t-2 border-slate-200">
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 space-y-3 border border-blue-200">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare size={18} className="text-blue-600" />
-                    <h3 className="text-sm font-semibold text-slate-900">
-                      Registrar nueva actividad
-                    </h3>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-sm font-medium text-slate-700 block mb-2">
-                        Etapa donde registrar (opcional)
-                      </label>
-                      <Select
-                        value={etapaProxima}
-                        onValueChange={setEtapaProxima}
-                        disabled={guardandoActividad}
-                      >
-                        <SelectTrigger className="h-9">
-                          <SelectValue placeholder="Seleccionar etapa" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="sin-cambio">
-                            Etapa actual
-                          </SelectItem>
-                          {etapas.map((item) => (
-                            <SelectItem key={item.id} value={String(item.id)}>
-                              {getLabel(item)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium text-slate-700 block mb-2">
-                      Detalle *
-                    </label>
-                    <textarea
-                      className="w-full h-20 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
-                      value={detalleAccion}
-                      onChange={(e) => setDetalleAccion(e.target.value)}
-                      placeholder="Describe qué acción se realizó, qué se comentó, etc."
-                      disabled={guardandoActividad}
-                    />
-                  </div>
-
-                  <Button
-                    onClick={handleGuardarActividad}
-                    disabled={guardandoActividad || !detalleAccion.trim()}
-                    className="w-full bg-blue-600 hover:bg-blue-700"
-                    size="sm"
-                  >
-                    {guardandoActividad
-                      ? "Guardando..."
-                      : "Guardar actividad"}
-                  </Button>
-                </div>
-
-                {/* HISTORIAL */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <History size={18} className="text-slate-600" />
-                    <h3 className="text-sm font-semibold text-slate-900">
-                      Historial ({actividades.length})
-                    </h3>
-                  </div>
-
-                  {loadingActividades ? (
-                    <div className="text-center text-muted-foreground text-sm py-4 bg-slate-50 rounded">
-                      Cargando...
-                    </div>
-                  ) : actividades.length === 0 ? (
-                    <div className="text-center text-muted-foreground text-sm py-4 bg-slate-50 rounded border border-dashed border-slate-300">
-                      No hay actividades
-                    </div>
-                  ) : (
-                    <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2">
-                      {actividades.map((actividad) => {
-                        const etapaActividad = actividad.etapasconversion_id
-                          ? etapas.find(
-                            (e) => e.id === actividad.etapasconversion_id
-                          )
-                          : null;
-
-                        return (
-                          <div
-                            key={actividad.id}
-                            className="border border-slate-200 rounded p-3 bg-white text-xs space-y-2 hover:shadow-md hover:border-blue-300 transition-all"
-                          >
-                            <div className="flex justify-between items-start gap-2">
-                              <div>
-                                <p className="font-semibold text-slate-800">
-                                  {actividad.created_by_name ||
-                                    `ID ${actividad.created_by}`}
-                                </p>
-                              </div>
-                              <div className="text-right flex-shrink-0">
-                                <p className="text-slate-500">
-                                  {format(
-                                    new Date(actividad.created_at),
-                                    "dd/MM HH:mm",
-                                    { locale: es }
-                                  )}
-                                </p>
-                              </div>
-                            </div>
-
-                            {etapaActividad && (
-                              <div>
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 rounded-full text-xs font-semibold border border-blue-200">
-                                  {getLabel(etapaActividad)}
-                                </span>
-                              </div>
-                            )}
-
-                            <p className="text-slate-700 line-clamp-3 leading-relaxed">
-                              {actividad.detalle}
-                            </p>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* COTIZACIONES */}
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <FileText size={18} />
-                    Cotizaciones
-                  </CardTitle>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button onClick={openCreateCotizacion} size="sm" className="gap-2">
-                        <Plus className="h-4 w-4" /> Agregar
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">Crear nueva cotización</TooltipContent>
-                  </Tooltip>
-                </CardHeader>
-                <CardContent>
-                  <CotizacionesTable
-                    cotizaciones={cotizaciones}
-                    sortConfig={{ key: "id", direction: "asc" }}
-                    onSort={() => { }}
-                    onEdit={openEditCotizacion}
-                    onDelete={openDeleteCotizacion}
-                    onChangeStatus={async (cot, estado) => {
-                      const res = await fetch(`/api/cotizacionesagenda/${cot.id}`, {
-                        method: "PUT",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          sku: cot.sku,
-                          color_externo: cot.color_externo,
-                          color_interno: cot.color_interno,
-                          version_id: cot.version_id,
-                          anio: cot.anio,
-                          marca_id: cot.marca_id,
-                          modelo_id: cot.modelo_id,
-                          estado,
-                        }),
-                      });
-                      if (res.ok) {
-                        toast.success(`Estado cambiado a ${estado}`);
-                        if (estado === "enviada") {
-                          await cambiarEtapa(6, "Cotización enviada");
-                        }
-                        await cargarCotizaciones(oportunidadId);
-                      }
-                    }}
-                    onDuplicate={async (cot) => {
-                      const res = await fetch("/api/cotizacionesagenda", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          oportunidad_id: cot.oportunidad_id,
-                          marca_id: cot.marca_id,
-                          modelo_id: cot.modelo_id,
-                          version_id: cot.version_id,
-                          anio: cot.anio,
-                          sku: cot.sku,
-                          color_externo: cot.color_externo,
-                          color_interno: cot.color_interno,
-                          estado: "borrador",
-                          created_by: userId,
-                        }),
-                      });
-                      if (res.ok) {
-                        toast.success("Cotización duplicada");
-                        await cargarCotizaciones(oportunidadId);
-                      }
-                    }}
-                    onLoadHistorial={() => { }}
-                    saving={false}
-                    userId={userId}
-                    onOpenHistorialDialog={(historialData) => {
-                      setSelectedHistorial(historialData);
-                      setHistorialDialog(true);
-                    }}
-                    onAddAccesorios={(cot) => {
-                      setSelectedCotizacionForAccesorios(cot);
-                      setDialogAccesoriosOpen(true);
-                    }}
-                    onPreview={(cot) => {
-                      setSelectedCotizacionPreview(cot);
-                      setPreviewCotizacionOpen(true);
-                    }}
-                  />
-                </CardContent>
-              </Card>
-
-              {/* TEST DRIVES */}
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Calendar size={18} />
-                    Test Drive
-                  </CardTitle>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button onClick={openCreateTestDrive} size="sm" className="gap-2">
-                        <Plus className="h-4 w-4" /> Agregar
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">Programar nuevo test drive</TooltipContent>
-                  </Tooltip>
-                </CardHeader>
-                <CardContent>
-                  {testDrives.length === 0 ? (
-                    <p className="text-slate-500 text-sm py-4">Sin test drives registrados</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {testDrives.map((testDrive) => (
-                        <div
-                          key={testDrive.id}
-                          className="flex items-start justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"
-                        >
-                          <div className="flex-1">
-                            <p className="font-medium text-slate-900">
-                              {new Date(testDrive.fecha_testdrive).toLocaleDateString("es-ES")} a las {testDrive.hora_inicio}
-                            </p>
-                            <p className="text-xs text-slate-600 mt-1">
-                              {testDrive.placa && `Placa: ${testDrive.placa}`}
-                              {testDrive.vin && ` • VIN: ${testDrive.vin}`}
-                            </p>
-                            {testDrive.descripcion && (
-                              <p className="text-xs text-slate-700 mt-1">{testDrive.descripcion}</p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className={`text-xs px-2 py-1 rounded-full font-semibold ${testDrive.estado === 'realizado' ? 'bg-green-100 text-green-700' :
-                              testDrive.estado === 'cancelado' ? 'bg-red-100 text-red-700' :
-                                'bg-blue-100 text-blue-700'
-                              }`}>
-                              {testDrive.estado}
-                            </span>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="outline"
-                                  onClick={() => openEditTestDrive(testDrive)}
-                                  className="h-8 w-8"
-                                >
-                                  <Pencil size={14} />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">Editar</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="destructive"
-                                  onClick={() => {
-                                    setDeleteTestDriveTarget(testDrive);
-                                    setDeleteTestDriveDialog(true);
-                                  }}
-                                  className="h-8 w-8"
-                                >
-                                  <Trash2 size={14} />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">Eliminar</TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* RESERVAS */}
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <FileText size={18} />
-                    Reservas
-                  </CardTitle>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        onClick={createReserva}
-                        size="sm"
-                        className="gap-2"
-                        disabled={reservas.length > 0}
-                      >
-                        <Plus className="h-4 w-4" /> Agregar
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      {reservas.length > 0 ? "Ya existe una reserva" : "Crear nueva reserva"}
-                    </TooltipContent>
-                  </Tooltip>
-                </CardHeader>
-                <CardContent>
-                  {reservas.length === 0 ? (
-                    <p className="text-slate-500 text-sm py-4">Sin reservas registradas</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {reservas.map((reserva) => (
-                        <div
-                          key={reserva.id}
-                          className="flex items-start justify-between p-3 bg-green-50 rounded-lg border border-green-200"
-                        >
-                          <div>
-                            <p className="font-medium text-green-900">
-                              Reserva creada el {new Date(reserva.created_at).toLocaleDateString("es-ES")}
-                            </p>
-                            <p className="text-xs text-green-700 mt-1">
-                              ID: {reserva.id}
-                            </p>
-                          </div>
-                          <div className="flex gap-2">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="outline"
-                                  onClick={() => router.push(`/reservas/${reserva.id}`)}
-                                  className="h-8 w-8 border-green-300 hover:bg-green-100"
-                                >
-                                  <Eye size={14} className="text-green-600" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">Ver detalles</TooltipContent>
-                            </Tooltip>
-
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="destructive"
-                                  onClick={() => {
-                                    setDeleteReservaTarget(reserva);
-                                    setDeleteReservaDialog(true);
-                                  }}
-                                  className="h-8 w-8"
-                                >
-                                  <Trash2 size={14} />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">Eliminar</TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* CIERRES */}
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Lock size={18} />
-                    Cierres
-                  </CardTitle>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button onClick={openCreateCierre} size="sm" className="gap-2">
-                        <Plus className="h-4 w-4" /> Agregar
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">Registrar cierre de oportunidad</TooltipContent>
-                  </Tooltip>
-                </CardHeader>
-                <CardContent>
-                  {cierres.length === 0 ? (
-                    <p className="text-slate-500 text-sm py-4">Sin cierres registrados</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {cierres.map((cierre) => (
-                        <div
-                          key={cierre.id}
-                          className="flex items-start justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"
-                        >
-                          <div className="flex-1">
-                            <p className="text-xs font-semibold text-slate-600 uppercase mb-1">
-                              {new Date(cierre.created_at).toLocaleString("es-ES")}
-                            </p>
-                            <p className="text-sm text-slate-900">{cierre.detalle}</p>
-                            {cierre.cierre_detalle_nombre && (
-                              <p className="text-xs text-slate-600 mt-2 italic border-t border-slate-300 pt-2">
-                                📋 {cierre.cierre_detalle_nombre}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex gap-2 flex-shrink-0">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="outline"
-                                  onClick={() => openEditCierre(cierre)}
-                                  className="h-8 w-8"
-                                >
-                                  <Pencil size={14} />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">Editar</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="destructive"
-                                  onClick={() => {
-                                    setDeleteCierreTarget(cierre);
-                                    setDeleteCierreDialog(true);
-                                  }}
-                                  className="h-8 w-8"
-                                >
-                                  <Trash2 size={14} />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">Eliminar</TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* RIGHT COLUMN */}
-            <div className="space-y-4">
-              {/* ETAPA ACTUAL */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Estado Actual</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg">
-                    <p className="text-2xl font-bold text-blue-900">
-                      {etapaActualObj?.nombre}
-                    </p>
-                    <p className="text-xs text-blue-700 mt-2">
-                      Etapa {indiceEtapaActual + 1} de {etapas.length}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
+        <div className="py-2 max-w-auto mx-auto">
+          <div className=" space-y-6">
+            <div className="grid grid-cols-2 gap-2">
               {/* TEMPERATURA */}
               <Card>
                 <CardHeader>
@@ -1922,7 +1223,7 @@ export default function OportunidadDetailPage() {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="cursor-help">
-                        <div className="text-4xl font-bold text-slate-900 mb-2">
+                        <div className="text-4xl font-bold text-slate-900 ">
                           {temperaturaNum}
                         </div>
                         <div className={`text-sm font-semibold text-white p-2 rounded-lg text-center ${temperaturaColor
@@ -1969,16 +1270,9 @@ export default function OportunidadDetailPage() {
                       />
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-
-              {/* ACCIONES */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Acciones</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex gap-2">
+                  {canViewAll && (
+                <div>
+                  <div className="flex gap-2 hidden">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
@@ -2010,7 +1304,71 @@ export default function OportunidadDetailPage() {
                     </Tooltip>
                   </div>
 
+                  {/* ✅ NUEVO BOTÓN: DEVOLVER AL INICIO */}
                   <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        onClick={async () => {
+                          const etapaNuevo = etapas.find((e) => e.nombre === "Nuevo");
+                          if (etapaNuevo) {
+                            setSaving(true);
+                            try {
+                              // ✅ Cambiar etapa
+                              setEtapaActual(etapaNuevo.id);
+                              setFormData((prev) => ({ ...prev, detalle: "" }));
+
+                              // ✅ Guardar automáticamente
+                              if (!userId) {
+                                toast.error("Usuario no identificado");
+                                setSaving(false);
+                                return;
+                              }
+
+                              const response = await fetch(`/api/oportunidades-oportunidades/${oportunidadId}`, {
+                                method: "PUT",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  ...formData,
+                                  etapasconversion_id: etapaNuevo.id,
+                                  etapa_name: "Nuevo",
+                                }),
+                              });
+
+                              if (response.ok) {
+                                toast.success("Oportunidad devuelta a 'Nuevo' y guardada");
+                              } else {
+                                toast.error("Error al guardar");
+                              }
+                            } catch (error) {
+                              console.error("Error:", error);
+                              toast.error("Error al devolver al inicio");
+                            } finally {
+                              setSaving(false);
+                            }
+                          }
+                        }}
+                        disabled={saving}
+                        variant="outline"
+                        className="w-full gap-2 border-orange-300 text-orange-600 hover:bg-orange-50 disabled:opacity-50"
+                      >
+                        {saving ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Devolviendo...
+                          </>
+                        ) : (
+                          <>
+                            <ChevronRight className="h-4 w-4" />
+                            Devolver al Inicio
+                          </>
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">Devolver la oportunidad a la etapa Nuevo y guardar automáticamente</TooltipContent>
+                  </Tooltip>
+
+                  <div className="hidden">
+                    <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
                         onClick={handleGuardar}
@@ -2045,9 +1403,613 @@ export default function OportunidadDetailPage() {
                     </TooltipTrigger>
                     <TooltipContent side="top">Volver atrás sin guardar</TooltipContent>
                   </Tooltip>
+                  </div>
+                </div>
+            )}
                 </CardContent>
               </Card>
+
             </div>
+            {/* INFORMACIÓN GENERAL */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Información General</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-xs text-slate-600 font-semibold uppercase">Cliente</p>
+                    <p className="text-slate-900 font-medium">{oportunidad.cliente_nombre}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 font-semibold uppercase">Código</p>
+                    <p className="text-slate-900 font-mono font-medium">{oportunidad.oportunidad_id}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 font-semibold uppercase">Origen</p>
+                    <p className="text-slate-900">{oportunidad.origen_nombre}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 font-semibold uppercase">Suborigen</p>
+                    <p className="text-slate-900">{oportunidad.suborigen_nombre}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 font-semibold uppercase">Asignado a</p>
+                    <p className="text-slate-900">{oportunidad.asignado_a_nombre || "Sin asignar"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 font-semibold uppercase">Correo</p>
+                    <p className="text-slate-900">{oportunidad.cliente_email || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 font-semibold uppercase">Teléfono</p>
+                    <p className="text-slate-900">{oportunidad.cliente_telefono || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 font-semibold uppercase">Celular</p>
+                    <p className="text-slate-900">{oportunidad.celular || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-600 font-semibold uppercase">DNI</p>
+                    <p className="text-slate-900">{oportunidad.cliente_dni || "-"}</p>
+                  </div>
+                </div>
+                
+              </CardContent>
+            </Card>
+
+
+            {/* DETALLES DE AGENDA */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Calendar size={18} />
+                  Detalles de Agenda
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {detalles.length === 0 ? (
+                  <p className="text-slate-500 text-sm py-4">Sin detalles de agenda</p>
+                ) : (
+                  <div className="space-y-3">
+                    {detalles.map((detalle) => (
+                      <div
+                        key={detalle.id}
+                        className="flex items-start justify-between p-3 bg-blue-50 rounded-lg border border-blue-200 hover:border-blue-300 transition-colors"
+                      >
+                        <div>
+                          <p className="font-medium text-slate-900">
+                            📅 {new Date(detalle.fecha_agenda).toLocaleDateString("es-ES")}
+                          </p>
+                          <p className="text-sm text-slate-700 mt-1">
+                            🕐 {String(detalle.hora_agenda).substring(0, 5)}
+                          </p>
+                          <p className="text-xs text-slate-600 mt-1">
+                            {new Date(detalle.created_at).toLocaleString("es-ES")}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            {/* REGISTRAR ACTIVIDAD Y HISTORIAL */}
+            <div className="md:col-span-2 space-y-4 pt-6 border-t-2 border-slate-200">
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 space-y-3 border border-blue-200">
+                <div className="flex items-center gap-2">
+                  <MessageSquare size={18} className="text-blue-600" />
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Registrar nueva actividad
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="hidden">
+                    <label className="text-sm font-medium text-slate-700 block mb-2">
+                      Etapa donde registrar (opcional)
+                    </label>
+                    <Select
+                      value={etapaProxima}
+                      onValueChange={setEtapaProxima}
+                      disabled={guardandoActividad}
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Seleccionar etapa" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sin-cambio">
+                          Etapa actual
+                        </SelectItem>
+                        {etapas.map((item) => (
+                          <SelectItem key={item.id} value={String(item.id)}>
+                            {getLabel(item)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-slate-700 block mb-2">
+                    Detalle *
+                  </label>
+                  <textarea
+                    className="w-full h-20 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
+                    value={detalleAccion}
+                    onChange={(e) => setDetalleAccion(e.target.value)}
+                    placeholder="Describe qué acción se realizó, qué se comentó, etc."
+                    disabled={guardandoActividad}
+                  />
+                </div>
+
+                <Button
+                  onClick={handleGuardarActividad}
+                  disabled={guardandoActividad || !detalleAccion.trim()}
+                  className="w-full bg-blue-600 hover:bg-blue-700"
+                  size="sm"
+                >
+                  {guardandoActividad
+                    ? "Guardando..."
+                    : "Guardar actividad"}
+                </Button>
+              </div>
+
+              {/* HISTORIAL */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <History size={18} className="text-slate-600" />
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Historial ({actividades.length})
+                  </h3>
+                </div>
+
+                {loadingActividades ? (
+                  <div className="text-center text-muted-foreground text-sm py-4 bg-slate-50 rounded">
+                    Cargando...
+                  </div>
+                ) : actividades.length === 0 ? (
+                  <div className="text-center text-muted-foreground text-sm py-4 bg-slate-50 rounded border border-dashed border-slate-300">
+                    No hay actividades
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2">
+                    {actividades.map((actividad) => {
+                      const etapaActividad = actividad.etapasconversion_id
+                        ? etapas.find(
+                          (e) => e.id === actividad.etapasconversion_id
+                        )
+                        : null;
+
+                      return (
+                        <Tooltip key={actividad.id}>
+                          <TooltipTrigger asChild>
+                            <div
+                              className="border border-slate-200 rounded p-3 bg-white text-xs space-y-2 hover:shadow-md hover:border-blue-300 transition-all cursor-help"
+                            >
+                              <p className="text-slate-700 line-clamp-2 leading-relaxed">
+                                {actividad.detalle}
+                              </p>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="max-w-xs">
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-start gap-2">
+                                <div>
+                                  <p className="font-semibold text-white">
+                                    {actividad.created_by_name ||
+                                      `ID ${actividad.created_by}`}
+                                  </p>
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                  <p className="text-gray-300 text-xs">
+                                    {format(
+                                      new Date(actividad.created_at),
+                                      "dd/MM HH:mm",
+                                      { locale: es }
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+
+
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+            {/* VEHÍCULOS DE INTERÉS */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-lg">Vehículos de Interés</CardTitle>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button onClick={openCreateVehiculo} size="sm" className="gap-2">
+                      <Plus className="h-4 w-4" /> Agregar
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Agregar vehículo de interés</TooltipContent>
+                </Tooltip>
+              </CardHeader>
+              <CardContent>
+                {vehiculosInteres.length === 0 ? (
+                  <p className="text-slate-500 text-sm py-4">Sin vehículos de interés</p>
+                ) : (
+                  <div className="space-y-2">
+                    {vehiculosInteres.map((vehiculo) => (
+                      <div
+                        key={vehiculo.id}
+                        className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors"
+                      >
+                        <div>
+                          <p className="font-medium text-slate-900">
+                            {vehiculo.marca || "Sin marca"} {vehiculo.modelo || ""}
+                          </p>
+                          <p className="text-xs text-slate-600">
+                            {vehiculo.anio_interes || "Sin año"}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={() => openCotizacionVehiculo(vehiculo)}
+                                className="h-8 w-8"
+                              >
+                                <ShoppingCart size={14} />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Crear cotización</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={() => openEditVehiculo(vehiculo)}
+                                className="h-8 w-8"
+                              >
+                                <Pencil size={14} />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Editar</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="destructive"
+                                onClick={() => openDeleteVehiculo(vehiculo)}
+                                className="h-8 w-8"
+                              >
+                                <Trash2 size={14} />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Eliminar</TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* COTIZACIONES */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <FileText size={18} />
+                  Cotizaciones
+                </CardTitle>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button onClick={openCreateCotizacion} size="sm" className="gap-2">
+                      <Plus className="h-4 w-4" /> Agregar
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Crear nueva cotización</TooltipContent>
+                </Tooltip>
+              </CardHeader>
+              <CardContent>
+                <CotizacionesTable
+                  cotizaciones={cotizaciones}
+                  sortConfig={{ key: "id", direction: "asc" }}
+                  onSort={() => { }}
+                  onEdit={openEditCotizacion}
+                  onDelete={openDeleteCotizacion}
+                  onChangeStatus={async (cot, estado) => {
+                    const res = await fetch(`/api/cotizacionesagenda/${cot.id}`, {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        sku: cot.sku,
+                        color_externo: cot.color_externo,
+                        color_interno: cot.color_interno,
+                        version_id: cot.version_id,
+                        anio: cot.anio,
+                        marca_id: cot.marca_id,
+                        modelo_id: cot.modelo_id,
+                        estado,
+                      }),
+                    });
+                    if (res.ok) {
+                      toast.success(`Estado cambiado a ${estado}`);
+                      if (estado === "enviada") {
+                        await cambiarEtapa(6, "Cotización enviada");
+                      }
+                      await cargarCotizaciones(oportunidadId);
+                    }
+                  }}
+                  onDuplicate={async (cot) => {
+                    const res = await fetch("/api/cotizacionesagenda", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        oportunidad_id: cot.oportunidad_id,
+                        marca_id: cot.marca_id,
+                        modelo_id: cot.modelo_id,
+                        version_id: cot.version_id,
+                        anio: cot.anio,
+                        sku: cot.sku,
+                        color_externo: cot.color_externo,
+                        color_interno: cot.color_interno,
+                        estado: "borrador",
+                        created_by: userId,
+                      }),
+                    });
+                    if (res.ok) {
+                      toast.success("Cotización duplicada");
+                      await cargarCotizaciones(oportunidadId);
+                    }
+                  }}
+                  onLoadHistorial={() => { }}
+                  saving={false}
+                  userId={userId}
+                  onOpenHistorialDialog={(historialData) => {
+                    setSelectedHistorial(historialData);
+                    setHistorialDialog(true);
+                  }}
+                  onAddAccesorios={(cot) => {
+                    setSelectedCotizacionForAccesorios(cot);
+                    setDialogAccesoriosOpen(true);
+                  }}
+                  onPreview={(cot) => {
+                    setSelectedCotizacionPreview(cot);
+                    setPreviewCotizacionOpen(true);
+                  }}
+                />
+              </CardContent>
+            </Card>
+
+            {/* TEST DRIVES */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Calendar size={18} />
+                  Test Drive
+                </CardTitle>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button onClick={openCreateTestDrive} size="sm" className="gap-2">
+                      <Plus className="h-4 w-4" /> Agregar
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Programar nuevo test drive</TooltipContent>
+                </Tooltip>
+              </CardHeader>
+              <CardContent>
+                {testDrives.length === 0 ? (
+                  <p className="text-slate-500 text-sm py-4">Sin test drives registrados</p>
+                ) : (
+                  <div className="space-y-2">
+                    {testDrives.map((testDrive) => (
+                      <div
+                        key={testDrive.id}
+                        className="flex items-start justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"
+                      >
+                        <div className="flex-1">
+                          <p className="font-medium text-slate-900">
+                            {new Date(testDrive.fecha_testdrive).toLocaleDateString("es-ES")} a las {testDrive.hora_inicio}
+                          </p>
+                          <p className="text-xs text-slate-600 mt-1">
+                            {testDrive.placa && `Placa: ${testDrive.placa}`}
+                            {testDrive.vin && ` • VIN: ${testDrive.vin}`}
+                          </p>
+                          {testDrive.descripcion && (
+                            <p className="text-xs text-slate-700 mt-1">{testDrive.descripcion}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs px-2 py-1 rounded-full font-semibold ${testDrive.estado === 'realizado' ? 'bg-green-100 text-green-700' :
+                            testDrive.estado === 'cancelado' ? 'bg-red-100 text-red-700' :
+                              'bg-blue-100 text-blue-700'
+                            }`}>
+                            {testDrive.estado}
+                          </span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={() => openEditTestDrive(testDrive)}
+                                className="h-8 w-8"
+                              >
+                                <Pencil size={14} />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Editar</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="destructive"
+                                onClick={() => {
+                                  setDeleteTestDriveTarget(testDrive);
+                                  setDeleteTestDriveDialog(true);
+                                }}
+                                className="h-8 w-8"
+                              >
+                                <Trash2 size={14} />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Eliminar</TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* RESERVAS */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <FileText size={18} />
+                  Reservas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {reservas.length === 0 ? (
+                  <p className="text-slate-500 text-sm py-4">Sin reservas registradas</p>
+                ) : (
+                  <div className="space-y-2">
+                    {reservas.map((reserva) => (
+                      <div
+                        key={reserva.id}
+                        className="flex items-start justify-between p-3 bg-green-50 rounded-lg border border-green-200"
+                      >
+                        <div>
+                          <p className="font-medium text-green-900">
+                            Reserva creada el {new Date(reserva.created_at).toLocaleDateString("es-ES")}
+                          </p>
+                          <p className="text-xs text-green-700 mt-1">
+                            ID: {reserva.id}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={() => router.push(`/reservas/${reserva.id}`)}
+                                className="h-8 w-8 border-green-300 hover:bg-green-100"
+                              >
+                                <Eye size={14} className="text-green-600" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Ver detalles</TooltipContent>
+                          </Tooltip>
+
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="destructive"
+                                onClick={() => {
+                                  setDeleteReservaTarget(reserva);
+                                  setDeleteReservaDialog(true);
+                                }}
+                                className="h-8 w-8"
+                              >
+                                <Trash2 size={14} />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Eliminar</TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* CIERRES */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Lock size={18} />
+                  Cierres
+                </CardTitle>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button onClick={openCreateCierre} size="sm" className="gap-2">
+                      <Plus className="h-4 w-4" /> Agregar
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Registrar cierre de oportunidad</TooltipContent>
+                </Tooltip>
+              </CardHeader>
+              <CardContent>
+                {cierres.length === 0 ? (
+                  <p className="text-slate-500 text-sm py-4">Sin cierres registrados</p>
+                ) : (
+                  <div className="space-y-2">
+                    {cierres.map((cierre) => (
+                      <div
+                        key={cierre.id}
+                        className="flex items-start justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"
+                      >
+                        <div className="flex-1">
+                          <p className="text-xs font-semibold text-slate-600 uppercase mb-1">
+                            {new Date(cierre.created_at).toLocaleString("es-ES")}
+                          </p>
+                          <p className="text-sm text-slate-900">{cierre.detalle}</p>
+                          {cierre.cierre_detalle_nombre && (
+                            <p className="text-xs text-slate-600 mt-2 italic border-t border-slate-300 pt-2">
+                              📋 {cierre.cierre_detalle_nombre}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex gap-2 flex-shrink-0">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={() => openEditCierre(cierre)}
+                                className="h-8 w-8"
+                              >
+                                <Pencil size={14} />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Editar</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="destructive"
+                                onClick={() => {
+                                  setDeleteCierreTarget(cierre);
+                                  setDeleteCierreDialog(true);
+                                }}
+                                className="h-8 w-8"
+                              >
+                                <Trash2 size={14} />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Eliminar</TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </div>
 
@@ -2137,7 +2099,7 @@ export default function OportunidadDetailPage() {
                 />
               </div>
 
-              <div>
+              <div className="hidden">
                 <label className="text-sm font-medium text-slate-700 block mb-2">
                   Origen
                 </label>
@@ -2391,7 +2353,7 @@ export default function OportunidadDetailPage() {
           </AlertDialogContent>
         </AlertDialog>
 
-        
+
         {/* CIERRE DIALOG */}
         <Dialog open={dialogCierreOpen} onOpenChange={setDialogCierreOpen}>
           <DialogContent>
@@ -2409,9 +2371,9 @@ export default function OportunidadDetailPage() {
                 <textarea
                   value={cierreFormData.detalle}
                   onChange={(e) =>
-                    setCierreFormData((prev) => ({ 
+                    setCierreFormData((prev) => ({
                       ...prev,
-                      detalle: e.target.value 
+                      detalle: e.target.value
                     }))
                   }
                   placeholder="Describe el motivo del cierre"

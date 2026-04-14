@@ -1,3 +1,4 @@
+// api/clientes/route.ts
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
@@ -13,19 +14,27 @@ export async function GET(req) {
       `
       SELECT
         c.*,
+        d.nombre AS departamento_nombre,
+        p.nombre AS provincia_nombre,
+        dist.nombre AS distrito_nombre,
         (SELECT COUNT(*) FROM vehiculos v WHERE v.cliente_id = c.id) AS vehiculos_count
       FROM clientes c
+      LEFT JOIN departamentos d ON d.id = c.departamento_id
+      LEFT JOIN provincias p ON p.id = c.provincia_id
+      LEFT JOIN distritos dist ON dist.id = c.distrito_id
       WHERE (? = "" OR
         c.nombre LIKE ? OR
         c.apellido LIKE ? OR
         c.email LIKE ? OR
         c.celular LIKE ? OR
         c.identificacion_fiscal LIKE ? OR
-        c.nombre_comercial LIKE ?
+        c.nombre_comercial LIKE ? OR
+        c.ocupacion LIKE ? OR
+        c.domicilio LIKE ?
       )
       ORDER BY c.id DESC
       `,
-      [q, like, like, like, like, like, like]
+      [q, like, like, like, like, like, like, like, like]
     );
 
     return NextResponse.json(rows);
@@ -44,15 +53,25 @@ export async function POST(req) {
     const apellido = (body.apellido || "").trim();
     const email = (body.email || "").trim();
     const celular = (body.celular || "").trim();
-    const tipo_identificacion = body.tipo_identificacion || null; // 'DNI' | 'RUC'
+    const tipo_identificacion = body.tipo_identificacion || null;
     const identificacion_fiscal = (body.identificacion_fiscal || "").trim();
     const nombre_comercial = (body.nombre_comercial || "").trim();
+    
+    // ✅ NUEVOS CAMPOS
+    const fecha_nacimiento = body.fecha_nacimiento || null;
+    const ocupacion = (body.ocupacion || "").trim() || null;
+    const domicilio = (body.domicilio || "").trim() || null;
+    const departamento_id = body.departamento_id || null;
+    const provincia_id = body.provincia_id || null;
+    const distrito_id = body.distrito_id || null;
+    const nombreconyugue = (body.nombreconyugue || "").trim() || null;
+    const dniconyugue = (body.dniconyugue || "").trim() || null;
 
     if (!nombre) {
       return NextResponse.json({ message: "Nombre requerido" }, { status: 400 });
     }
 
-    if (tipo_identificacion && !["DNI", "RUC"].includes(tipo_identificacion)) {
+    if (tipo_identificacion && !["DNI", "RUC", "PASAPORTE"].includes(tipo_identificacion)) {
       return NextResponse.json({ message: "tipo_identificacion inválido" }, { status: 400 });
     }
 
@@ -103,7 +122,7 @@ export async function POST(req) {
 
       return NextResponse.json(
         { message: mensaje, field: fieldName },
-        { status: 409 } // Conflict
+        { status: 409 }
       );
     }
 
@@ -112,8 +131,11 @@ export async function POST(req) {
       INSERT INTO clientes(
         nombre, apellido, email, celular,
         tipo_identificacion, identificacion_fiscal, nombre_comercial,
+        fecha_nacimiento, ocupacion, domicilio,
+        departamento_id, provincia_id, distrito_id,
+        nombreconyugue, dniconyugue,
         created_at
-      ) VALUES (?,?,?,?,?,?,?, CURRENT_DATE)
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, CURRENT_DATE)
       `,
       [
         nombre,
@@ -123,10 +145,21 @@ export async function POST(req) {
         tipo_identificacion,
         identificacion_fiscal || null,
         nombre_comercial || null,
+        fecha_nacimiento,
+        ocupacion,
+        domicilio,
+        departamento_id,
+        provincia_id,
+        distrito_id,
+        nombreconyugue,
+        dniconyugue,
       ]
     );
 
-    return NextResponse.json({ message: "Cliente creado", id: result.insertId }, { status: 201 });
+    return NextResponse.json(
+      { message: "Cliente creado", id: result.insertId },
+      { status: 201 }
+    );
   } catch (e) {
     console.log(e);
     return NextResponse.json({ message: "Error" }, { status: 500 });

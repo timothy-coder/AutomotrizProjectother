@@ -72,19 +72,19 @@ function getLabel(item) {
   if (item?.nombre && item?.apellido) return `${item.nombre} ${item.apellido}`;
   if (item?.nombre) return item.nombre;
   if (item?.celular) return item.celular;
-  
+
   // Para usuarios
   if (item?.fullname) return item.fullname;
   if (item?.username) return item.username;
-  
+
   // Para orígenes y otros
   if (item?.name) return item.name;
-  
+
   // Fallback
   if (item?.full_name) return item.full_name;
   if (item?.razon_social) return item.razon_social;
   if (item?.description) return item.description;
-  
+
   return `ID ${item?.id}`;
 }
 
@@ -152,7 +152,7 @@ function Combobox({
   // Filtrar items por nombre/label
   const filteredItems = useMemo(() => {
     if (!searchValue.trim()) return items;
-    
+
     const lowerSearch = searchValue.toLowerCase();
     return items.filter((item) => {
       const label = getLabel(item).toLowerCase();
@@ -483,7 +483,7 @@ export default function OportunidadDialog({
           etapasconversion_id: String(etapaAsignado.id),
         }));
         setMostrarDetallesAlAsignar(true);
-        toast.info("Etapa cambiada a 'Asignado'. Agrega detalles y actividades.");
+        toast.info("Etapa cambiada a 'Asignado'. Agrega la agenda.");
       }
     } else if (form.asignado_a === "sin-asignar") {
       setMostrarDetallesAlAsignar(false);
@@ -833,14 +833,10 @@ export default function OportunidadDialog({
       return;
     }
 
-    // Si hay usuario asignado, requiere detalles Y actividades
+    // ✅ CAMBIO: Si hay usuario asignado, SIEMPRE requiere detalles (agenda)
     if (form.asignado_a && form.asignado_a !== "sin-asignar") {
       if (detallesLocales.length === 0) {
         toast.error("Debes agregar un detalle de agenda");
-        return;
-      }
-      if (actividadesLocales.length === 0) {
-        toast.error("Debes agregar al menos una actividad");
         return;
       }
     }
@@ -854,7 +850,7 @@ export default function OportunidadDialog({
       if (oportunidadActiva) {
         const numeroOportunidad =
           oportunidadActiva.oportunidad_id || `OPO-${oportunidadActiva.id}`;
-        
+
         toast.error(
           `No se puede crear una nueva oportunidad. Ya existe una oportunidad activa para este cliente: ${numeroOportunidad}`
         );
@@ -889,7 +885,7 @@ export default function OportunidadDialog({
       const numeroOportunidadNueva =
         data.oportunidad_id || `OPO-${oportunidadId}`;
 
-      // Guardar detalles
+      // ✅ Guardar detalles SIEMPRE si hay usuario asignado
       if (form.asignado_a && form.asignado_a !== "sin-asignar" && detallesLocales.length > 0) {
         for (const detalle of detallesLocales) {
           try {
@@ -909,7 +905,7 @@ export default function OportunidadDialog({
         }
       }
 
-      // Guardar actividades
+      // ✅ Las actividades NO son obligatorias
       if (actividadesLocales.length > 0) {
         for (const actividad of actividadesLocales) {
           try {
@@ -1021,11 +1017,14 @@ export default function OportunidadDialog({
   const actividadesAMostrar = isNew ? actividadesLocales : actividades;
   const isCreating = guardandoOportunidad || loading || guardandoDetalle || guardandoActividad;
 
-  // Mostrar detalles si hay usuario asignado o si es view/edit
+  // ✅ CAMBIO: Mostrar detalles si hay usuario asignado o si es view/edit
   const mostrarSeccionDetalles =
     !isNew ||
     (form.asignado_a && form.asignado_a !== "sin-asignar") ||
     mostrarDetallesAlAsignar;
+
+  // ✅ CAMBIO: El botón de guardar solo requiere detalles si hay usuario asignado
+  const puedeGuardar = !isNew || !form.asignado_a || form.asignado_a === "sin-asignar" || detallesAMostrar.length > 0;
 
   return (
     <TooltipProvider>
@@ -1231,7 +1230,7 @@ export default function OportunidadDialog({
                 />
               </div>
 
-              <div className="md:col-span-2">
+              <div className="md:col-span-2 hidden">
                 <div className="flex items-center gap-2 mb-2">
                   <label className="text-sm font-medium text-[#5d16ec]">Detalle</label>
                   <Tooltip>
@@ -1301,34 +1300,197 @@ export default function OportunidadDialog({
                 </div>
               )}
 
+              {/* ACTIVIDADES - MOSTRAR SIEMPRE */}
+              <div className="md:col-span-2 space-y-4 pt-6 border-t-2 border-slate-200">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 space-y-3 border border-blue-200">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare size={18} className="text-blue-600" />
+                    <h3 className="text-sm font-semibold text-slate-900">
+                      Actividades
+                    </h3>
+                  </div>
+
+                  {(isNew || isEdit) && (
+                    <div className="space-y-3">
+                      <div className="hidden">
+                        <label className="text-sm font-medium text-slate-700 block mb-2">
+                          Próxima etapa (opcional)
+                        </label>
+                        <Select
+                          value={actividadForm.etapasconversion_id}
+                          onValueChange={(value) =>
+                            updateActividadField("etapasconversion_id", value)
+                          }
+                          disabled={isCreating}
+                        >
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Seleccionar etapa" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="sin-cambio">
+                              Sin cambio de etapa
+                            </SelectItem>
+                            {etapas.map((item) => (
+                              <SelectItem key={item.id} value={String(item.id)}>
+                                {getLabel(item)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <label className="text-sm font-medium text-slate-700 block mb-2">
+                          Detalle de la actividad
+                        </label>
+                        <textarea
+                          className="w-full h-20 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
+                          value={actividadForm.detalle}
+                          onChange={(e) =>
+                            updateActividadField("detalle", e.target.value)
+                          }
+                          placeholder="Describe qué acción se realizó, qué se comentó, etc."
+                          disabled={isCreating}
+                        />
+                      </div>
+
+                      <Button
+                        onClick={
+                          isNew
+                            ? handleAgregarActividadLocal
+                            : handleGuardarActividad
+                        }
+                        disabled={isCreating}
+                        className="w-full bg-blue-600 hover:bg-blue-700"
+                        size="sm"
+                      >
+                        <Plus size={16} className="mr-1" />
+                        {isNew
+                          ? "Agregar actividad"
+                          : editingActividadLocalId
+                            ? "Actualizar actividad"
+                            : "Crear actividad"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* LISTA DE ACTIVIDADES */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <History size={18} className="text-slate-600" />
+                    <h3 className="text-sm font-semibold text-slate-900">
+                      Actividades ({actividadesAMostrar.length})
+                    </h3>
+                  </div>
+
+                  {loadingActividades ? (
+                    <div className="text-center text-muted-foreground text-sm py-4 bg-slate-50 rounded">
+                      Cargando...
+                    </div>
+                  ) : actividadesAMostrar.length === 0 ? (
+                    <div className="text-center text-muted-foreground text-sm py-4 bg-slate-50 rounded border border-dashed border-slate-300">
+                      No hay actividades
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2">
+                      {actividadesAMostrar.map((actividad) => {
+                        const etapaActividad = actividad.etapasconversion_id
+                          ? etapas.find(
+                            (e) => e.id === actividad.etapasconversion_id
+                          )
+                          : null;
+
+                        return (
+                          <div
+                            key={actividad.id}
+                            className="border border-slate-200 rounded p-3 bg-white text-xs space-y-2 hover:shadow-md hover:border-blue-300 transition-all"
+                          >
+                            <div className="flex justify-between items-start gap-2">
+                              <div className="flex-1">
+                                <p className="font-semibold text-slate-800 line-clamp-2">
+                                  {actividad.detalle}
+                                </p>
+                              </div>
+                              {(isNew || isEdit) && (
+                                <div className="flex gap-1 flex-shrink-0">
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        onClick={() =>
+                                          isNew
+                                            ? handleEditarActividadLocal(
+                                              actividad
+                                            )
+                                            : undefined
+                                        }
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-8 w-8 p-0"
+                                        disabled={isCreating || isEdit}
+                                      >
+                                        <Edit2 className="h-3 w-3" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="left">
+                                      Editar
+                                    </TooltipContent>
+                                  </Tooltip>
+
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        onClick={() =>
+                                          isNew
+                                            ? handleEliminarActividadLocal(
+                                              actividad.id
+                                            )
+                                            : undefined
+                                        }
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                        disabled={isCreating || isEdit}
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="left">
+                                      Eliminar
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
+                              )}
+                            </div>
+
+                            {etapaActividad && (
+                              <div>
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 rounded-full text-xs font-semibold border border-blue-200">
+                                  {getLabel(etapaActividad)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* DETALLES DE AGENDA - MOSTRAR SIEMPRE */}
               <div className="md:col-span-2 space-y-4 pt-6 border-t-2 border-slate-200">
                 <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 space-y-3 border border-green-200">
                   <div className="flex items-center gap-2">
                     <Calendar size={18} className="text-green-600" />
                     <h3 className="text-sm font-semibold text-slate-900">
-                      Histórico de agendas
+                      Histórico de agendas *
                       {isNew &&
                         form.asignado_a &&
                         form.asignado_a !== "sin-asignar" &&
                         " (Obligatorio)"}
                     </h3>
                   </div>
-
-                  {isNew &&
-                    form.asignado_a &&
-                    form.asignado_a !== "sin-asignar" &&
-                    detallesAMostrar.length === 0 && (
-                      <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
-                        <AlertCircle
-                          size={16}
-                          className="flex-shrink-0 mt-0.5"
-                        />
-                        <p>
-                          Debes agregar un detalle de agenda
-                        </p>
-                      </div>
-                    )}
 
                   {/* LISTA DE DETALLES PRIMERO */}
                   <div className="space-y-3">
@@ -1657,203 +1819,6 @@ export default function OportunidadDialog({
                   )}
                 </div>
               </div>
-
-              {/* ACTIVIDADES - MOSTRAR SIEMPRE */}
-              <div className="md:col-span-2 space-y-4 pt-6 border-t-2 border-slate-200">
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 space-y-3 border border-blue-200">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare size={18} className="text-blue-600" />
-                    <h3 className="text-sm font-semibold text-slate-900">
-                      Actividades
-                      {isNew &&
-                        form.asignado_a &&
-                        form.asignado_a !== "sin-asignar" &&
-                        " (Obligatorio)"}
-                    </h3>
-                  </div>
-
-                  {isNew &&
-                    form.asignado_a &&
-                    form.asignado_a !== "sin-asignar" &&
-                    actividadesAMostrar.length === 0 && (
-                      <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
-                        <AlertCircle
-                          size={16}
-                          className="flex-shrink-0 mt-0.5"
-                        />
-                        <p>
-                          Debes agregar al menos una actividad
-                        </p>
-                      </div>
-                    )}
-
-                  {(isNew || isEdit) && (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-sm font-medium text-slate-700 block mb-2">
-                          Próxima etapa (opcional)
-                        </label>
-                        <Select
-                          value={actividadForm.etapasconversion_id}
-                          onValueChange={(value) =>
-                            updateActividadField("etapasconversion_id", value)
-                          }
-                          disabled={isCreating}
-                        >
-                          <SelectTrigger className="h-9">
-                            <SelectValue placeholder="Seleccionar etapa" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="sin-cambio">
-                              Sin cambio de etapa
-                            </SelectItem>
-                            {etapas.map((item) => (
-                              <SelectItem key={item.id} value={String(item.id)}>
-                                {getLabel(item)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <label className="text-sm font-medium text-slate-700 block mb-2">
-                          Detalle de la actividad *
-                        </label>
-                        <textarea
-                          className="w-full h-20 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
-                          value={actividadForm.detalle}
-                          onChange={(e) =>
-                            updateActividadField("detalle", e.target.value)
-                          }
-                          placeholder="Describe qué acción se realizó, qué se comentó, etc."
-                          disabled={isCreating}
-                        />
-                      </div>
-
-                      <Button
-                        onClick={
-                          isNew
-                            ? handleAgregarActividadLocal
-                            : handleGuardarActividad
-                        }
-                        disabled={isCreating}
-                        className="w-full bg-blue-600 hover:bg-blue-700"
-                        size="sm"
-                      >
-                        <Plus size={16} className="mr-1" />
-                        {isNew
-                          ? "Agregar actividad"
-                          : editingActividadLocalId
-                            ? "Actualizar actividad"
-                            : "Crear actividad"}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                {/* LISTA DE ACTIVIDADES */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <History size={18} className="text-slate-600" />
-                    <h3 className="text-sm font-semibold text-slate-900">
-                      Actividades ({actividadesAMostrar.length})
-                    </h3>
-                  </div>
-
-                  {loadingActividades ? (
-                    <div className="text-center text-muted-foreground text-sm py-4 bg-slate-50 rounded">
-                      Cargando...
-                    </div>
-                  ) : actividadesAMostrar.length === 0 ? (
-                    <div className="text-center text-muted-foreground text-sm py-4 bg-slate-50 rounded border border-dashed border-slate-300">
-                      No hay actividades
-                    </div>
-                  ) : (
-                    <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2">
-                      {actividadesAMostrar.map((actividad) => {
-                        const etapaActividad = actividad.etapasconversion_id
-                          ? etapas.find(
-                            (e) => e.id === actividad.etapasconversion_id
-                          )
-                          : null;
-
-                        return (
-                          <div
-                            key={actividad.id}
-                            className="border border-slate-200 rounded p-3 bg-white text-xs space-y-2 hover:shadow-md hover:border-blue-300 transition-all"
-                          >
-                            <div className="flex justify-between items-start gap-2">
-                              <div className="flex-1">
-                                <p className="font-semibold text-slate-800 line-clamp-2">
-                                  {actividad.detalle}
-                                </p>
-                              </div>
-                              {(isNew || isEdit) && (
-                                <div className="flex gap-1 flex-shrink-0">
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        onClick={() =>
-                                          isNew
-                                            ? handleEditarActividadLocal(
-                                                actividad
-                                              )
-                                            : undefined
-                                        }
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-8 w-8 p-0"
-                                        disabled={isCreating || isEdit}
-                                      >
-                                        <Edit2 className="h-3 w-3" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="left">
-                                      Editar
-                                    </TooltipContent>
-                                  </Tooltip>
-
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        onClick={() =>
-                                          isNew
-                                            ? handleEliminarActividadLocal(
-                                                actividad.id
-                                              )
-                                            : undefined
-                                        }
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                        disabled={isCreating || isEdit}
-                                      >
-                                        <Trash2 className="h-3 w-3" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="left">
-                                      Eliminar
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </div>
-                              )}
-                            </div>
-
-                            {etapaActividad && (
-                              <div>
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 rounded-full text-xs font-semibold border border-blue-200">
-                                  {getLabel(etapaActividad)}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
             </div>
           </div>
 
@@ -1871,13 +1836,10 @@ export default function OportunidadDialog({
             {(isNew || isEdit) && (
               <Button
                 onClick={handleSave}
+                // ✅ CAMBIO: Requiere agenda si hay usuario asignado
                 disabled={
                   isCreating ||
-                  (isNew &&
-                    form.asignado_a &&
-                    form.asignado_a !== "sin-asignar" &&
-                    (detallesAMostrar.length === 0 ||
-                      actividadesAMostrar.length === 0))
+                  (isNew && form.asignado_a && form.asignado_a !== "sin-asignar" && detallesLocales.length === 0)
                 }
                 className="gap-2 bg-blue-600 hover:bg-blue-700"
               >

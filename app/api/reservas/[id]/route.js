@@ -20,6 +20,7 @@ export async function GET(request, { params }) {
         r.created_by,
         r.created_at,
         r.updated_at,
+        r.estado,
         u.fullname as created_by_name,
         oo.oportunidad_id as oportunidad_codigo,
         oo.cliente_id,
@@ -45,53 +46,61 @@ export async function GET(request, { params }) {
 
     const reserva = rows[0];
     const oportunidadId = reserva.oportunidad_id;
+    const clienteId = reserva.cliente_id;
 
     // ✅ Obtener detalles completos de la reserva CON LOS IDs
     const [detalles] = await db.query(`
       SELECT 
         -- IDs principales
         rd.id as detalle_id,
-        rd.departamento_id,
-        rd.provincia_id,
-        rd.distrito_id,
+        oo.cliente_id,
+        c.departamento_id,
+        c.provincia_id,
+        c.distrito_id,
         -- Datos del Comprobante y Cliente
         rd.tipo_comprobante,
         c.identificacion_fiscal,
         c.nombre_comercial,
-        rd.fecha_nacimiento,
-        rd.ocupacion,
-        rd.domicilio,
+        c.fecha_nacimiento,
+        c.ocupacion,
+        c.domicilio,
         d.nombre as departamento_nombre,
         p.nombre as provincia_nombre,
         di.nombre as distrito_nombre,
         c.email,
         c.celular,
         -- Datos del Cónyuge
-        rd.nombreconyugue,
-        rd.dniconyugue,
+        c.nombreconyugue,
+        c.dniconyugue,
         -- Datos de Oportunidad
         oo.oportunidad_id,
         -- Datos del Vehículo
+        m.id as marca_id,
         m.name as marca_nombre,
+        mo.id as modelo_id,
         mo.name as modelo_nombre,
+        cl.id as clase_id,
         cl.name as clase_nombre,
+        v.id as version_id,
         v.nombre as version_nombre,
         -- Datos Técnicos
         rd.vin,
+        rd.vin_existe,
         rd.usovehiculo,
         ca.anio,
         ca.color_externo,
         ca.color_interno,
         prv.precio_base,
         rd.numero_motor,
-        -- Descuentos y Montos
-        rd.dsctocredinissan,
+        -- ✅ NUEVOS DESCUENTOS
         rd.dsctotienda,
+        rd.dsctotiendaporcentaje,
         rd.dsctobonoretoma,
         rd.dsctonper,
         rd.cantidad,
         rd.precio_unitario,
         rd.flete,
+        rd.cuota_inicial,
         rd.tarjetaplaca,
         rd.glp,
         rd.tc_referencial,
@@ -106,9 +115,9 @@ export async function GET(request, { params }) {
       JOIN cotizacionesagenda ca ON ca.id = rd.cotizacion_id
       JOIN marcas m ON m.id = ca.marca_id
       JOIN modelos mo ON ca.modelo_id = mo.id
-      LEFT JOIN departamentos d ON d.id = rd.departamento_id
-      LEFT JOIN provincias p ON p.id = rd.provincia_id
-      LEFT JOIN distritos di ON di.id = rd.distrito_id
+      LEFT JOIN departamentos d ON d.id = c.departamento_id
+      LEFT JOIN provincias p ON p.id = c.provincia_id
+      LEFT JOIN distritos di ON di.id = c.distrito_id
       LEFT JOIN clases cl ON cl.id = mo.clase_id
       LEFT JOIN versiones v ON v.id = ca.version_id
       LEFT JOIN precios_region_version prv ON prv.marca_id = m.id 
@@ -142,15 +151,190 @@ export async function GET(request, { params }) {
       ORDER BY ca.created_at DESC
     `, [oportunidadId]);
 
+    // ✅ Construir respuesta completa
+    const detallesFinal = detalles.length > 0 ? detalles[0] : null;
+
     return NextResponse.json({
       ...reserva,
-      detalles: detalles.length > 0 ? detalles[0] : null,
+      cliente_id: clienteId,
+      detalles: detallesFinal ? {
+        ...detallesFinal,
+        cliente_id: clienteId,
+      } : null,
       cotizaciones: cotizaciones || [],
     });
   } catch (e) {
     console.log(e);
     return NextResponse.json(
       { message: "Error: " + e.message },
+      { status: 500 }
+    );
+  }
+}
+
+// ✅ PUT - Actualizar reserva_detalles
+export async function PUT(request, { params }) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+
+    if (!id || isNaN(id)) {
+      return NextResponse.json(
+        { message: "ID inválido" },
+        { status: 400 }
+      );
+    }
+
+    // ✅ Verificar que la reserva existe
+    const [checkReserva] = await db.query(
+      `SELECT id FROM reservas WHERE id = ?`,
+      [id]
+    );
+
+    if (checkReserva.length === 0) {
+      return NextResponse.json(
+        { message: "Reserva no encontrada" },
+        { status: 404 }
+      );
+    }
+
+    // ✅ Obtener el detalle_id
+    const [detalleCheck] = await db.query(
+      `SELECT id FROM reserva_detalles WHERE reserva_id = ? LIMIT 1`,
+      [id]
+    );
+
+    if (detalleCheck.length === 0) {
+      return NextResponse.json(
+        { message: "No hay detalle para esta reserva" },
+        { status: 404 }
+      );
+    }
+
+    const detalleId = detalleCheck[0].id;
+
+    // ✅ Campos permitidos para actualizar
+    const camposPermitidos = [
+      "tipo_comprobante",
+      "numero_motor",
+      "tc_referencial",
+      "total",
+      "vin",
+      "vin_existe",
+      "usovehiculo",
+      "placa",
+      "dsctotienda",
+      "dsctotiendaporcentaje",
+      "dsctobonoretoma",
+      "dsctonper",
+      "glp",
+      "tarjetaplaca",
+      "flete",
+      "cuota_inicial",
+      "cantidad",
+      "precio_unitario",
+      "descripcion",
+    ];
+
+    // ✅ Construir objeto de actualización
+    const datosActualizacion = {};
+    camposPermitidos.forEach((campo) => {
+      if (campo in body) {
+        // ✅ Manejo especial para vin_existe (booleano)
+        if (campo === "vin_existe") {
+          datosActualizacion[campo] = body[campo] === true || body[campo] === "true" || body[campo] === 1 ? 1 : 0;
+        } else {
+          datosActualizacion[campo] = body[campo] === "" ? null : body[campo];
+        }
+      }
+    });
+
+    if (Object.keys(datosActualizacion).length === 0) {
+      return NextResponse.json(
+        { message: "No hay campos para actualizar" },
+        { status: 400 }
+      );
+    }
+
+    // ✅ Construir query dinámicamente
+    const campos = Object.keys(datosActualizacion);
+    const valores = Object.values(datosActualizacion);
+    const setClause = campos.map((c) => `${c} = ?`).join(", ");
+
+    const [result] = await db.query(
+      `UPDATE reserva_detalles SET ${setClause}, updated_at = NOW() WHERE id = ?`,
+      [...valores, detalleId]
+    );
+
+    if (result.affectedRows === 0) {
+      return NextResponse.json(
+        { message: "No se pudo actualizar el detalle" },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({
+      message: "Detalle actualizado correctamente",
+      id: parseInt(id),
+      detalle_id: detalleId,
+      campos_actualizados: campos,
+    });
+  } catch (e) {
+    console.log(e);
+    return NextResponse.json(
+      { message: "Error: " + e.message },
+      { status: 500 }
+    );
+  }
+}
+
+// ✅ DELETE - Soft delete
+export async function DELETE(request, { params }) {
+  try {
+    const { id } = await params;
+
+    if (!id || isNaN(id)) {
+      return NextResponse.json(
+        { message: "ID inv��lido" },
+        { status: 400 }
+      );
+    }
+
+    // ✅ Verificar que la reserva existe
+    const [checkReserva] = await db.query(
+      `SELECT id, estado FROM reservas WHERE id = ?`,
+      [id]
+    );
+
+    if (checkReserva.length === 0) {
+      return NextResponse.json(
+        { message: "Reserva no encontrada" },
+        { status: 404 }
+      );
+    }
+
+    // ✅ SOFT DELETE: Cambiar estado a 'cancelada'
+    const [result] = await db.query(
+      `UPDATE reservas SET estado = 'cancelada', updated_at = NOW() WHERE id = ?`,
+      [id]
+    );
+
+    if (result.affectedRows === 0) {
+      return NextResponse.json(
+        { message: "No se pudo cancelar la reserva" },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({
+      message: "Reserva cancelada correctamente",
+      id: parseInt(id),
+      estado: "cancelada",
+    });
+  } catch (e) {
+    console.log(e);
+    return NextResponse.json(
+      { message: "Error al cancelar: " + e.message },
       { status: 500 }
     );
   }

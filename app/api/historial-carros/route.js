@@ -25,6 +25,7 @@ export async function GET(request) {
         v.nombre as version_nombre,
         hc.numerofactura,
         hc.preciocompra,
+        hc.precioventa,
         hc.created_at,
         hc.created_at_facturacion,
         hc.created_at_entrega,
@@ -120,9 +121,9 @@ export async function POST(request) {
     /* =========================
        VALIDACIONES
     =========================*/
-    if (!vin || vin.length !== 17) {
+    if (!vin ) {
       return NextResponse.json(
-        { message: "VIN inválido. Debe tener 17 caracteres" },
+        { message: "VIN inválido" },
         { status: 400 }
       );
     }
@@ -160,12 +161,6 @@ export async function POST(request) {
       [marcaId, modeloId, versionId]
     );
 
-    if (duplicateCombo.length > 0) {
-      return NextResponse.json(
-        { message: "Ya existe un carro con esta combinación de marca, modelo y versión" },
-        { status: 409 }
-      );
-    }
 
     /* =========================
        INSERT HISTORIAL

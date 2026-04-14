@@ -1,3 +1,5 @@
+// app/(cotizacion-publica)/cotizacion-publica/[token]/page.jsx
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -34,12 +36,76 @@ export default function CotizacionPublicaPage({ params: paramsPromise }) {
   const params = use(paramsPromise);
 
   const [cotizacion, setCotizacion] = useState(null);
+  const [oportunidad, setOportunidad] = useState(null);
   const [accesorios, setAccesorios] = useState([]);
+  const [regalos, setRegalos] = useState([]);
   const [precioVersion, setPrecioVersion] = useState(null);
   const [especificaciones, setEspecificaciones] = useState([]);
   const [historial, setHistorial] = useState(null);
   const [loading, setLoading] = useState(true);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [igvRate, setIgvRate] = useState(0.18);
+  
+  const [marcaNombre, setMarcaNombre] = useState("");
+  const [modeloNombre, setModeloNombre] = useState("");
+
+  // ✅ Función auxiliar para obtener nombre de marca
+  const cargarMarca = async (marcaId) => {
+    try {
+      const resMarcas = await fetch("/api/marcas", { cache: "no-store" });
+      if (resMarcas.ok) {
+        const marcas = await resMarcas.json();
+        
+        let marcasArray = [];
+        if (Array.isArray(marcas)) {
+          marcasArray = marcas;
+        } else if (marcas.data && Array.isArray(marcas.data)) {
+          marcasArray = marcas.data;
+        }
+
+        const marca = marcasArray.find((m) => Number(m.id) === Number(marcaId));
+
+        if (marca) {
+          setMarcaNombre(marca.name || "");
+          console.log("✅ Marca encontrada:", marca.name);
+          return marca.name;
+        } else {
+          console.warn("❌ Marca no encontrada");
+        }
+      }
+    } catch (error) {
+      console.error("Error cargando marca:", error);
+    }
+  };
+
+  // ✅ Función auxiliar para obtener nombre de modelo
+  const cargarModelo = async (modeloId) => {
+    try {
+      const resModelos = await fetch("/api/modelos", { cache: "no-store" });
+      if (resModelos.ok) {
+        const modelos = await resModelos.json();
+        
+        let modelosArray = [];
+        if (Array.isArray(modelos)) {
+          modelosArray = modelos;
+        } else if (modelos.data && Array.isArray(modelos.data)) {
+          modelosArray = modelos.data;
+        }
+
+        const modelo = modelosArray.find((m) => Number(m.id) === Number(modeloId));
+
+        if (modelo) {
+          setModeloNombre(modelo.name || "");
+          console.log("✅ Modelo encontrado:", modelo.name);
+          return modelo.name;
+        } else {
+          console.warn("❌ Modelo no encontrado");
+        }
+      }
+    } catch (error) {
+      console.error("Error cargando modelo:", error);
+    }
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -58,8 +124,6 @@ export default function CotizacionPublicaPage({ params: paramsPromise }) {
           }
         );
 
-        console.log("Response status:", resCot.status);
-
         if (!resCot.ok) {
           const error = await resCot.text();
           console.error("Error response:", error);
@@ -71,12 +135,39 @@ export default function CotizacionPublicaPage({ params: paramsPromise }) {
 
         console.log("Cotización cargada:", {
           id: dataC.id,
-          marca: dataC.marca_nombre,
-          modelo: dataC.modelo_nombre,
+          marca_id: dataC.marca_id,
+          modelo_id: dataC.modelo_id,
           version_id: dataC.version_id,
         });
 
         setCotizacion(dataC);
+
+        // ✅ CARGAR MARCA Y MODELO EN PARALELO
+        if (dataC.marca_id) {
+          await cargarMarca(dataC.marca_id);
+        }
+
+        if (dataC.modelo_id) {
+          await cargarModelo(dataC.modelo_id);
+        }
+
+        // ✅ CARGAR OPORTUNIDAD
+        if (dataC.oportunidad_id) {
+          try {
+            const resOpo = await fetch(
+              `/api/oportunidades-oportunidades/${dataC.oportunidad_id}`,
+              { cache: "no-store" }
+            );
+
+            if (resOpo.ok) {
+              const opoData = await resOpo.json();
+              setOportunidad(opoData);
+              console.log("Oportunidad cargada:", opoData.cliente_nombre);
+            }
+          } catch (error) {
+            console.error("Error cargando oportunidad:", error);
+          }
+        }
 
         // ✅ CARGAR ACCESORIOS
         if (dataC.id) {
@@ -112,6 +203,40 @@ export default function CotizacionPublicaPage({ params: paramsPromise }) {
           }
         }
 
+        // ✅ CARGAR REGALOS
+        if (dataC.id) {
+          try {
+            const resReg = await fetch(
+              `/api/cotizaciones-regalos/by-cotizacion/${dataC.id}`,
+              { cache: "no-store" }
+            );
+
+            if (resReg.ok) {
+              const dataReg = await resReg.json();
+              const regalosFormateados = Array.isArray(dataReg)
+                ? dataReg.map((reg) => ({
+                    ...reg,
+                    cantidad: Number(reg.cantidad),
+                    precio_unitario: Number(reg.precio_unitario),
+                    subtotal: Number(reg.subtotal),
+                    descuento_porcentaje: reg.descuento_porcentaje
+                      ? Number(reg.descuento_porcentaje)
+                      : 0,
+                    descuento_monto: reg.descuento_monto
+                      ? Number(reg.descuento_monto)
+                      : 0,
+                    total: Number(reg.total),
+                  }))
+                : [];
+
+              setRegalos(regalosFormateados);
+              console.log("Regalos cargados:", regalosFormateados.length);
+            }
+          } catch (error) {
+            console.error("Error cargando regalos:", error);
+          }
+        }
+
         // ✅ CARGAR PRECIO DE VERSION
         if (dataC.marca_id && dataC.modelo_id && dataC.version_id) {
           try {
@@ -125,9 +250,9 @@ export default function CotizacionPublicaPage({ params: paramsPromise }) {
               if (Array.isArray(dataPreciosArray) && dataPreciosArray.length > 0) {
                 const precioEncontrado = dataPreciosArray.find(
                   (p) =>
-                    p.marca_id === dataC.marca_id &&
-                    p.modelo_id === dataC.modelo_id &&
-                    p.version_id === dataC.version_id
+                    Number(p.marca_id) === Number(dataC.marca_id) &&
+                    Number(p.modelo_id) === Number(dataC.modelo_id) &&
+                    Number(p.version_id) === Number(dataC.version_id)
                 );
 
                 if (precioEncontrado) {
@@ -160,6 +285,24 @@ export default function CotizacionPublicaPage({ params: paramsPromise }) {
           } catch (error) {
             console.error("Error cargando especificaciones:", error);
           }
+        }
+
+        // ✅ CARGAR IGV
+        try {
+          const resImpuestos = await fetch("/api/impuestos", {
+            cache: "no-store",
+          });
+          if (resImpuestos.ok) {
+            const impuestos = await resImpuestos.json();
+            if (Array.isArray(impuestos) && impuestos.length > 0) {
+              const igv = impuestos.find((imp) => imp.nombre === "IGV");
+              if (igv) {
+                setIgvRate(parseFloat(igv.porcentaje) / 100);
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error cargando IGV:", error);
         }
 
         // Cargar historial de vistas
@@ -205,13 +348,12 @@ export default function CotizacionPublicaPage({ params: paramsPromise }) {
 
       setGeneratingPdf(true);
 
-      const response = await fetch(
-        `/api/cotizacionesagenda/${cotizacion.id}/pdf`,
-        {
-          method: "GET",
-          cache: "no-store",
-        }
-      );
+      const response = await fetch("/api/cotizaciones-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cotizacion_id: cotizacion.id }),
+        cache: "no-store",
+      });
 
       if (!response.ok) {
         throw new Error("Error generando PDF");
@@ -337,6 +479,65 @@ export default function CotizacionPublicaPage({ params: paramsPromise }) {
     }
   };
 
+  // ✅ CALCULAR TOTALES
+  const calcularTotales = () => {
+    const precioVehiculoConIgv = precioVersion ? parseFloat(precioVersion.precio_base) : 0;
+    const precioVehiculoSinIgv = precioVehiculoConIgv / (1 + igvRate);
+
+    // Descuento vehículo
+    const descuentoVehiculo = cotizacion
+      ? parseFloat(cotizacion.descuento_vehículo) > 0
+        ? parseFloat(cotizacion.descuento_vehículo)
+        : precioVehiculoConIgv * (parseFloat(cotizacion.descuento_vehículo_porcentaje) / 100 || 0)
+      : 0;
+
+    const precioVehiculoConDescuentoConIgv = precioVehiculoConIgv - descuentoVehiculo;
+    const precioVehiculoConDescuentoSinIgv = precioVehiculoConDescuentoConIgv / (1 + igvRate);
+
+    // Accesorios
+    const accesoriosTotalConIgv = accesorios.reduce((sum, a) => sum + parseFloat(a.total || 0), 0);
+    const accesoriosTotalSinIgv = accesoriosTotalConIgv / (1 + igvRate);
+
+    // Regalos
+    const regalosTotalConIgv = regalos.reduce((sum, r) => sum + parseFloat(r.total || 0), 0);
+    const regalosTotalSinIgv = regalosTotalConIgv / (1 + igvRate);
+
+    // Descuentos generales
+    const descuentoAccConIgv = parseFloat(cotizacion?.descuento_total_accesorios || 0);
+    const descuentoRegConIgv = parseFloat(cotizacion?.descuento_total_regalos || 0);
+    const descuentoAccSinIgv = descuentoAccConIgv / (1 + igvRate);
+    const descuentoRegSinIgv = descuentoRegConIgv / (1 + igvRate);
+
+    // Subtotal sin IGV
+    const subtotalSinIgv =
+      precioVehiculoConDescuentoSinIgv +
+      accesoriosTotalSinIgv +
+      regalosTotalSinIgv -
+      descuentoAccSinIgv -
+      descuentoRegSinIgv;
+
+    // IGV total
+    const igvTotal = subtotalSinIgv * igvRate;
+
+    // Gran total
+    const granTotal = subtotalSinIgv + igvTotal;
+
+    return {
+      precioVehiculoConIgv,
+      descuentoVehiculo,
+      precioVehiculoConDescuentoConIgv,
+      accesoriosTotalConIgv,
+      descuentoAccConIgv,
+      regalosTotalConIgv,
+      descuentoRegConIgv,
+      subtotalSinIgv,
+      igvTotal,
+      granTotal,
+    };
+  };
+
+  const totales = calcularTotales();
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100">
@@ -367,35 +568,6 @@ export default function CotizacionPublicaPage({ params: paramsPromise }) {
       </div>
     );
   }
-
-  // ✅ CALCULAR TOTALES POR MONEDA DE ACCESORIOS
-  const agruparAccesoriosPorMoneda = () => {
-    const grupos = {};
-
-    accesorios.forEach((acc) => {
-      const monedaCodigo = acc.moneda_codigo || "SIN_MONEDA";
-
-      if (!grupos[monedaCodigo]) {
-        grupos[monedaCodigo] = {
-          simbolo: acc.moneda_simbolo,
-          codigo: monedaCodigo,
-          subtotal: 0,
-          descuento: 0,
-          total: 0,
-          accesorios: [],
-        };
-      }
-
-      grupos[monedaCodigo].subtotal += acc.subtotal || 0;
-      grupos[monedaCodigo].descuento += acc.descuento_monto || 0;
-      grupos[monedaCodigo].total += acc.total || 0;
-      grupos[monedaCodigo].accesorios.push(acc);
-    });
-
-    return Object.values(grupos);
-  };
-
-  const gruposAccesoriosPorMoneda = agruparAccesoriosPorMoneda();
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -433,7 +605,7 @@ export default function CotizacionPublicaPage({ params: paramsPromise }) {
                       MARCA
                     </p>
                     <p className="text-lg font-bold text-gray-900">
-                      {cotizacion.marca_nombre || "No especificado"}
+                      {marcaNombre || "No especificado"}
                     </p>
                   </div>
 
@@ -442,7 +614,7 @@ export default function CotizacionPublicaPage({ params: paramsPromise }) {
                       MODELO
                     </p>
                     <p className="text-lg font-bold text-gray-900">
-                      {cotizacion.modelo_nombre || "No especificado"}
+                      {modeloNombre || "No especificado"}
                     </p>
                   </div>
 
@@ -504,6 +676,8 @@ export default function CotizacionPublicaPage({ params: paramsPromise }) {
             </CardContent>
           </Card>
 
+         
+
           {/* ✅ ESPECIFICACIONES DEL MODELO */}
           {especificaciones.length > 0 && (
             <Card className="border-l-4 border-l-orange-500 shadow-lg">
@@ -537,7 +711,7 @@ export default function CotizacionPublicaPage({ params: paramsPromise }) {
               </CardHeader>
 
               <CardContent className="pt-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                     <p className="text-xs text-green-600 font-semibold mb-2 uppercase">
                       Versión
@@ -549,34 +723,11 @@ export default function CotizacionPublicaPage({ params: paramsPromise }) {
 
                   <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                     <p className="text-xs text-blue-600 font-semibold mb-2 uppercase">
-                      Precio Base
+                      Precio Base (c/IGV)
                     </p>
                     <p className="text-2xl font-bold text-blue-600">
                       ${Number(precioVersion.precio_base).toLocaleString("es-ES")}
                     </p>
-                  </div>
-
-                  <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                    <p className="text-xs text-purple-600 font-semibold mb-2 uppercase">
-                      Stock
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        className={
-                          precioVersion.en_stock
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
-                        }
-                      >
-                        {precioVersion.en_stock ? "En Stock" : "Sin Stock"}
-                      </Badge>
-                      {precioVersion.tiempo_entrega_dias > 0 && (
-                        <div className="flex items-center gap-1 text-xs text-purple-600">
-                          <Truck className="h-4 w-4" />
-                          {precioVersion.tiempo_entrega_dias} días
-                        </div>
-                      )}
-                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -594,110 +745,242 @@ export default function CotizacionPublicaPage({ params: paramsPromise }) {
               </CardHeader>
 
               <CardContent className="pt-6 space-y-6">
-                {gruposAccesoriosPorMoneda.map((grupo) => (
-                  <div key={grupo.codigo} className="space-y-3">
-                    {/* Encabezado de Moneda */}
-                    <div className="bg-purple-50 p-3 rounded-lg border border-purple-200">
-                      <h3 className="font-semibold text-purple-900">
-                        Accesorios en {grupo.simbolo} ({grupo.codigo})
-                      </h3>
-                    </div>
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-100 border-b">
+                        <th className="text-left p-3 font-semibold">
+                          Descripción
+                        </th>
+                        <th className="text-left p-3 font-semibold">
+                          N° Parte
+                        </th>
+                        <th className="text-right p-3 font-semibold">
+                          Cantidad
+                        </th>
+                        <th className="text-right p-3 font-semibold">
+                          Unitario
+                        </th>
+                        <th className="text-right p-3 font-semibold">
+                          Descuento
+                        </th>
+                        <th className="text-right p-3 font-semibold">
+                          Total
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {accesorios.map((acc) => (
+                        <tr key={acc.id} className="border-b hover:bg-gray-50">
+                          <td className="p-3">{acc.detalle}</td>
+                          <td className="p-3 text-gray-600">
+                            {acc.numero_parte}
+                          </td>
+                          <td className="text-right p-3">
+                            {acc.cantidad}
+                          </td>
+                          <td className="text-right p-3">
+                            ${Number(acc.precio_unitario).toFixed(2)}
+                          </td>
+                          <td className="text-right p-3">
+                            {acc.descuento_monto &&
+                            Number(acc.descuento_monto) > 0 ? (
+                              <p className="font-medium text-red-600">
+                                -${Number(acc.descuento_monto).toFixed(2)}
+                              </p>
+                            ) : (
+                              "-"
+                            )}
+                          </td>
+                          <td className="text-right p-3 font-bold text-purple-600">
+                            ${Number(acc.total).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
-                    {/* Tabla de Accesorios */}
-                    <div className="border rounded-lg overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="bg-gray-100 border-b">
-                            <th className="text-left p-3 font-semibold">
-                              Descripción
-                            </th>
-                            <th className="text-left p-3 font-semibold">
-                              N° Parte
-                            </th>
-                            <th className="text-right p-3 font-semibold">
-                              Cantidad
-                            </th>
-                            <th className="text-right p-3 font-semibold">
-                              Unitario
-                            </th>
-                            <th className="text-right p-3 font-semibold">
-                              Subtotal
-                            </th>
-                            <th className="text-right p-3 font-semibold">
-                              Descuento
-                            </th>
-                            <th className="text-right p-3 font-semibold">
-                              Total
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {grupo.accesorios.map((acc) => (
-                            <tr key={acc.id} className="border-b hover:bg-gray-50">
-                              <td className="p-3">{acc.detalle}</td>
-                              <td className="p-3 text-gray-600">
-                                {acc.numero_parte}
-                              </td>
-                              <td className="text-right p-3">
-                                {acc.cantidad}
-                              </td>
-                              <td className="text-right p-3">
-                                {Number(acc.precio_unitario).toFixed(2)}{" "}
-                                {acc.moneda_simbolo}
-                              </td>
-                              <td className="text-right p-3 font-medium">
-                                {Number(acc.subtotal).toFixed(2)}
-                              </td>
-                              <td className="text-right p-3">
-                                {acc.descuento_monto &&
-                                Number(acc.descuento_monto) > 0 ? (
-                                  <>
-                                    <p className="text-xs text-gray-500">
-                                      {acc.descuento_porcentaje}%
-                                    </p>
-                                    <p className="font-medium">
-                                      -{Number(acc.descuento_monto).toFixed(2)}
-                                    </p>
-                                  </>
-                                ) : (
-                                  "-"
-                                )}
-                              </td>
-                              <td className="text-right p-3 font-bold text-purple-600">
-                                {Number(acc.total).toFixed(2)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Totales por Moneda */}
-                    <div className="space-y-2 p-4 bg-purple-50 rounded-lg ml-auto w-96 border-l-4 border-purple-500">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Subtotal:</span>
-                        <span className="font-medium">
-                          {Number(grupo.subtotal).toFixed(2)} {grupo.simbolo}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Descuentos:</span>
-                        <span className="font-medium text-red-600">
-                          -{Number(grupo.descuento).toFixed(2)} {grupo.simbolo}
-                        </span>
-                      </div>
-                      <div className="border-t pt-2 flex justify-between">
-                        <span className="font-bold text-gray-900">Total:</span>
-                        <span className="font-bold text-lg text-purple-600">
-                          {Number(grupo.total).toFixed(2)} {grupo.simbolo}
-                        </span>
-                      </div>
-                    </div>
+                <div className="space-y-2 p-4 bg-purple-50 rounded-lg border-l-4 border-purple-500">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Subtotal:</span>
+                    <span className="font-medium">
+                      ${totales.accesoriosTotalConIgv.toFixed(2)}
+                    </span>
                   </div>
-                ))}
+                  {totales.descuentoAccConIgv > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Descuentos:</span>
+                      <span className="font-medium text-red-600">
+                        -${totales.descuentoAccConIgv.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="border-t pt-2 flex justify-between">
+                    <span className="font-bold text-gray-900">Total:</span>
+                    <span className="font-bold text-lg text-purple-600">
+                      ${(totales.accesoriosTotalConIgv - totales.descuentoAccConIgv).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           )}
+
+          {/* ✅ REGALOS */}
+          {regalos.length > 0 && (
+            <Card className="border-l-4 border-l-pink-500 shadow-lg">
+              <CardHeader className="bg-gradient-to-r from-pink-50 to-pink-100 border-b">
+                <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <Package className="h-5 w-5 text-pink-600" />
+                  Regalos Incluidos ({regalos.length})
+                </CardTitle>
+              </CardHeader>
+
+              <CardContent className="pt-6 space-y-6">
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-100 border-b">
+                        <th className="text-left p-3 font-semibold">
+                          Descripción
+                        </th>
+                        <th className="text-left p-3 font-semibold">
+                          Lote
+                        </th>
+                        <th className="text-right p-3 font-semibold">
+                          Cantidad
+                        </th>
+                        <th className="text-right p-3 font-semibold">
+                          Descuento
+                        </th>
+                        <th className="text-right p-3 font-semibold">
+                          Total
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {regalos.map((reg) => (
+                        <tr key={reg.id} className="border-b hover:bg-gray-50">
+                          <td className="p-3">{reg.detalle}</td>
+                          <td className="p-3 text-gray-600">
+                            {reg.lote || "-"}
+                          </td>
+                          <td className="text-right p-3">
+                            {reg.cantidad}
+                          </td>
+                          <td className="text-right p-3">
+                            {reg.descuento_monto &&
+                            Number(reg.descuento_monto) > 0 ? (
+                              <p className="font-medium text-red-600">
+                                -${Number(reg.descuento_monto).toFixed(2)}
+                              </p>
+                            ) : (
+                              "-"
+                            )}
+                          </td>
+                          <td className="text-right p-3 font-bold text-pink-600">
+                            ${Number(reg.total).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="space-y-2 p-4 bg-pink-50 rounded-lg border-l-4 border-pink-500">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Subtotal:</span>
+                    <span className="font-medium">
+                      ${totales.regalosTotalConIgv.toFixed(2)}
+                    </span>
+                  </div>
+                  {totales.descuentoRegConIgv > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Descuentos:</span>
+                      <span className="font-medium text-red-600">
+                        -${totales.descuentoRegConIgv.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="border-t pt-2 flex justify-between">
+                    <span className="font-bold text-gray-900">Total:</span>
+                    <span className="font-bold text-lg text-pink-600">
+                      ${(totales.regalosTotalConIgv - totales.descuentoRegConIgv).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ✅ RESUMEN GENERAL */}
+          <Card className="border-2 border-green-300 bg-gradient-to-r from-green-50 to-emerald-50 shadow-lg">
+            <CardHeader className="bg-gradient-to-r from-green-100 to-emerald-100 border-b">
+              <CardTitle className="text-xl text-green-900">
+                Resumen General
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent className="pt-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white p-4 rounded-lg border border-green-200">
+                  <p className="text-xs text-gray-600 font-semibold">Vehículo (c/IGV)</p>
+                  <p className="text-lg font-bold text-gray-900">
+                    ${totales.precioVehiculoConIgv.toFixed(2)}
+                  </p>
+                </div>
+
+                {totales.descuentoVehiculo > 0 && (
+                  <div className="bg-white p-4 rounded-lg border border-green-200">
+                    <p className="text-xs text-gray-600 font-semibold">Descuento Vehículo</p>
+                    <p className="text-lg font-bold text-red-600">
+                      -${totales.descuentoVehiculo.toFixed(2)}
+                    </p>
+                  </div>
+                )}
+
+                {totales.accesoriosTotalConIgv > 0 && (
+                  <div className="bg-white p-4 rounded-lg border border-green-200">
+                    <p className="text-xs text-gray-600 font-semibold">Accesorios (c/IGV)</p>
+                    <p className="text-lg font-bold text-gray-900">
+                      ${totales.accesoriosTotalConIgv.toFixed(2)}
+                    </p>
+                  </div>
+                )}
+
+                {totales.regalosTotalConIgv > 0 && (
+                  <div className="bg-white p-4 rounded-lg border border-green-200">
+                    <p className="text-xs text-gray-600 font-semibold">Regalos (c/IGV)</p>
+                    <p className="text-lg font-bold text-gray-900">
+                      ${totales.regalosTotalConIgv.toFixed(2)}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-white border-2 border-green-400 rounded-lg p-4">
+                <div className="space-y-2 mb-4">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Subtotal (S/IGV):</span>
+                    <span className="font-bold">${totales.subtotalSinIgv.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">IGV ({(igvRate * 100).toFixed(0)}%):</span>
+                    <span className="font-bold text-green-600">+${totales.igvTotal.toFixed(2)}</span>
+                  </div>
+                </div>
+                <div className="border-t pt-2">
+                  <div className="flex justify-between text-lg">
+                    <span className="font-bold text-gray-900">TOTAL (CON IGV):</span>
+                    <span className="font-bold text-3xl text-green-600">
+                      ${totales.granTotal.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* BOTONES DE ACCIÓN */}
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -752,21 +1035,9 @@ export default function CotizacionPublicaPage({ params: paramsPromise }) {
                   <p className="font-semibold mb-2">Información:</p>
                   <ul className="list-disc list-inside space-y-1 text-xs">
                     <li>Este enlace es público y puede ser compartido</li>
-                    <li>Cada apertura es registrada automáticamente</li>
-                    <li>
-                      Se muestra la IP, dispositivo y hora de cada visualización
-                    </li>
-                    <li>
-                      Puedes descargar el PDF en cualquier momento sin
-                      restricciones
-                    </li>
-                    <li>
-                      Los precios mostrados incluyen el vehículo base más los
-                      accesorios
-                    </li>
-                    <li>
-                      Las especificaciones incluyen imágenes, videos y datos técnicos
-                    </li>
+                    <li>Puedes descargar el PDF en cualquier momento sin restricciones</li>
+                    <li>Los precios mostrados incluyen vehículo, accesorios y regalos</li>
+                    <li>Todos los precios incluyen IGV ({(igvRate * 100).toFixed(0)}%)</li>
                   </ul>
                 </div>
               </div>

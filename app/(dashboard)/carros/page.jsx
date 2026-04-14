@@ -1,4 +1,5 @@
 "use client";
+
 import React from "react";
 import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,13 @@ import {
 
 import HistorialCarrosImportGlobal from "@/app/components/carros/HistorialCarrosImportGlobal";
 import HistorialCarrosSheet from "@/app/components/carros/HistorialCarrosSheet";
+
+// ✅ Función helper para limpiar IDs
+function cleanId(value) {
+  if (!value) return null;
+  const cleaned = parseInt(String(value).trim());
+  return !isNaN(cleaned) && cleaned > 0 ? cleaned : null;
+}
 
 export default function PreciosPage() {
   const [precios, setPrecios] = useState([]);
@@ -701,7 +709,7 @@ export default function PreciosPage() {
                   Matriz de Precios
                 </CardTitle>
                 <p className="text-sm text-gray-600 mt-1">
-                  Ingresa los precios para cada marca, modelo y versión
+                  Ingresa los precios para cada marca, modelo y versión (Incluye Igv)
                 </p>
               </div>
             </div>
@@ -786,6 +794,10 @@ export default function PreciosPage() {
                             const preciosData =
                               preciosPorMarcaModeloVersion[key] || {};
 
+                            // ✅ LIMPIAR LOS IDs AQUÍ
+                            const cleanMarcaId = cleanId(modelo.marca_id);
+                            const cleanModeloId = cleanId(modelo.id);
+
                             return (
                               <tr
                                 key={modelo.id}
@@ -809,12 +821,21 @@ export default function PreciosPage() {
                                 </td>
 
                                 <td className="border-r border-slate-300 p-2 text-center">
-                                  <HistorialCarrosSheet
-                                    marcaId={modelo.marca_id}
-                                    modeloId={modelo.id}
-                                    marcaNombre={marca?.name || ""}
-                                    modeloNombre={modelo.name}
-                                  />
+                                  {cleanMarcaId && cleanModeloId ? (
+                                    <HistorialCarrosSheet
+                                      marcaId={cleanMarcaId}
+                                      modeloId={cleanModeloId}
+                                      marcaNombre={marca?.name || ""}
+                                      modeloNombre={modelo.name}
+                                    />
+                                  ) : (
+                                    <div
+                                      className="text-xs text-gray-400"
+                                      title="IDs inválidos"
+                                    >
+                                      —
+                                    </div>
+                                  )}
                                 </td>
 
                                 {versiones.map((version) => {

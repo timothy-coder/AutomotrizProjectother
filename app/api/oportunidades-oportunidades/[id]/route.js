@@ -8,6 +8,7 @@ export async function GET(req, { params }) {
     const [rows] = await db.query(
       `SELECT o.*, 
               c.nombre as cliente_nombre,
+              concat(c.nombre, " ", c.apellido) as cliente_contacto,
               c.email as cliente_email,
               origen.name as origen_nombre,
               so.name as suborigen_nombre,

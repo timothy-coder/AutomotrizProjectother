@@ -95,8 +95,8 @@ export default function HistorialCarrosDialog({
 
   async function handleSubmit() {
     // Validar VIN
-    if (!formData.vin || formData.vin.length !== 17) {
-      toast.error("VIN debe tener 17 caracteres");
+    if (!formData.vin) {
+      toast.error("VIN es requerido");
       return;
     }
 
@@ -174,9 +174,6 @@ export default function HistorialCarrosDialog({
               maxLength={17}
               className="uppercase"
             />
-            <p className="text-xs text-gray-500">
-              Debe tener exactamente 17 caracteres
-            </p>
           </div>
 
           {/* Versión */}

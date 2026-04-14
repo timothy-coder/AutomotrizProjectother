@@ -11,6 +11,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Switch,
+} from "@/components/ui/switch";
+import {
+  Label,
+} from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import CotizacionFormContent from "./CotizacionFormContent";
 
 export default function CotizacionDialog({
@@ -30,6 +37,7 @@ export default function CotizacionDialog({
   const [saving, setSaving] = useState(false);
   const [selectedMarca, setSelectedMarca] = useState("");
   const [selectedModelo, setSelectedModelo] = useState("");
+  const [descuentoEnMonto, setDescuentoEnMonto] = useState(false); // ✅ Switch: false = porcentaje, true = monto
 
   const [formData, setFormData] = useState({
     sku: "",
@@ -37,18 +45,27 @@ export default function CotizacionDialog({
     color_interno: "",
     version_id: "",
     anio: "",
+    descuento_vehículo_porcentaje: "",
+    descuento_vehículo: "",
   });
 
   useEffect(() => {
     if (editingCotizacion) {
       setSelectedMarca(editingCotizacion.marca_id.toString());
       setSelectedModelo(editingCotizacion.modelo_id.toString());
+      
+      // ✅ Determinar si había monto o porcentaje
+      const tieneDescuentoEnMonto = editingCotizacion.descuento_vehículo > 0;
+      setDescuentoEnMonto(tieneDescuentoEnMonto);
+
       setFormData({
         sku: editingCotizacion.sku || "",
         color_externo: editingCotizacion.color_externo || "",
         color_interno: editingCotizacion.color_interno || "",
         version_id: editingCotizacion.version_id || "",
         anio: editingCotizacion.anio || "",
+        descuento_vehículo_porcentaje: editingCotizacion.descuento_vehículo_porcentaje || "",
+        descuento_vehículo: editingCotizacion.descuento_vehículo || "",
       });
     } else if (precargadaMarcaId || precargadaModeloId) {
       // Si hay datos precargados (desde vehículo de interés)
@@ -58,22 +75,28 @@ export default function CotizacionDialog({
       if (precargadaModeloId) {
         setSelectedModelo(precargadaModeloId.toString());
       }
+      setDescuentoEnMonto(false);
       setFormData({
         sku: "",
         color_externo: "",
         color_interno: "",
         version_id: "",
         anio: new Date().getFullYear().toString(),
+        descuento_vehículo_porcentaje: "",
+        descuento_vehículo: "",
       });
     } else {
       setSelectedMarca("");
       setSelectedModelo("");
+      setDescuentoEnMonto(false);
       setFormData({
         sku: "",
         color_externo: "",
         color_interno: "",
         version_id: "",
         anio: "",
+        descuento_vehículo_porcentaje: "",
+        descuento_vehículo: "",
       });
     }
   }, [editingCotizacion, open, precargadaMarcaId, precargadaModeloId]);
@@ -96,6 +119,7 @@ export default function CotizacionDialog({
 
       const method = editingCotizacion ? "PUT" : "POST";
 
+      // ✅ CAMBIO: Preparar descuentos según el switch
       const body = editingCotizacion
         ? {
             sku: formData.sku || null,
@@ -105,6 +129,9 @@ export default function CotizacionDialog({
             anio: formData.anio ? parseInt(formData.anio) : null,
             marca_id: parseInt(selectedMarca),
             modelo_id: parseInt(selectedModelo),
+            // ✅ Si es monto, guardar en descuento_vehículo. Si es porcentaje, guardar en descuento_vehículo_porcentaje
+            descuento_vehículo: descuentoEnMonto ? parseFloat(formData.descuento_vehículo) || 0 : 0,
+            descuento_vehículo_porcentaje: !descuentoEnMonto ? parseFloat(formData.descuento_vehículo_porcentaje) || 0 : 0,
             estado: "borrador",
           }
         : {
@@ -116,6 +143,9 @@ export default function CotizacionDialog({
             sku: formData.sku || null,
             color_externo: formData.color_externo || null,
             color_interno: formData.color_interno || null,
+            // ✅ Si es monto, guardar en descuento_vehículo. Si es porcentaje, guardar en descuento_vehículo_porcentaje
+            descuento_vehículo: descuentoEnMonto ? parseFloat(formData.descuento_vehículo) || 0 : 0,
+            descuento_vehículo_porcentaje: !descuentoEnMonto ? parseFloat(formData.descuento_vehículo_porcentaje) || 0 : 0,
             estado: "borrador",
             created_by: userId,
           };
@@ -168,6 +198,76 @@ export default function CotizacionDialog({
           versiones={versiones}
           editingCotizacion={editingCotizacion}
         />
+
+        {/* ✅ NUEVA SECCIÓN: Descuento del vehículo */}
+        <div className="border-t pt-6 mt-6">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold">Descuento del vehículo</Label>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-slate-600">
+                  {!descuentoEnMonto ? "%" : "$"}
+                </span>
+                <Switch
+                  checked={descuentoEnMonto}
+                  onCheckedChange={setDescuentoEnMonto}
+                />
+                <span className="text-xs text-slate-600 w-16">
+                  {descuentoEnMonto ? "Monto ($)" : "Porcentaje (%)"}
+                </span>
+              </div>
+            </div>
+
+            {/* ✅ Campo de Porcentaje (Desactivado = Por defecto) */}
+            {!descuentoEnMonto && (
+              <div>
+                <Label htmlFor="descuento-porcentaje" className="text-xs text-slate-600">
+                  Descuento en porcentaje (%)
+                </Label>
+                <Input
+                  id="descuento-porcentaje"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={formData.descuento_vehículo_porcentaje}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      descuento_vehículo_porcentaje: e.target.value,
+                    }))
+                  }
+                  className="mt-1"
+                />
+              </div>
+            )}
+
+            {/* ✅ Campo de Monto (Activado) */}
+            {descuentoEnMonto && (
+              <div>
+                <Label htmlFor="descuento-monto" className="text-xs text-slate-600">
+                  Descuento en monto ($)
+                </Label>
+                <Input
+                  id="descuento-monto"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={formData.descuento_vehículo}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      descuento_vehículo: e.target.value,
+                    }))
+                  }
+                  className="mt-1"
+                />
+              </div>
+            )}
+          </div>
+        </div>
 
         <DialogFooter className="mt-6 gap-2">
           <Button

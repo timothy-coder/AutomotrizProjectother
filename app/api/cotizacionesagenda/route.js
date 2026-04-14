@@ -10,7 +10,7 @@ export async function GET(req) {
       return NextResponse.json([], { status: 200 });
     }
 
-    // Obtener cotizaciones con su enlace público
+    // ✅ Obtener cotizaciones con descuentos del vehículo
     const [cotizaciones] = await db.query(
       `SELECT 
         c.*,
@@ -47,14 +47,17 @@ export async function POST(req) {
       sku,
       color_externo,
       color_interno,
+      descuento_vehículo,
+      descuento_vehículo_porcentaje,
       estado,
       created_by,
     } = await req.json();
 
+    // ✅ CAMBIO: Incluir campos de descuento
     const [result] = await db.query(
       `INSERT INTO cotizacionesagenda 
-       (oportunidad_id, marca_id, modelo_id, version_id, anio, sku, color_externo, color_interno, estado, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (oportunidad_id, marca_id, modelo_id, version_id, anio, sku, color_externo, color_interno, descuento_vehículo, descuento_vehículo_porcentaje, estado, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         oportunidad_id,
         marca_id,
@@ -64,6 +67,8 @@ export async function POST(req) {
         sku || null,
         color_externo || null,
         color_interno || null,
+        descuento_vehículo || 0.00,
+        descuento_vehículo_porcentaje || 0.00,
         estado,
         created_by,
       ]
@@ -77,6 +82,81 @@ export async function POST(req) {
     console.error("Error creating cotización:", error);
     return NextResponse.json(
       { message: "Error al crear cotización", error: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+// ✅ NUEVO: Actualizar descuentos de cotización
+export async function PUT(req) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const cotizacionId = searchParams.get("id");
+
+    if (!cotizacionId) {
+      return NextResponse.json(
+        { message: "ID de cotización requerido" },
+        { status: 400 }
+      );
+    }
+
+    const {
+      descuento_vehículo,
+      descuento_vehículo_porcentaje,
+      sku,
+      color_externo,
+      color_interno,
+      version_id,
+      anio,
+      marca_id,
+      modelo_id,
+      estado,
+    } = await req.json();
+
+    // ✅ Actualizar cotización con descuentos
+    const [result] = await db.query(
+      `UPDATE cotizacionesagenda 
+       SET 
+        descuento_vehículo = ?,
+        descuento_vehículo_porcentaje = ?,
+        sku = ?,
+        color_externo = ?,
+        color_interno = ?,
+        version_id = ?,
+        anio = ?,
+        marca_id = ?,
+        modelo_id = ?,
+        estado = ?
+       WHERE id = ?`,
+      [
+        descuento_vehículo || 0.00,
+        descuento_vehículo_porcentaje || 0.00,
+        sku || null,
+        color_externo || null,
+        color_interno || null,
+        version_id || null,
+        anio || null,
+        marca_id,
+        modelo_id,
+        estado,
+        cotizacionId,
+      ]
+    );
+
+    if (result.affectedRows === 0) {
+      return NextResponse.json(
+        { message: "Cotización no encontrada" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      message: "Cotización actualizada exitosamente",
+    });
+  } catch (error) {
+    console.error("Error updating cotización:", error);
+    return NextResponse.json(
+      { message: "Error al actualizar cotización", error: error.message },
       { status: 500 }
     );
   }

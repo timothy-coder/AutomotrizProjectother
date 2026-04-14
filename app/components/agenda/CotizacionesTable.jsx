@@ -1,8 +1,15 @@
 "use client";
 
-import { FileText, ChevronDown } from "lucide-react";
+import { FileText, ChevronDown, EyeIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useState } from "react";
 import CotizacionRow from "./CotizacionRow";
+import PreviewCotizacionDialog from "./PreviewCotizacionDialog";
 
 export default function CotizacionesTable({
   cotizaciones,
@@ -17,6 +24,9 @@ export default function CotizacionesTable({
   userId,
   onOpenHistorialDialog,
 }) {
+  const [selectedCotizacion, setSelectedCotizacion] = useState(null);
+  const [openPreviewDialog, setOpenPreviewDialog] = useState(false);
+
   const sortedCotizaciones = [...cotizaciones].sort((a, b) => {
     let aVal = a[sortConfig.key];
     let bVal = b[sortConfig.key];
@@ -30,6 +40,11 @@ export default function CotizacionesTable({
     if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
     return 0;
   });
+
+  function handleOpenPreview(cot) {
+    setSelectedCotizacion(cot);
+    setOpenPreviewDialog(true);
+  }
 
   if (cotizaciones.length === 0) {
     return (
@@ -48,65 +63,89 @@ export default function CotizacionesTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200">
-      <table className="w-full">
-        <thead>
-          <tr className="bg-gray-50 border-b-2 border-gray-200">
-            <th className="text-left py-3 px-4">
-              <button
-                onClick={() => onSort("id")}
-                className="flex items-center gap-2 font-semibold text-gray-700 hover:text-gray-900"
-              >
-                Número
-                <ChevronDown size={16} />
-              </button>
-            </th>
-            <th className="text-left py-3 px-4">
-              <button
-                onClick={() => onSort("estado")}
-                className="flex items-center gap-2 font-semibold text-gray-700 hover:text-gray-900"
-              >
-                Estado
-                <ChevronDown size={16} />
-              </button>
-            </th>
-            <th className="text-left py-3 px-4">
-              <button
-                onClick={() => onSort("created_at")}
-                className="flex items-center gap-2 font-semibold text-gray-700 hover:text-gray-900"
-              >
-                Fecha
-                <ChevronDown size={16} />
-              </button>
-            </th>
-            <th className="text-center py-3 px-4 font-semibold text-gray-700">
-              Vistas
-            </th>
-            <th className="text-center py-3 px-4 font-semibold text-gray-700">
-              Enlace Público
-            </th>
-            <th className="text-center py-3 px-4 font-semibold text-gray-700">
-              Acciones
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {sortedCotizaciones.map((cot, idx) => (
-            <CotizacionRow
-              key={cot.id}
-              cot={cot}
-              idx={idx}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onChangeStatus={onChangeStatus}
-              onDuplicate={onDuplicate}
-              onLoadHistorial={onLoadHistorial}
-              saving={saving}
-              onOpenHistorialDialog={onOpenHistorialDialog}
-            />
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <table className="w-full">
+          <thead>
+            <tr className="bg-gray-50 border-b-2 border-gray-200">
+              <th className="text-left py-3 px-4">
+                <button
+                  onClick={() => onSort("id")}
+                  className="flex items-center gap-2 font-semibold text-gray-700 hover:text-gray-900"
+                >
+                  Número
+                  <ChevronDown size={16} />
+                </button>
+              </th>
+              <th className="text-left py-3 px-4">
+                <button
+                  onClick={() => onSort("id")}
+                  className="flex items-center gap-2 font-semibold text-gray-700 hover:text-gray-900"
+                >
+                  Marca y Modelo
+                  <ChevronDown size={16} />
+                </button>
+              </th>
+              <th className="text-left py-3 px-4">
+                <button
+                  onClick={() => onSort("estado")}
+                  className="flex items-center gap-2 font-semibold text-gray-700 hover:text-gray-900"
+                >
+                  Estado
+                  <ChevronDown size={16} />
+                </button>
+              </th>
+              <th className="text-left py-3 px-4">
+                <button
+                  onClick={() => onSort("created_at")}
+                  className="flex items-center gap-2 font-semibold text-gray-700 hover:text-gray-900"
+                >
+                  Fecha
+                  <ChevronDown size={16} />
+                </button>
+              </th>
+              <th className="text-center py-3 px-4 font-semibold text-gray-700">
+                Vistas
+              </th>
+              <th className="text-center py-3 px-4 font-semibold text-gray-700">
+                Previsualización
+              </th>
+              <th className="text-center py-3 px-4 font-semibold text-gray-700">
+                Enlace Público
+              </th>
+              <th className="text-center py-3 px-4 font-semibold text-gray-700">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedCotizaciones.map((cot, idx) => (
+              <CotizacionRow
+                key={cot.id}
+                cot={cot}
+                idx={idx}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onChangeStatus={onChangeStatus}
+                onDuplicate={onDuplicate}
+                onLoadHistorial={onLoadHistorial}
+                saving={saving}
+                onOpenHistorialDialog={onOpenHistorialDialog}
+                onOpenPreview={handleOpenPreview}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ✅ DIÁLOGO DE PREVISUALIZACIÓN */}
+      {selectedCotizacion && (
+        <PreviewCotizacionDialog
+          open={openPreviewDialog}
+          onOpenChange={setOpenPreviewDialog}
+          cotizacion={selectedCotizacion}
+        />
+      )}
+    </>
   );
 }
