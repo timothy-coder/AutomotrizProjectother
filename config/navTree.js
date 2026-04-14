@@ -31,7 +31,6 @@ export const NAV_TREE = [
       { to: "/carros", label: "Precios de Carros", icon: DollarSign, perm: ["inventariocarros", "view"] },
       { to: "/accesorios", label: "Accesorios", icon: Boxes, perm: ["inventariocarros", "view"] },
       { to: "/regalos", label: "Regalos", icon: Boxes, perm: ["inventariocarros", "view"] },
-      { to: "/ventas/catalogo", label: "Catálogo", icon: BookOpen, perm: ["mensajes", "view"] },
     ],
   },
   {
