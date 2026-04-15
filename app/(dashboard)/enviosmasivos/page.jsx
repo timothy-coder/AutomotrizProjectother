@@ -577,13 +577,9 @@ export default function EnviosMasivosPage() {
                   <td className="px-4 py-3 text-xs">{row.send_now ? "Inmediato" : formatLocalDate(row.scheduled_at)}</td>
                   <td className="px-4 py-3 text-xs">{formatLocalDate(row.finished_at) || "—"}</td>
                   <td className="px-4 py-3">
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs text-slate-600">
-                      <span><span className="text-slate-400">Env:</span> {Number(row.sent_count || 0)}</span>
-                      <span><span className="text-slate-400">Entr:</span> {Number(row.delivered_count || 0)}</span>
-                      <span><span className="text-slate-400">Resp:</span> {Number(row.responded_count || 0)}</span>
-                      <span><span className="text-slate-400">CTA:</span> {Number(row.contact_cta_count || 0)}</span>
-                      <span><span className="text-slate-400">Baja:</span> {Number(row.stop_cta_count || 0)}</span>
-                    </div>
+                    <span className="text-xs text-slate-600">
+                      <span className="text-slate-400">Enviados:</span> {Number(row.sent_count || 0)}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     {row.status === "running" && (
