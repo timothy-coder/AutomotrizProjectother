@@ -1109,11 +1109,9 @@ export default function EnviosMasivosPage() {
           </DialogHeader>
 
           {/* KPI cards */}
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3">
             {[
               { label: "Enviados", value: campaignDetail?.campaign?.sent_count ?? 0, color: "text-blue-700", bg: "bg-blue-50" },
-              { label: "Entregados", value: campaignDetail?.status_summary?.delivered ?? 0, color: "text-emerald-700", bg: "bg-emerald-50" },
-              { label: "Respondieron", value: campaignDetail?.status_summary?.responded ?? 0, color: "text-violet-700", bg: "bg-violet-50" },
               { label: "Fallidos", value: campaignDetail?.status_summary?.failed ?? 0, color: "text-red-700", bg: "bg-red-50" },
             ].map(({ label, value, color, bg }) => (
               <div key={label} className={`rounded-xl border p-3 ${bg}`}>
@@ -1123,7 +1121,7 @@ export default function EnviosMasivosPage() {
             ))}
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="rounded-xl border p-3 text-sm">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Campaña</p>
               <p><span className="text-muted-foreground">Tipo:</span> {campaignDetail?.campaign?.campaign_type || "—"}</p>
@@ -1133,52 +1131,11 @@ export default function EnviosMasivosPage() {
             </div>
 
             <div className="rounded-xl border p-3 text-sm">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Estados de entrega</p>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Estados de envío</p>
               <p>Pendientes: <span className="font-medium">{Number(campaignDetail?.status_summary?.pending || 0)}</span></p>
               <p>En cola: <span className="font-medium">{Number(campaignDetail?.status_summary?.queued || 0)}</span></p>
-              <p>Entregados: <span className="font-medium">{Number(campaignDetail?.status_summary?.delivered || 0)}</span></p>
-              <p>Leídos: <span className="font-medium">{Number(campaignDetail?.status_summary?.read || 0)}</span></p>
-              <p>Respondieron: <span className="font-medium">{Number(campaignDetail?.status_summary?.responded || 0)}</span></p>
+              <p>Saltados: <span className="font-medium">{Number(campaignDetail?.status_summary?.skipped || 0)}</span></p>
               <p>Fallidos: <span className="font-medium text-red-600">{Number(campaignDetail?.status_summary?.failed || 0)}</span></p>
-            </div>
-
-            <div className="rounded-xl border p-3 text-sm">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Acciones CTA</p>
-              <p>Solicitaron contacto: <span className="font-medium text-blue-700">{Number(campaignDetail?.cta_summary?.contact || 0)}</span></p>
-              <p>Detener promociones: <span className="font-medium text-orange-600">{Number(campaignDetail?.cta_summary?.stop_promotions || 0)}</span></p>
-              <p>No mapeadas: <span className="font-medium">{Number(campaignDetail?.cta_summary?.unknown || 0)}</span></p>
-              <p>Total acciones: <span className="font-bold">{Number(campaignDetail?.cta_summary?.total || 0)}</span></p>
-            </div>
-          </div>
-
-          <div className="rounded-xl border">
-            <div className="border-b px-3 py-2 text-sm font-semibold">Acciones CTA recientes</div>
-            <div className="max-h-60 overflow-y-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b bg-slate-50 text-xs uppercase text-muted-foreground">
-                    <th className="px-3 py-2">Cliente</th>
-                    <th className="px-3 py-2">Acción</th>
-                    <th className="px-3 py-2">Teléfono</th>
-                    <th className="px-3 py-2">Fecha</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(campaignDetail?.cta_actions_recent || []).map((action) => (
-                    <tr key={action.id} className="border-b hover:bg-slate-50">
-                      <td className="px-3 py-2">{action.recipient_name || [action.cliente_nombre, action.cliente_apellido].filter(Boolean).join(" ") || "—"}</td>
-                      <td className="px-3 py-2 capitalize">{String(action.action_type || "unknown").replace("_", " ")}</td>
-                      <td className="px-3 py-2">{action.phone_normalized || "—"}</td>
-                      <td className="px-3 py-2">{formatLocalDate(action.created_at)}</td>
-                    </tr>
-                  ))}
-                  {!Array.isArray(campaignDetail?.cta_actions_recent) || !campaignDetail?.cta_actions_recent.length ? (
-                    <tr>
-                      <td className="px-3 py-4 text-muted-foreground" colSpan={4}>Sin acciones CTA registradas.</td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
             </div>
           </div>
 
@@ -1191,7 +1148,6 @@ export default function EnviosMasivosPage() {
                     <th className="px-3 py-2">Cliente</th>
                     <th className="px-3 py-2">Teléfono</th>
                     <th className="px-3 py-2">Estado</th>
-                    <th className="px-3 py-2">Respondió</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1200,7 +1156,6 @@ export default function EnviosMasivosPage() {
                       <td className="px-3 py-2">{recipient.recipient_name || [recipient.cliente_nombre, recipient.cliente_apellido].filter(Boolean).join(" ") || "—"}</td>
                       <td className="px-3 py-2">{recipient.phone_normalized || "—"}</td>
                       <td className="px-3 py-2 capitalize">{recipient.status || "—"}</td>
-                      <td className="px-3 py-2">{recipient.responded_at ? formatLocalDate(recipient.responded_at) : "—"}</td>
                     </tr>
                   ))}
                 </tbody>
