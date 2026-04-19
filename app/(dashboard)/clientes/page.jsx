@@ -12,12 +12,7 @@ import ClienteDialog from "@/app/components/clientes/ClienteDialog";
 import VehiculoDialog from "@/app/components/clientes/VehiculoDialog";
 import ConfirmDeleteDialog from "@/app/components/clientes/ConfirmDeleteDialog";
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -28,14 +23,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-import {
-  Plus,
-  AlertTriangle,
-  Loader2,
-  Info,
-  UserRound,
-  Car,
-} from "lucide-react";
+import { Plus, AlertTriangle, Loader2, Info, UserRound, Car } from "lucide-react";
 
 export default function ClientesPage() {
   const { permissions, user } = useAuth();
@@ -66,15 +54,11 @@ export default function ClientesPage() {
   const [deleteDialog, setDeleteDialog] = useState({
     open: false,
     item: null,
-    type: null,
+    type: null, // "cliente" | "vehiculo"
   });
 
   const actorName =
-    user?.fullname ||
-    user?.name ||
-    user?.username ||
-    user?.email ||
-    "Un usuario";
+    user?.fullname || user?.name || user?.username || user?.email || "Un usuario";
 
   async function loadClientes() {
     try {
@@ -179,10 +163,7 @@ export default function ClientesPage() {
   async function saveCliente(data) {
     const isEdit = clienteDialog.mode === "edit";
     const method = isEdit ? "PUT" : "POST";
-
-    const url = isEdit
-      ? `/api/clientes/${clienteDialog.data.id}`
-      : `/api/clientes`;
+    const url = isEdit ? `/api/clientes/${clienteDialog.data.id}` : `/api/clientes`;
 
     try {
       const response = await fetch(url, {
@@ -226,10 +207,7 @@ export default function ClientesPage() {
 
     const isEdit = vehiculoDialog.mode === "edit";
     const method = isEdit ? "PUT" : "POST";
-
-    const url = isEdit
-      ? `/api/vehiculos/${vehiculoDialog.data.id}`
-      : `/api/vehiculos`;
+    const url = isEdit ? `/api/vehiculos/${vehiculoDialog.data.id}` : `/api/vehiculos`;
 
     try {
       const response = await fetch(url, {
@@ -334,9 +312,7 @@ export default function ClientesPage() {
         url: "/clientes",
       });
 
-      if (selectedCliente) {
-        loadVehiculos(selectedCliente.id);
-      }
+      if (selectedCliente) loadVehiculos(selectedCliente.id);
       loadAllVehiculos();
     } catch (err) {
       console.error(err);
@@ -350,9 +326,7 @@ export default function ClientesPage() {
         <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
         <div className="text-sm text-red-700">
           <p className="font-semibold">Sin permiso</p>
-          <p className="text-xs mt-1">
-            No tienes permisos para ver esta sección
-          </p>
+          <p className="text-xs mt-1">No tienes permisos para ver esta sección</p>
         </div>
       </div>
     );
@@ -366,15 +340,14 @@ export default function ClientesPage() {
   return (
     <TooltipProvider delayDuration={200}>
       <div className="space-y-6 pb-8">
+        {/* HEADER GENERAL */}
         <div className="border-b border-gray-200 pb-6">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-3 bg-[#5d16ec] rounded-lg shadow-md">
               <UserRound className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                Gestión de Clientes
-              </h1>
+              <h1 className="text-3xl font-bold text-gray-900">Gestión de Clientes</h1>
               <p className="text-sm text-gray-600 mt-1">
                 Administra clientes y sus vehículos asociados
               </p>
@@ -382,6 +355,7 @@ export default function ClientesPage() {
           </div>
         </div>
 
+        {/* STATS */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Tooltip>
             <TooltipTrigger asChild>
@@ -389,9 +363,7 @@ export default function ClientesPage() {
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-blue-600 font-medium">
-                        Total de Clientes
-                      </p>
+                      <p className="text-sm text-blue-600 font-medium">Total de Clientes</p>
                       <p className="text-3xl font-bold text-blue-900 mt-2">
                         {stats.totalClientes}
                       </p>
@@ -412,9 +384,7 @@ export default function ClientesPage() {
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-purple-600 font-medium">
-                        Total de Vehículos
-                      </p>
+                      <p className="text-sm text-purple-600 font-medium">Total de Vehículos</p>
                       <p className="text-3xl font-bold text-purple-900 mt-2">
                         {stats.totalVehiculos}
                       </p>
@@ -430,9 +400,10 @@ export default function ClientesPage() {
           </Tooltip>
         </div>
 
+        {/* LISTA CLIENTES */}
         <Card className="border-l-4 border-l-[#5d16ec] shadow-lg overflow-hidden">
           <CardHeader className="border-b space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-[#5d16ec] rounded-lg">
                   <UserRound className="h-5 w-5 text-white" />
@@ -446,6 +417,25 @@ export default function ClientesPage() {
                   </p>
                 </div>
               </div>
+
+              {/* ✅ BOTÓN CREAR FUERA DE LA TABLA */}
+              {permCreate && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={() =>
+                        setClienteDialog({ open: true, mode: "create", data: null })
+                      }
+                      className="bg-[#5d16ec] hover:bg-[#4a12c8]/70 text-white shadow-md gap-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span className="hidden sm:inline">Nuevo Cliente</span>
+                      <span className="sm:hidden">Nuevo</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">Crear nuevo cliente</TooltipContent>
+                </Tooltip>
+              )}
             </div>
           </CardHeader>
 
@@ -474,34 +464,15 @@ export default function ClientesPage() {
                 data={clientes}
                 onSelect={onSelectCliente}
                 onVehiculos={openVehiculos}
-                onCreate={
-                  permCreate
-                    ? () =>
-                        setClienteDialog({
-                          open: true,
-                          mode: "create",
-                          data: null,
-                        })
-                    : undefined
-                }
+                // ✅ ya NO pasamos onCreate (para que no salga dentro de la tabla)
                 onEdit={
                   permEdit
-                    ? (c) =>
-                        setClienteDialog({
-                          open: true,
-                          mode: "edit",
-                          data: c,
-                        })
+                    ? (c) => setClienteDialog({ open: true, mode: "edit", data: c })
                     : undefined
                 }
                 onDelete={
                   permDelete
-                    ? (c) =>
-                        setDeleteDialog({
-                          open: true,
-                          item: c,
-                          type: "cliente",
-                        })
+                    ? (c) => setDeleteDialog({ open: true, item: c, type: "cliente" })
                     : undefined
                 }
               />
@@ -509,6 +480,7 @@ export default function ClientesPage() {
           </CardContent>
         </Card>
 
+        {/* VEHÍCULOS DEL CLIENTE */}
         {selectedCliente && (
           <Card className="border-l-4 border-l-[#5d16ec] shadow-lg overflow-hidden">
             <CardHeader className="border-b space-y-3">
@@ -542,11 +514,7 @@ export default function ClientesPage() {
                     <TooltipTrigger asChild>
                       <Button
                         onClick={() =>
-                          setVehiculoDialog({
-                            open: true,
-                            mode: "create",
-                            data: null,
-                          })
+                          setVehiculoDialog({ open: true, mode: "create", data: null })
                         }
                         className="bg-[#5d16ec] hover:bg-[#4a12c8]/70 text-white shadow-md gap-2"
                       >
@@ -591,32 +559,17 @@ export default function ClientesPage() {
                   data={vehiculos}
                   onCreate={
                     permEdit
-                      ? () =>
-                          setVehiculoDialog({
-                            open: true,
-                            mode: "create",
-                            data: null,
-                          })
+                      ? () => setVehiculoDialog({ open: true, mode: "create", data: null })
                       : undefined
                   }
                   onEdit={
                     permEdit
-                      ? (v) =>
-                          setVehiculoDialog({
-                            open: true,
-                            mode: "edit",
-                            data: v,
-                          })
+                      ? (v) => setVehiculoDialog({ open: true, mode: "edit", data: v })
                       : undefined
                   }
                   onDelete={
                     permDelete
-                      ? (v) =>
-                          setDeleteDialog({
-                            open: true,
-                            item: v,
-                            type: "vehiculo",
-                          })
+                      ? (v) => setDeleteDialog({ open: true, item: v, type: "vehiculo" })
                       : undefined
                   }
                 />
@@ -626,13 +579,12 @@ export default function ClientesPage() {
         )}
       </div>
 
+      {/* DIALOGS */}
       <ClienteDialog
         open={clienteDialog.open}
         mode={clienteDialog.mode}
         cliente={clienteDialog.data}
-        onOpenChange={(v) =>
-          setClienteDialog((prev) => ({ ...prev, open: v }))
-        }
+        onOpenChange={(v) => setClienteDialog((prev) => ({ ...prev, open: v }))}
         onSave={saveCliente}
       />
 
@@ -641,9 +593,7 @@ export default function ClientesPage() {
         mode={vehiculoDialog.mode}
         vehiculo={vehiculoDialog.data}
         onSave={saveVehiculo}
-        onOpenChange={(v) =>
-          setVehiculoDialog((prev) => ({ ...prev, open: v }))
-        }
+        onOpenChange={(v) => setVehiculoDialog((prev) => ({ ...prev, open: v }))}
       />
 
       <ConfirmDeleteDialog
@@ -655,9 +605,7 @@ export default function ClientesPage() {
             ? () => deleteVehiculo(deleteDialog.item)
             : deleteCliente
         }
-        onOpenChange={(v) =>
-          setDeleteDialog((prev) => ({ ...prev, open: v }))
-        }
+        onOpenChange={(v) => setDeleteDialog((prev) => ({ ...prev, open: v }))}
       />
     </TooltipProvider>
   );

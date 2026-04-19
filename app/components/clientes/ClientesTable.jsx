@@ -79,7 +79,7 @@ export default function ClientesTable({
         return (
           <div className="flex gap-1">
 
-            
+
 
             {onVehiculos && (
               <Tooltip>
@@ -173,7 +173,7 @@ export default function ClientesTable({
 
         {/* Header - Buscador a la izquierda, botones a la derecha */}
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-center justify-between">
-          
+
           {/* Buscador a la izquierda */}
           <div className="flex items-center gap-2 flex-1 max-w-md w-full sm:w-auto">
             <div className="relative flex-1">
@@ -207,7 +207,7 @@ export default function ClientesTable({
             {onCreate && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button 
+                  <Button
                     onClick={onCreate}
                     size="sm"
                     className="bg-[#5d16ec]  hover:bg-[#5d16ec]/70 text-white gap-2 w-full sm:w-auto"
@@ -232,7 +232,7 @@ export default function ClientesTable({
               {table.getHeaderGroups().map(hg => (
                 <TableRow key={hg.id}>
                   {hg.headers.map(h => (
-                    <TableHead 
+                    <TableHead
                       key={h.id}
                       className="font-semibold text-slate-700 h-12 text-xs sm:text-sm whitespace-nowrap"
                     >
@@ -249,8 +249,8 @@ export default function ClientesTable({
             <TableBody>
               {table.getRowModel().rows.length === 0 ? (
                 <TableRow>
-                  <TableCell 
-                    colSpan={columns.length} 
+                  <TableCell
+                    colSpan={columns.length}
                     className="text-center py-8 text-gray-500"
                   >
                     <div className="flex flex-col items-center gap-2">
@@ -263,12 +263,12 @@ export default function ClientesTable({
                 </TableRow>
               ) : (
                 table.getRowModel().rows.map((row, index) => (
-                  <TableRow 
-                    key={row.id} 
+                  <TableRow
+                    key={row.id}
                     className={` transition-colors border-b `}
                   >
                     {row.getVisibleCells().map(cell => (
-                      <TableCell 
+                      <TableCell
                         key={cell.id}
                         className="h-12 text-xs sm:text-sm py-2 sm:py-3 px-2 sm:px-4"
                       >
@@ -295,7 +295,7 @@ export default function ClientesTable({
                 Total: <span className="font-semibold text-slate-700">{filteredData.length}</span> cliente(s)
                 {searchValue && ` (filtrando)`}
               </span>
-              
+
               {/* Información de paginación */}
               <span className="text-xs sm:text-sm text-gray-600">
                 Página <span className="font-semibold">{table.getState().pagination.pageIndex + 1}</span> de <span className="font-semibold">{table.getPageCount()}</span>
@@ -306,7 +306,7 @@ export default function ClientesTable({
 
             {/* Controles de paginación */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-              
+
               {/* Botones de navegación */}
               <div className="flex gap-2 w-full sm:w-auto">
                 <Tooltip>
