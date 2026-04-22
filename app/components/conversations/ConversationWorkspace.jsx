@@ -648,8 +648,8 @@ export default function ConversationWorkspace({
         });
         return;
       }
-    } catch {
-      // Falla silenciosa: se muestra fallback abajo.
+    } catch (err) {
+      setError(err?.message || "No se pudo cargar el resumen");
     }
     setResumenState({ text: "Sin resumen disponible.", loading: false, loaded: true });
   }
