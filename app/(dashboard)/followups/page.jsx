@@ -181,7 +181,8 @@ export default function FollowupsPage() {
       setActive(d1.followups  || []);
       setPending(d2.followups || []);
       setClosed(d3.followups  || []);
-    } catch {
+    } catch (err) {
+      console.error("Error al cargar follow-ups:", err.message);
       toast.error("Error al cargar follow-ups");
     } finally {
       setLoading(false);
@@ -203,7 +204,8 @@ export default function FollowupsPage() {
       toast.success("Sesión cerrada correctamente");
       setCloseDialog({ open: false, row: null, reason: "" });
       load();
-    } catch {
+    } catch (err) {
+      console.error("Error al cerrar la sesión:", err.message);
       toast.error("Error al cerrar la sesión");
     } finally {
       setClosing(false);
@@ -214,9 +216,9 @@ export default function FollowupsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Follow-up 3-3-3</h1>
+          <h1 className="text-2xl font-bold">Seguimiento de leads</h1>
           <p className="text-sm text-muted-foreground">
-            Seguimiento automático de leads — 3 intentos cada 3 días
+            Re-contacto automático — 3 intentos cada 3 días (método 3-3-3)
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={load} disabled={loading}>

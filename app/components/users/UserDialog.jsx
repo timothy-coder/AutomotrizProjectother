@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import {
   Dialog,
@@ -58,6 +59,7 @@ const EMPTY_FORM = {
   centros: [],
   talleres: [],
   mostradores: [],
+  chatwoot_agent_id: null,
 };
 
 function normalizeIds(value) {
@@ -115,6 +117,8 @@ export default function UserDialog({
 
   const [rolesOptions, setRolesOptions] = useState([]);
   const [loadingRoles, setLoadingRoles] = useState(false);
+  const [chatwootAgents, setChatwootAgents] = useState([]);
+  const [loadingAgents, setLoadingAgents] = useState(false);
 
   const [centrosOptions, setCentrosOptions] = useState([]);
   const [talleresOptions, setTalleresOptions] = useState([]);
@@ -123,7 +127,7 @@ export default function UserDialog({
   const [loadingCentros, setLoadingCentros] = useState(false);
   const [loadingDependientes, setLoadingDependientes] = useState(false);
 
-  // ✅ Cargar roles
+  // ✅ Cargar roles y agentes de Chatwoot
   useEffect(() => {
     if (!open) return;
 
@@ -133,19 +137,39 @@ export default function UserDialog({
       try {
         setLoadingRoles(true);
         const res = await fetch("/api/roles", { cache: "no-store" });
+        if (!res.ok) throw new Error(`Error cargando roles: ${res.status}`);
         const data = await res.json();
-
         if (!active) return;
         setRolesOptions(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Error cargando roles:", error);
-        if (active) setRolesOptions([]);
+      } catch {
+        if (active) { setRolesOptions([]); toast.error("Error al cargar roles"); }
       } finally {
         if (active) setLoadingRoles(false);
       }
     }
 
+    async function loadAgents() {
+      try {
+        setLoadingAgents(true);
+        const match = typeof document !== "undefined" ? document.cookie.match(/(?:^|;\s*)token=([^;]+)/) : null;
+        const token = match ? match[1] : "";
+        const res = await fetch("/api/chatwoot/agents", {
+          cache: "no-store",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!res.ok) throw new Error(`Error cargando agentes: ${res.status}`);
+        if (!active) return;
+        const data = await res.json();
+        setChatwootAgents(Array.isArray(data?.data) ? data.data : []);
+      } catch {
+        if (active) { setChatwootAgents([]); toast.error("Error al cargar agentes de Chatwoot"); }
+      } finally {
+        if (active) setLoadingAgents(false);
+      }
+    }
+
     loadRoles();
+    loadAgents();
 
     return () => {
       active = false;
@@ -204,13 +228,13 @@ export default function UserDialog({
       try {
         setLoadingCentros(true);
         const res = await fetch("/api/centros", { cache: "no-store" });
+        if (!res.ok) throw new Error(`Error cargando centros: ${res.status}`);
         const data = await res.json();
 
         if (!active) return;
         setCentrosOptions(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Error cargando centros:", error);
-        if (active) setCentrosOptions([]);
+      } catch {
+        if (active) { setCentrosOptions([]); toast.error("Error al cargar centros"); }
       } finally {
         if (active) setLoadingCentros(false);
       }
@@ -222,6 +246,11 @@ export default function UserDialog({
       active = false;
     };
   }, [open]);
+
+  const centrosKey = useMemo(
+    () => normalizeIds(form.centros).join(","),
+    [form.centros]
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -252,8 +281,8 @@ export default function UserDialog({
               fetch(`/api/mostradores/bycentro?centro_id=${centroId}`, { cache: "no-store" }),
             ]);
 
-            const talleresData = await talleresRes.json();
-            const mostradoresData = await mostradoresRes.json();
+            const talleresData = talleresRes.ok ? await talleresRes.json() : [];
+            const mostradoresData = mostradoresRes.ok ? await mostradoresRes.json() : [];
 
             return {
               talleres: Array.isArray(talleresData) ? talleresData : [],
@@ -283,11 +312,11 @@ export default function UserDialog({
             mostradores: prevMostradores.filter((id) => mostradoresValidos.has(id)),
           };
         });
-      } catch (error) {
-        console.error("Error cargando talleres/mostradores:", error);
+      } catch {
         if (!active) return;
         setTalleresOptions([]);
         setMostradoresOptions([]);
+        toast.error("Error al cargar talleres y mostradores");
       } finally {
         if (active) setLoadingDependientes(false);
       }
@@ -298,7 +327,7 @@ export default function UserDialog({
     return () => {
       active = false;
     };
-  }, [open, JSON.stringify(normalizeIds(form.centros))]);
+  }, [open, centrosKey]);
 
   function updateField(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -356,16 +385,16 @@ export default function UserDialog({
     }));
   }
 
+  const passMismatch =
+    form.password &&
+    form.password2 &&
+    form.password !== form.password2;
+
   function handleSave() {
     if (isView) return;
     if (passMismatch) return;
     onSave(form);
   }
-
-  const passMismatch =
-    form.password &&
-    form.password2 &&
-    form.password !== form.password2;
 
   const centrosSeleccionadosTexto = useMemo(() => {
     if (!form.centros?.length) return "Ninguno";
@@ -378,7 +407,7 @@ export default function UserDialog({
 
   return (
     <TooltipProvider>
-      <Dialog open={open} onOpenChange={onOpenChange} className="bg-white">
+      <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="sticky top-0 bg-white border-b pb-4 z-10">
             <div className="flex items-center gap-2">
@@ -568,6 +597,50 @@ export default function UserDialog({
                                 ({rol.description})
                               </span>
                             )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Agente Chatwoot */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1 text-[#5d16ec]">
+                    Agente en Chatwoot
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertCircle size={14} className="text-gray-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        Vincula este usuario con su cuenta de agente en Chatwoot
+                      </TooltipContent>
+                    </Tooltip>
+                  </Label>
+                  <Select
+                    value={form.chatwoot_agent_id ? String(form.chatwoot_agent_id) : "none"}
+                    onValueChange={(v) => updateField("chatwoot_agent_id", v === "none" ? null : Number(v))}
+                    disabled={isView || loadingAgents}
+                  >
+                    <SelectTrigger className="h-9">
+                      {loadingAgents ? (
+                        <div className="flex items-center gap-2">
+                          <Loader2 size={16} className="animate-spin" />
+                          <span>Cargando agentes...</span>
+                        </div>
+                      ) : (
+                        <SelectValue placeholder="Sin vínculo con Chatwoot" />
+                      )}
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">
+                        <span className="text-gray-500">— Sin vínculo —</span>
+                      </SelectItem>
+                      {chatwootAgents.map((a) => (
+                        <SelectItem key={a.id} value={String(a.id)}>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{a.name}</span>
+                            <span className="text-xs text-gray-400">{a.email}</span>
                           </div>
                         </SelectItem>
                       ))}

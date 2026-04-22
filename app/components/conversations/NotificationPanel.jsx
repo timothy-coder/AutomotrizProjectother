@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, Bell, Car, Wrench } from "lucide-react";
+import { AlertTriangle, Bell, Car, Wrench, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -15,6 +15,21 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+
+// ─── Labels para tipos de alerta del bot IA ─────────────────────────────────
+
+const ALERT_TYPE_LABELS = {
+  precio_exacto: "Precio exacto",
+  documentos_financiamiento: "Documentos financiamiento",
+  test_drive: "Test drive",
+  pedido_especial: "Pedido especial",
+  duplicado_comprobante: "Duplicado comprobante",
+  queja: "Queja",
+  garantia_recall: "Garantía / recall",
+  cita_postventa: "Cita postventa",
+  mostrador_repuesto: "Repuesto mostrador",
+  planchado_pintura: "Planchado y pintura",
+};
 
 // ─── Listas de keywords para detección de intención ────────────────────────
 
@@ -109,6 +124,14 @@ function buildNotifications(conversations) {
 // ─── NotificationCard ───────────────────────────────────────────────────────
 
 const TYPE_CONFIG = {
+  bot_alert: {
+    icon: Zap,
+    label: (alertType) => ALERT_TYPE_LABELS[alertType] || "Alerta IA",
+    borderColor: "border-l-purple-500",
+    bg: "bg-purple-50",
+    iconColor: "text-purple-500",
+    labelColor: "text-purple-600",
+  },
   urgent: {
     icon: AlertTriangle,
     label: "URGENTE",
@@ -139,6 +162,7 @@ function NotificationCard({ notification, onOpen }) {
   const { type, conversation: c } = notification;
   const cfg = TYPE_CONFIG[type];
   const Icon = cfg.icon;
+  const label = typeof cfg.label === "function" ? cfg.label(notification.alert_type) : cfg.label;
 
   return (
     <div className={`rounded-xl border-l-4 ${cfg.borderColor} ${cfg.bg} p-3 space-y-1.5`}>
@@ -146,7 +170,7 @@ function NotificationCard({ notification, onOpen }) {
         <div className="flex items-center gap-1.5">
           <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${cfg.iconColor}`} />
           <span className={`text-[10px] font-bold uppercase tracking-wide ${cfg.labelColor}`}>
-            {cfg.label}
+            {label}
           </span>
         </div>
         <span className="text-[10px] text-gray-400">{timeAgo(c.last_message_at)}</span>
@@ -178,13 +202,26 @@ function NotificationCard({ notification, onOpen }) {
 
 // ─── NotificationPanel principal ────────────────────────────────────────────
 
-export default function NotificationPanel({ conversations = [], onOpenConversation }) {
+export default function NotificationPanel({ conversations = [], botAlerts = [], onOpenConversation }) {
   const [open, setOpen] = useState(false);
 
-  const notifications = useMemo(
-    () => buildNotifications(conversations),
-    [conversations]
-  );
+  const notifications = useMemo(() => {
+    const botNotifs = botAlerts.map((alert) => {
+      const conv = conversations.find((c) => Number(c.session_id) === Number(alert.conversation_id));
+      return {
+        type: "bot_alert",
+        alert_type: alert.alert_type,
+        conversation: conv || { session_id: alert.conversation_id, cliente_nombre: "Conversación", ultimomensaje: "", last_message_at: alert.timestamp },
+      };
+    });
+
+    const botAlertConvIds = new Set(botAlerts.map((a) => Number(a.conversation_id)));
+    const keywordNotifs = buildNotifications(
+      conversations.filter((c) => !botAlertConvIds.has(Number(c.session_id)))
+    );
+
+    return [...botNotifs, ...keywordNotifs];
+  }, [botAlerts, conversations]);
 
   function handleOpen(sessionId) {
     if (onOpenConversation) onOpenConversation(sessionId);

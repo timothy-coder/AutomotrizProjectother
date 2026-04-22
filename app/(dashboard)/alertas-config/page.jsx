@@ -6,6 +6,13 @@ import { toast } from "sonner";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 
 import { useRequirePerm } from "@/hooks/useRequirePerm";
@@ -30,22 +37,23 @@ function getAuthHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-function AlertRow({ row, onSave }) {
-  const [teamId, setTeamId]   = useState(row.chatwoot_team_id  ?? "");
-  const [agentId, setAgentId] = useState(row.chatwoot_agent_id ?? "");
+function AlertRow({ row, teams, agents, onSave }) {
+  const [teamId, setTeamId]   = useState(row.chatwoot_team_id  != null ? String(row.chatwoot_team_id)  : "none");
+  const [agentId, setAgentId] = useState(row.chatwoot_agent_id != null ? String(row.chatwoot_agent_id) : "none");
   const [label, setLabel]     = useState(row.label ?? "");
   const [saving, setSaving]   = useState(false);
+
   const dirty =
-    String(teamId)  !== String(row.chatwoot_team_id  ?? "") ||
-    String(agentId) !== String(row.chatwoot_agent_id ?? "") ||
+    (teamId  === "none" ? null : Number(teamId))  !== (row.chatwoot_team_id  ?? null) ||
+    (agentId === "none" ? null : Number(agentId)) !== (row.chatwoot_agent_id ?? null) ||
     label !== (row.label ?? "");
 
   async function handleSave() {
     setSaving(true);
     try {
       await onSave(row.alert_type, {
-        chatwoot_team_id:  teamId  !== "" ? Number(teamId)  : null,
-        chatwoot_agent_id: agentId !== "" ? Number(agentId) : null,
+        chatwoot_team_id:  teamId  !== "none" ? Number(teamId)  : null,
+        chatwoot_agent_id: agentId !== "none" ? Number(agentId) : null,
         label: label || null,
       });
     } finally {
@@ -59,29 +67,39 @@ function AlertRow({ row, onSave }) {
         <p className="font-medium text-sm">{ALERT_LABELS[row.alert_type] || row.alert_type}</p>
         <p className="text-xs text-muted-foreground font-mono">{row.alert_type}</p>
       </td>
-      <td className="py-3 pr-4">
-        <Input
-          className="h-8 w-24 text-sm"
-          placeholder="ID equipo"
-          value={teamId}
-          onChange={(e) => setTeamId(e.target.value)}
-          type="number"
-          min="1"
-        />
+      <td className="py-3 pr-4 min-w-[160px]">
+        <Select value={teamId} onValueChange={setTeamId}>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue placeholder="Sin equipo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">— Sin equipo —</SelectItem>
+            {teams.map((t) => (
+              <SelectItem key={t.id} value={String(t.id)}>
+                {t.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </td>
-      <td className="py-3 pr-4">
-        <Input
-          className="h-8 w-24 text-sm"
-          placeholder="ID agente"
-          value={agentId}
-          onChange={(e) => setAgentId(e.target.value)}
-          type="number"
-          min="1"
-        />
+      <td className="py-3 pr-4 min-w-[160px]">
+        <Select value={agentId} onValueChange={setAgentId}>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue placeholder="Sin agente" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">— Sin agente —</SelectItem>
+            {agents.map((a) => (
+              <SelectItem key={a.id} value={String(a.id)}>
+                {a.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </td>
-      <td className="py-3 pr-4">
+      <td className="py-3 pr-4 min-w-[140px]">
         <Input
-          className="h-8 w-36 text-sm"
+          className="h-8 text-xs"
           placeholder="etiqueta"
           value={label}
           onChange={(e) => setLabel(e.target.value)}
@@ -106,16 +124,28 @@ function AlertRow({ row, onSave }) {
 export default function AlertasConfigPage() {
   useRequirePerm("mensajes", "view");
 
-  const [rows, setRows]     = useState([]);
+  const [rows, setRows]       = useState([]);
+  const [teams, setTeams]     = useState([]);
+  const [agents, setAgents]   = useState([]);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/chatwoot/alert", { headers: getAuthHeaders() });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setRows(data.alertas || []);
+      const headers = getAuthHeaders();
+      const [alertRes, teamRes, agentRes] = await Promise.all([
+        fetch("/api/chatwoot/alert",   { headers }),
+        fetch("/api/chatwoot/teams",   { headers }),
+        fetch("/api/chatwoot/agents",  { headers }),
+      ]);
+      if (!alertRes.ok) throw new Error("alertas");
+      const alertData = await alertRes.json();
+      setRows(alertData.alertas || []);
+      if (teamRes.ok)  setTeams(await teamRes.json());
+      if (agentRes.ok) {
+        const agentData = await agentRes.json();
+        setAgents(Array.isArray(agentData?.data) ? agentData.data : []);
+      }
     } catch {
       toast.error("Error al cargar configuración de alertas");
     } finally {
@@ -170,15 +200,21 @@ export default function AlertasConfigPage() {
                 <thead>
                   <tr className="border-b text-muted-foreground">
                     <th className="text-left py-2 pr-4 font-medium">Tipo de alerta</th>
-                    <th className="text-left py-2 pr-4 font-medium">ID Equipo</th>
-                    <th className="text-left py-2 pr-4 font-medium">ID Agente</th>
+                    <th className="text-left py-2 pr-4 font-medium">Equipo</th>
+                    <th className="text-left py-2 pr-4 font-medium">Agente (opcional)</th>
                     <th className="text-left py-2 pr-4 font-medium">Etiqueta</th>
                     <th className="text-right py-2 font-medium"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((row) => (
-                    <AlertRow key={row.id} row={row} onSave={handleSave} />
+                    <AlertRow
+                      key={row.id}
+                      row={row}
+                      teams={teams}
+                      agents={agents}
+                      onSave={handleSave}
+                    />
                   ))}
                 </tbody>
               </table>
@@ -195,9 +231,9 @@ export default function AlertasConfigPage() {
       <Card className="border-dashed">
         <CardContent className="pt-4">
           <p className="text-xs text-muted-foreground">
-            <strong>ID Equipo</strong>: ID numérico del equipo en Chatwoot (Settings → Teams).<br />
-            <strong>ID Agente</strong>: ID numérico del agente (tiene prioridad sobre el equipo si ambos están configurados).<br />
-            <strong>Etiqueta</strong>: Label que se agrega a la conversación en Chatwoot para filtrado.
+            <strong>Equipo</strong>: grupo de Chatwoot que recibirá la conversación y la alerta.<br />
+            <strong>Agente</strong>: si se configura, tiene prioridad sobre el equipo para la asignación directa.<br />
+            <strong>Etiqueta</strong>: label que se agrega a la conversación en Chatwoot para filtrado.
           </p>
         </CardContent>
       </Card>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import bcrypt from "bcryptjs";
+import { requireAuth } from "@/lib/conversationsAuth";
 
 function normalizarIds(arr) {
   if (!Array.isArray(arr)) return [];
@@ -11,6 +12,9 @@ function normalizarIds(arr) {
    GET: obtener usuario por id con roles
 ========================= */
 export async function GET(req, { params }) {
+  const auth = requireAuth(req);
+  if (!auth.ok) return auth.response;
+
   try {
     const { id } = await params;
 
@@ -30,6 +34,7 @@ export async function GET(req, { params }) {
         u.work_schedule,
         u.created_at,
         u.color,
+        u.chatwoot_agent_id,
 
         (
           SELECT GROUP_CONCAT(DISTINCT um.mostrador_id ORDER BY um.mostrador_id ASC)
@@ -79,6 +84,9 @@ export async function GET(req, { params }) {
    PUT: actualizar usuario + relaciones + role_id
 ========================= */
 export async function PUT(req, { params }) {
+  const auth = requireAuth(req);
+  if (!auth.ok) return auth.response;
+
   let connection;
 
   try {
@@ -90,6 +98,7 @@ export async function PUT(req, { params }) {
     const email = (body.email || "").trim();
     const phone = (body.phone || "").trim();
     const role_id = body.role_id || null;
+    const chatwoot_agent_id = body.chatwoot_agent_id != null ? Number(body.chatwoot_agent_id) || null : null;
     const color = body.color ?? "#5e17eb";
     const is_active = body.is_active ?? 1;
     const password = body.password || "";
@@ -218,6 +227,7 @@ export async function PUT(req, { params }) {
         permissions = ?,
         work_schedule = ?,
         color = ?,
+        chatwoot_agent_id = ?,
         password_hash = IFNULL(?, password_hash)
       WHERE id = ?
       `,
@@ -231,6 +241,7 @@ export async function PUT(req, { params }) {
         permissions,
         work_schedule,
         color,
+        chatwoot_agent_id,
         password_hash,
         id,
       ]
@@ -315,6 +326,9 @@ export async function PUT(req, { params }) {
    DELETE: eliminar usuario con transacción
 ========================= */
 export async function DELETE(req, { params }) {
+  const auth = requireAuth(req);
+  if (!auth.ok) return auth.response;
+
   let connection;
 
   try {

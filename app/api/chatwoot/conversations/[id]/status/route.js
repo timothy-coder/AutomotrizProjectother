@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { updateConversationStatus } from "@/lib/chatwoot";
 import { authorizeConversation } from "@/lib/conversationsAuth";
 
-export async function POST(req, { params }) {
+export async function PUT(req, { params }) {
   const auth = authorizeConversation(req, "edit");
   if (!auth.ok) return auth.response;
 
@@ -14,7 +14,7 @@ export async function POST(req, { params }) {
   } catch {
     return NextResponse.json({ message: "Body JSON inválido" }, { status: 400 });
   }
-  const { status } = body;
+  const { status, snoozed_until } = body;
   const allowed = ["open", "resolved", "pending", "snoozed"];
   if (!allowed.includes(status)) {
     return NextResponse.json(
@@ -22,9 +22,12 @@ export async function POST(req, { params }) {
       { status: 400 }
     );
   }
+  if (status === "snoozed" && !snoozed_until) {
+    return NextResponse.json({ message: "snoozed_until es requerido para snooze" }, { status: 400 });
+  }
 
   try {
-    const data = await updateConversationStatus(id, status);
+    const data = await updateConversationStatus(id, status, snoozed_until ?? null);
     return NextResponse.json(data);
   } catch (err) {
     console.error("Error al actualizar estado de conversación:", err);

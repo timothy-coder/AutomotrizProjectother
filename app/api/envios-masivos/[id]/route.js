@@ -214,3 +214,42 @@ export async function GET(req, { params }) {
     return NextResponse.json({ message: "Error obteniendo detalle" }, { status: 500 });
   }
 }
+
+export async function DELETE(req, { params }) {
+  const auth = authorizeConversation(req, "edit");
+  if (!auth.ok) return auth.response;
+
+  try {
+    const { id } = await params;
+    const campaignId = Number(id);
+
+    if (!Number.isFinite(campaignId) || campaignId <= 0) {
+      return NextResponse.json({ message: "id inválido" }, { status: 400 });
+    }
+
+    const [rows] = await db.query(
+      "SELECT id, status FROM whatsapp_mass_campaigns WHERE id = ? LIMIT 1",
+      [campaignId]
+    );
+
+    const campaign = rows?.[0];
+    if (!campaign) {
+      return NextResponse.json({ message: "Campaña no encontrada" }, { status: 404 });
+    }
+
+    if (campaign.status !== "scheduled") {
+      return NextResponse.json(
+        { message: `Solo se pueden eliminar campañas programadas. Estado actual: ${campaign.status}` },
+        { status: 409 }
+      );
+    }
+
+    await db.query("DELETE FROM campaign_recipients WHERE campaign_id = ?", [campaignId]);
+    await db.query("DELETE FROM whatsapp_mass_campaigns WHERE id = ?", [campaignId]);
+
+    return NextResponse.json({ message: "Campaña eliminada" });
+  } catch (error) {
+    console.error("DELETE /api/envios-masivos/[id] error:", error);
+    return NextResponse.json({ message: "Error eliminando campaña" }, { status: 500 });
+  }
+}

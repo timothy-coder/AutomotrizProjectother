@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { assignConversation, addLabel } from "@/lib/chatwoot";
 import { authorizeConversation } from "@/lib/conversationsAuth";
+import { broadcastSseEvent } from "@/lib/chatwootSse";
 
 const VALID_ALERT_TYPES = [
   "planchado_pintura",
@@ -95,6 +96,18 @@ export async function POST(req) {
       errors.push(`add_label: ${e.message}`);
       console.error("[alert POST] add label error:", e.message);
     }
+  }
+
+  if (errors.length === 0) {
+    broadcastSseEvent(
+      "bot_alert",
+      {
+        conversation_id: Number(conversation_id),
+        alert_type,
+        timestamp: new Date().toISOString(),
+      },
+      routing.chatwoot_team_id ?? null
+    );
   }
 
   return NextResponse.json({

@@ -43,18 +43,8 @@ function channelFromInbox(channelType) {
   return "whatsapp";
 }
 
-async function fetchConversations(status = "open") {
-  const token = getAuthToken();
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
-  const res = await fetch(`/api/chatwoot/conversations?status=${status}`, {
-    cache: "no-store",
-    headers,
-  });
-  if (!res.ok) return [];
-  const data = await res.json();
-  // Chatwoot returns { data: { payload: [...] } }
-  const payload = data?.data?.payload || [];
-  return payload.map((conv) => ({
+function mapConversation(conv) {
+  return {
     session_id: conv.id,
     client_name: conv.meta?.sender?.name || "Cliente",
     cliente_nombre: conv.meta?.sender?.name || "Cliente",
@@ -72,6 +62,7 @@ async function fetchConversations(status = "open") {
     last_message: conv.last_non_activity_message?.content || "",
     ultimomensaje: conv.last_non_activity_message?.content || "",
     sla_due_at: null,
+    contact_id: conv.meta?.sender?.id || null,
     assigned_agent_name: conv.meta?.assignee?.name || null,
     assigned_agent_id: conv.meta?.assignee?.id || null,
     team_name: conv.meta?.team?.name || null,
@@ -83,7 +74,32 @@ async function fetchConversations(status = "open") {
     updated_at: conv.updated_at
       ? new Date(conv.updated_at * 1000).toISOString()
       : null,
-  }));
+  };
+}
+
+async function fetchConversations(status = "open") {
+  const token = getAuthToken();
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const res = await fetch(`/api/chatwoot/conversations?status=${status}`, {
+    cache: "no-store",
+    headers,
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  const payload = data?.data?.payload || [];
+  return payload.map(mapConversation);
+}
+
+async function fetchSearchResults(q) {
+  const token = getAuthToken();
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const res = await fetch(`/api/chatwoot/search?q=${encodeURIComponent(q)}`, {
+    cache: "no-store",
+    headers,
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data?.conversations ?? []).map(mapConversation);
 }
 
 // ── Helpers globales ─────────────────────────────────────────────────────────
@@ -113,8 +129,9 @@ function formatRelativeTime(dateStr) {
 function assignmentColorClass(status) {
   if (status === "open") return "bg-green-500";
   if (status === "pending") return "bg-amber-400";
-  if (status === "closed") return "bg-gray-400";
-  return "bg-gray-300";
+  if (status === "closed" || status === "resolved") return "bg-gray-400";
+  if (status === "snoozed") return "bg-blue-400";
+  return "bg-green-500";
 }
 
 function ChannelPill({ channel }) {
@@ -183,6 +200,34 @@ function formatChatDuration(createdAt) {
   if (hrs < 24) return `${hrs}h`;
   return `${Math.floor(hrs / 24)}d`;
 }
+
+// ─── Brand icons (SVG inline — lucide-react no incluye logos de marca) ────────
+
+function WhatsAppIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+    </svg>
+  );
+}
+
+function InstagramIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
+    </svg>
+  );
+}
+
+function FacebookIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+    </svg>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const CHANNEL_CFG = {
   whatsapp: { Icon: WhatsAppIcon, iconColor: "text-green-500", bg: "bg-green-50 border-green-200", label: "WhatsApp" },
@@ -279,38 +324,12 @@ function ChatKpiCards({ session }) {
   );
 }
 
-// ─── Brand icons (SVG inline — lucide-react no incluye logos de marca) ────────
-
-function WhatsAppIcon({ className }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-    </svg>
-  );
-}
-
-function InstagramIcon({ className }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
-    </svg>
-  );
-}
-
-function FacebookIcon({ className }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-    </svg>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-
 export default function ConversationsPage() {
   const router = useRouter();
   const { user } = useAuth();
   const [sessions, setSessions] = useState([]);
+  const [myTeam, setMyTeam] = useState(null);
+  const [botAlerts, setBotAlerts] = useState([]);
   const [metrics, setMetrics] = useState({
     total_conversations: 0,
     active_conversations: 0,
@@ -324,19 +343,14 @@ export default function ConversationsPage() {
   });
   const [selectedSession, setSelectedSession] = useState(null);
   const [search, setSearch] = useState("");
+  const [serverSearchResults, setServerSearchResults] = useState(null);
+  const [serverSearchLoading, setServerSearchLoading] = useState(false);
+  const [viewFilter, setViewFilter] = useState("team"); // "team" | "mine"
   const [channelFilter, setChannelFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [ownerFilter, setOwnerFilter] = useState("all");
   const [assignmentFilter, setAssignmentFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
-  const [bulkOpen, setBulkOpen] = useState(false);
-  const [bulkChannel, setBulkChannel] = useState("whatsapp");
-  const [bulkText, setBulkText] = useState("");
-  const [bulkSending, setBulkSending] = useState(false);
-  const [bulkError, setBulkError] = useState("");
-  const [bulkSummary, setBulkSummary] = useState(null);
-  const [selectedSessionIds, setSelectedSessionIds] = useState([]);
-  const [bulkTargetMode, setBulkTargetMode] = useState("filtered");
   const [pageError, setPageError] = useState("");
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [summarySession, setSummarySession] = useState(null);
@@ -359,8 +373,8 @@ export default function ConversationsPage() {
 
       const [newSessions, metricsRes, interactionRes, agentsRes] = await Promise.all([
         fetchConversations("open"),
-        fetch(`/api/conversations/metrics?user_id=${user?.id || 0}`, { cache: "no-store" }),
-        fetch("/api/conversations/interaction-metrics", { cache: "no-store" }),
+        fetch(`/api/conversations/metrics?user_id=${user?.id || 0}`, { cache: "no-store", headers: authHeaders }),
+        fetch("/api/conversations/interaction-metrics", { cache: "no-store", headers: authHeaders }),
         fetch("/api/chatwoot/agents", { cache: "no-store", headers: authHeaders }),
       ]);
 
@@ -390,7 +404,7 @@ export default function ConversationsPage() {
 
       if (agentsRes.ok) {
         const agentsData = await agentsRes.json();
-        setAgents(Array.isArray(agentsData) ? agentsData : []);
+        setAgents(Array.isArray(agentsData?.data) ? agentsData.data : []);
       }
     } catch (error) {
       console.error("Error cargando conversaciones:", error);
@@ -404,6 +418,41 @@ export default function ConversationsPage() {
   useEffect(() => {
     load();
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const token = getAuthToken();
+    fetch("/api/chatwoot/my-team", {
+      cache: "no-store",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then((r) => r.json())
+      .then((d) => { if (d?.team) setMyTeam(d.team); })
+      .catch((err) => console.error("Error cargando equipo:", err));
+  }, [user?.id]);
+
+  // ── Server-side search (debounced 400ms) ──────────────────────────────────────
+  useEffect(() => {
+    const q = search.trim();
+    if (q.length < 2) {
+      setServerSearchResults(null);
+      setServerSearchLoading(false);
+      return;
+    }
+    setServerSearchLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await fetchSearchResults(q);
+        setServerSearchResults(results);
+      } catch (err) {
+        console.error("Server search error:", err);
+        setServerSearchResults([]);
+      } finally {
+        setServerSearchLoading(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // ── SSE: actualizaciones en tiempo real (reemplaza polling de 15 s) ──────────
   useEffect(() => {
@@ -426,8 +475,19 @@ export default function ConversationsPage() {
     evtSource.addEventListener("conversation_status", () => {
       fetchConversations(activeStatus).then(setSessions).catch(console.error);
     });
+    evtSource.addEventListener("bot_alert", (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        setBotAlerts((prev) => [
+          data,
+          ...prev.filter((a) => a.conversation_id !== data.conversation_id),
+        ]);
+      } catch (err) {
+        console.error("SSE bot_alert parse error:", err);
+      }
+    });
     evtSource.onerror = () => {
-      console.warn("Chatwoot SSE: connection error — browser will auto-reconnect. readyState:", evtSource.readyState);
+      console.error("Chatwoot SSE: connection error — browser will auto-reconnect. readyState:", evtSource.readyState);
     };
 
     return () => evtSource.close();
@@ -468,7 +528,14 @@ export default function ConversationsPage() {
   }, [sessions]);
 
   function handleOpenTimeline(session) {
-    setSelectedSession(session);
+    setSelectedSession({ ...session, unread_count: 0 });
+    if (Number(session.unread_count) > 0) {
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.session_id === session.session_id ? { ...s, unread_count: 0 } : s
+        )
+      );
+    }
   }
 
   function handleToggleChannel(ch) {
@@ -486,7 +553,7 @@ export default function ConversationsPage() {
       // Mapear "closed" → "resolved" para compatibilidad con Chatwoot
       const chatwootStatus = nextStatus === "closed" ? "resolved" : nextStatus;
       const res = await fetch(`/api/chatwoot/conversations/${sessionId}/status`, {
-        method: "POST",
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -509,7 +576,7 @@ export default function ConversationsPage() {
     try {
       const token = getAuthToken();
       const res = await fetch(`/api/chatwoot/conversations/${sessionId}/assign`, {
-        method: "POST",
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -564,6 +631,12 @@ export default function ConversationsPage() {
   }
 
 
+  function handleStatusTabChange(tab) {
+    const chatwootStatus = tab === "pending" ? "pending" : "open";
+    setAssignmentFilter(tab === "pending" ? "pending" : "all");
+    fetchConversations(chatwootStatus).then(setSessions).catch(console.error);
+  }
+
   async function handleOpenSummaryDialog(session) {
     setSummarySession(session);
     setSummaryText("");
@@ -572,9 +645,10 @@ export default function ConversationsPage() {
 
     try {
       // Intentar obtener conversation_summary real desde el timeline
+      const token = getAuthToken();
       const res = await fetch(
         `/api/conversations/timeline?session_id=${session.session_id}`,
-        { cache: "no-store" }
+        { cache: "no-store", headers: token ? { Authorization: `Bearer ${token}` } : {} }
       );
       if (res.ok) {
         const data = await res.json();
@@ -624,9 +698,11 @@ export default function ConversationsPage() {
   }
 
   const filteredSessions = useMemo(() => {
-    return sessions.filter((s) => {
+    const baseList = serverSearchResults !== null ? serverSearchResults : sessions;
+    return baseList.filter((s) => {
       const term = search.trim().toLowerCase();
-      const bySearch = !term
+      const bySearch = serverSearchResults !== null
+        || !term
         || String(s?.cliente_nombre || "").toLowerCase().includes(term)
         || String(s?.celular || "").toLowerCase().includes(term)
         || String(s?.ultimomensaje || "").toLowerCase().includes(term);
@@ -641,10 +717,13 @@ export default function ConversationsPage() {
         || (statusFilter === "unread" && unreadCount > 0);
 
       const assignedAgentId = Number(s?.assigned_agent_id || 0);
-      const currentUserId = Number(user?.id || 0);
+      const chatwootAgentId = Number(user?.chatwoot_agent_id || 0);
       const byOwner = ownerFilter === "all"
-        || (ownerFilter === "mine" && currentUserId > 0 && assignedAgentId === currentUserId)
+        || (ownerFilter === "mine" && chatwootAgentId > 0 && assignedAgentId === chatwootAgentId)
         || (ownerFilter === "unassigned" && !assignedAgentId);
+
+      const byView = viewFilter === "team"
+        || (viewFilter === "mine" && chatwootAgentId > 0 && assignedAgentId === chatwootAgentId);
 
       const assignmentStatus = String(s?.assignment_status || "unassigned").toLowerCase();
       const byAssignment = assignmentFilter === "all"
@@ -656,9 +735,9 @@ export default function ConversationsPage() {
         || (priorityFilter === "overdue" && Number(s?.is_overdue || 0) === 1)
         || priorityLevel === priorityFilter;
 
-      return bySearch && byChannel && byStatus && byOwner && byAssignment && byPriority;
+      return bySearch && byChannel && byStatus && byOwner && byAssignment && byPriority && byView;
     });
-  }, [sessions, search, channelFilter, statusFilter, ownerFilter, assignmentFilter, priorityFilter, user]);
+  }, [sessions, search, channelFilter, statusFilter, ownerFilter, assignmentFilter, priorityFilter, viewFilter, user]);
 
   const scopedSessions = useMemo(() => {
     if (!selectedSession?.session_id) return filteredSessions;
@@ -671,19 +750,6 @@ export default function ConversationsPage() {
     return [selectedSession];
   }, [filteredSessions, selectedSession]);
 
-  useEffect(() => {
-    const filteredIdSet = new Set(filteredSessions.map((s) => Number(s.session_id)));
-    setSelectedSessionIds((prev) => prev.filter((id) => filteredIdSet.has(Number(id))));
-  }, [filteredSessions]);
-
-  const selectedSessions = useMemo(() => {
-    const selectedIdSet = new Set(selectedSessionIds.map((id) => Number(id)));
-    return filteredSessions.filter((s) => selectedIdSet.has(Number(s.session_id)));
-  }, [filteredSessions, selectedSessionIds]);
-
-  const allFilteredSelected =
-    filteredSessions.length > 0 && selectedSessions.length === filteredSessions.length;
-
   const metricsCards = useMemo(() => {
     const total = scopedSessions.length;
     const active = scopedSessions.filter((s) => {
@@ -695,11 +761,11 @@ export default function ConversationsPage() {
     const overdue = scopedSessions.filter((s) => Number(s?.is_overdue || 0) === 1).length;
     const unread = scopedSessions.reduce((acc, s) => acc + Number(s?.unread_count || 0), 0);
 
-    const currentUserId = Number(user?.id || 0);
+    const chatwootAgentId = Number(user?.chatwoot_agent_id || 0);
     const mine = scopedSessions.filter((s) => {
       const assignedId = Number(s?.assigned_agent_id || 0);
       const status = String(s?.assignment_status || "unassigned").toLowerCase();
-      return currentUserId > 0 && assignedId === currentUserId && (status === "open" || status === "pending");
+      return chatwootAgentId > 0 && assignedId === chatwootAgentId && (status === "open" || status === "pending");
     }).length;
 
     // ── Espera máxima calculada desde scopedSessions ──────────
@@ -830,80 +896,6 @@ export default function ConversationsPage() {
     return counts;
   }, [sessions]);
 
-  function handleToggleSessionSelection(sessionId) {
-    const normalized = Number(sessionId);
-    setSelectedSessionIds((prev) => {
-      if (prev.includes(normalized)) {
-        return prev.filter((id) => id !== normalized);
-      }
-      return [...prev, normalized];
-    });
-  }
-
-  function handleToggleSelectAll() {
-    if (allFilteredSelected) {
-      setSelectedSessionIds([]);
-      return;
-    }
-
-    setSelectedSessionIds(filteredSessions.map((s) => Number(s.session_id)));
-  }
-
-  async function handleSendBulkMessage() {
-    const text = bulkText.trim();
-    if (!text || bulkSending) return;
-
-    const targetSessions = bulkTargetMode === "selected" ? selectedSessions : filteredSessions;
-
-    if (!targetSessions.length) {
-      setBulkError(
-        bulkTargetMode === "selected"
-          ? "No hay conversaciones seleccionadas para enviar."
-          : "No hay conversaciones filtradas para enviar."
-      );
-      return;
-    }
-
-    setBulkSending(true);
-    setBulkError("");
-    setBulkSummary(null);
-
-    try {
-      const recipients = targetSessions.map((s) => ({
-        session_id: s.session_id,
-        phone: s.celular || s.phone || null,
-      }));
-
-      const res = await fetch("/api/conversations/bulk-messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text,
-          source_channel: bulkChannel,
-          source: "bulk_ui",
-          recipients,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data?.message || "No se pudo enviar la campaña básica");
-      }
-
-      setBulkSummary(data?.summary || null);
-      await load();
-    } catch (error) {
-      setBulkError(error?.message || "Error enviando masivo");
-    } finally {
-      setBulkSending(false);
-    }
-  }
-
-  // Detectar si hay filtros activos (para mostrar etiqueta en indicadores)
-  const hasActiveFilters = channelFilter !== "all" || statusFilter !== "all"
-    || ownerFilter !== "all" || assignmentFilter !== "all" || priorityFilter !== "all"
-    || search.trim() !== "";
-
   return (
     <TooltipProvider>
       <div className="h-full min-h-0 flex flex-col gap-2 overflow-y-auto pr-1">
@@ -916,9 +908,18 @@ export default function ConversationsPage() {
         {/* Panel de filtros */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h1 className="text-base font-semibold text-gray-800">Mensajes</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-semibold text-gray-800">Mensajes</h1>
+              {myTeam ? (
+                <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium bg-violet-100 text-violet-700 border border-violet-200">
+                  <Users className="w-2.5 h-2.5" />
+                  {myTeam.name}
+                </span>
+              ) : user?.role && !String(user.role).toLowerCase().includes("admin") ? null : null}
+            </div>
             <NotificationPanel
               conversations={sessions}
+              botAlerts={botAlerts}
               onOpenConversation={handleOpenConversationById}
             />
           </div>
@@ -1060,44 +1061,77 @@ export default function ConversationsPage() {
           </div>
           )}
 
-          <div className="flex items-center justify-between">
-            <div />
-
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-400">{filteredSessions.length} conv. · {selectedSessions.length} sel.</span>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 px-2 text-xs"
-                onClick={() => handleToggleSelectAll()}
-                disabled={filteredSessions.length === 0}
-              >
-                {allFilteredSelected ? "Limpiar" : "Seleccionar"}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 px-2 text-xs"
-                onClick={() => {
-                  setBulkError("");
-                  setBulkSummary(null);
-                  setBulkTargetMode(selectedSessions.length > 0 ? "selected" : "filtered");
-                  setBulkOpen(true);
-                }}
-              >
-                Masivo
-              </Button>
-            </div>
+          <div className="flex items-center justify-end">
+            <span className="text-xs text-gray-400">{filteredSessions.length} conv.</span>
           </div>
         </div>
 
         {/* Layout conversaciones */}
         <div className="grid grid-cols-1 lg:grid-cols-[330px_minmax(0,1fr)] gap-2 flex-1 min-h-0">
           <div className={`${selectedSession ? "hidden lg:flex" : "flex"} border rounded-xl overflow-hidden bg-white shadow min-h-0 h-full flex-col`}>
+            {/* Tabs Del equipo / Mis chats (solo si el usuario tiene agente Chatwoot) */}
+            {user?.chatwoot_agent_id && (
+              <div className="flex border-b bg-gray-50 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setViewFilter("team")}
+                  className={`flex-1 py-1.5 text-[11px] font-medium transition-colors ${
+                    viewFilter === "team"
+                      ? "border-b-2 border-violet-500 text-violet-700 bg-violet-50"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  Del equipo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewFilter("mine")}
+                  className={`flex-1 py-1.5 text-[11px] font-medium transition-colors ${
+                    viewFilter === "mine"
+                      ? "border-b-2 border-violet-500 text-violet-700 bg-violet-50"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  Mis chats
+                </button>
+              </div>
+            )}
+
+            {/* Tabs Activos / Pendientes */}
+            <div className="flex border-b bg-white flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => handleStatusTabChange("open")}
+                className={`flex-1 py-2 text-xs font-medium transition-colors ${
+                  assignmentFilter !== "pending"
+                    ? "border-b-2 border-blue-500 text-blue-600"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Activos
+              </button>
+              <button
+                type="button"
+                onClick={() => handleStatusTabChange("pending")}
+                className={`flex-1 py-2 text-xs font-medium transition-colors ${
+                  assignmentFilter === "pending"
+                    ? "border-b-2 border-amber-500 text-amber-600"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Pendientes
+              </button>
+            </div>
+
             {search.trim() && (
               <div className="px-4 py-2 border-b bg-blue-50/60 flex items-center justify-between">
                 <span className="text-xs text-blue-700 font-medium">
-                  {filteredSessions.length} resultado{filteredSessions.length !== 1 ? "s" : ""} para &ldquo;{search.trim()}&rdquo;
+                  {serverSearchLoading
+                    ? "Buscando en Chatwoot..."
+                    : serverSearchResults !== null
+                      ? `${filteredSessions.length} resultado${filteredSessions.length !== 1 ? "s" : ""} en Chatwoot para "${search.trim()}"`
+                      : `${filteredSessions.length} resultado${filteredSessions.length !== 1 ? "s" : ""} para "${search.trim()}"`
+                  }
                 </span>
                 <button
                   type="button"
@@ -1125,16 +1159,6 @@ export default function ConversationsPage() {
                       isSelected ? "bg-blue-50/50 border-l-blue-500" : "border-l-transparent"
                     }`}
                   >
-                    {/* Checkbox */}
-                    <input
-                      type="checkbox"
-                      className="mt-1 h-3.5 w-3.5 rounded flex-shrink-0"
-                      checked={selectedSessionIds.includes(Number(s.session_id))}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={() => handleToggleSessionSelection(s.session_id)}
-                      aria-label={`Seleccionar conversacion ${s.session_id}`}
-                    />
-
                     {/* Avatar con iniciales */}
                     <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 text-white ${assignmentColorClass(s.assignment_status)}`}>
                       {getInitials(s.cliente_nombre)}
@@ -1178,16 +1202,16 @@ export default function ConversationsPage() {
                           <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                             <div className="relative flex items-center">
                               <select
-                                value={s.assignment_status || "unassigned"}
+                                value={s.assignment_status === "resolved" ? "closed" : (s.assignment_status || "open")}
                                 onChange={(e) => handleQuickStatusChange(s.session_id, e.target.value)}
                                 className={`appearance-none text-[10px] pr-4 pl-1.5 py-0.5 rounded-full border font-medium cursor-pointer transition-colors ${
                                   s.assignment_status === "open" ? "bg-green-50 border-green-300 text-green-700" :
                                   s.assignment_status === "pending" ? "bg-amber-50 border-amber-300 text-amber-700" :
-                                  s.assignment_status === "closed" ? "bg-gray-100 border-gray-300 text-gray-500" :
-                                  "bg-gray-50 border-gray-200 text-gray-400"
+                                  (s.assignment_status === "closed" || s.assignment_status === "resolved") ? "bg-gray-100 border-gray-300 text-gray-500" :
+                                  s.assignment_status === "snoozed" ? "bg-blue-50 border-blue-300 text-blue-600" :
+                                  "bg-green-50 border-green-300 text-green-700"
                                 }`}
                               >
-                                <option value="unassigned">Sin asignar</option>
                                 <option value="open">Abierta</option>
                                 <option value="pending">Pendiente</option>
                                 <option value="closed">Cerrada</option>
@@ -1195,8 +1219,12 @@ export default function ConversationsPage() {
                               <ChevronDown className="absolute right-1 w-2.5 h-2.5 pointer-events-none text-current opacity-60" />
                             </div>
                           </div>
-                          <span className="group-hover:hidden text-[10px] text-gray-400 capitalize">
-                            {s.assignment_status || "sin asignar"}
+                          <span className="group-hover:hidden text-[10px] font-medium">
+                            {s.assignment_status === "open" ? <span className="text-green-600">Abierta</span> :
+                             s.assignment_status === "pending" ? <span className="text-amber-600">Pendiente</span> :
+                             (s.assignment_status === "resolved" || s.assignment_status === "closed") ? <span className="text-gray-400">Cerrada</span> :
+                             s.assignment_status === "snoozed" ? <span className="text-blue-500">Pospuesta</span> :
+                             <span className="text-green-600">Abierta</span>}
                           </span>
                           {/* Agente asignado — siempre visible si existe */}
                           {s.assigned_agent_name && (
@@ -1264,78 +1292,6 @@ export default function ConversationsPage() {
             />
           </div>
         </div>
-
-        {/* Dialog: Envío masivo */}
-        <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
-          <DialogContent className="sm:max-w-xl">
-            <DialogHeader>
-              <DialogTitle>Envío masivo básico</DialogTitle>
-              <DialogDescription>
-                Envia el mismo mensaje a las conversaciones filtradas actualmente.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-3">
-              <p className="text-xs text-gray-500">
-                Filtrados: {filteredSessions.length} · Seleccionados: {selectedSessions.length}
-              </p>
-
-              <select
-                className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-                value={bulkTargetMode}
-                onChange={(e) => setBulkTargetMode(e.target.value)}
-                disabled={bulkSending}
-              >
-                <option value="filtered">Enviar a filtrados</option>
-                <option value="selected">Enviar solo a seleccionados</option>
-              </select>
-
-              <select
-                className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-                value={bulkChannel}
-                onChange={(e) => setBulkChannel(e.target.value)}
-                disabled={bulkSending}
-              >
-                <option value="whatsapp">WhatsApp</option>
-                <option value="instagram">Instagram</option>
-                <option value="facebook">Facebook</option>
-              </select>
-
-              <Textarea
-                value={bulkText}
-                onChange={(e) => setBulkText(e.target.value)}
-                placeholder="Escribe el mensaje promocional a enviar..."
-                className="min-h-28"
-                disabled={bulkSending}
-              />
-
-              {bulkError && <p className="text-sm text-red-600">{bulkError}</p>}
-
-              {bulkSummary && (
-                <div className="text-xs rounded-md border bg-gray-50 p-2 text-gray-700">
-                  Total: {bulkSummary.total || 0} · Enviados: {bulkSummary.sent || 0} · En cola: {bulkSummary.queued || 0} · Fallidos: {bulkSummary.failed || 0} · Omitidos: {bulkSummary.skipped || 0}
-                </div>
-              )}
-            </div>
-
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setBulkOpen(false)} disabled={bulkSending}>
-                Cerrar
-              </Button>
-              <Button
-                onClick={() => handleSendBulkMessage()}
-                disabled={
-                  bulkSending
-                  || !bulkText.trim()
-                  || (bulkTargetMode === "selected" && selectedSessions.length === 0)
-                  || (bulkTargetMode === "filtered" && filteredSessions.length === 0)
-                }
-              >
-                {bulkSending ? "Enviando..." : "Enviar a filtrados"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
 
         {/* Dialog: Resumen de conversación */}
         <Dialog open={summaryOpen} onOpenChange={setSummaryOpen}>

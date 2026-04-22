@@ -58,28 +58,6 @@ Se agrego una base funcional para bandeja conversacional con envio manual y webh
 	- Si existe `N8N_CONVERSATIONS_OUTBOUND_URL`, reenvia payload a n8n.
 	- Incluye idempotencia (`idempotency_key`) y estado (`message_status`) cuando las columnas de tracking estan migradas.
 
-- `POST /api/conversations/bulk-messages`
-	- Envia el mismo mensaje a multiples destinatarios en una sola solicitud.
-	- Soporta `whatsapp`, `instagram` y `facebook`.
-	- Encola mensajes en outbox (no envia sincrono por request) y devuelve resumen (`queued`, `failed`, `skipped`).
-	- Para canales sociales intenta resolver `platform_id` desde `social_identities` por celular.
-	- El envio real ocurre de forma asincrona via cron/job usando `POST /api/conversations/outbox/process` o `npm run outbox:process`.
-
-Body ejemplo:
-
-```json
-{
-	"text": "Promo de mantenimiento con 15% de descuento",
-	"source_channel": "instagram",
-	"source": "bulk_ui",
-	"recipients": [
-		{ "session_id": 10 },
-		{ "phone": "+51999999999" },
-		{ "phone": "+51988888888", "platform_id": "1784xxxxxx" }
-	]
-}
-```
-
 Body ejemplo:
 
 ```json

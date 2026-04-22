@@ -1,23 +1,44 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRequirePerm } from "@/hooks/useRequirePerm";
 import {
   ArrowUpRight, ChevronDown, ChevronUp, Filter, RefreshCw, Trash2, User, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const ESTADOS = ["nuevo", "contactado", "negociando", "cerrado", "perdido"];
+function getAuthHeaders() {
+  if (typeof document === "undefined") return {};
+  const match = document.cookie.match(/(?:^|;\s*)token=([^;]+)/);
+  const token = match ? match[1] : "";
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+const ESTADOS = ["nuevo", "en_gestion", "vendido", "perdido"];
 
 const ESTADO_CONFIG = {
-  nuevo: { label: "Nuevo", color: "bg-blue-100 text-blue-700" },
-  contactado: { label: "Contactado", color: "bg-yellow-100 text-yellow-700" },
-  negociando: { label: "Negociando", color: "bg-purple-100 text-purple-700" },
-  cerrado: { label: "Cerrado", color: "bg-green-100 text-green-700" },
-  perdido: { label: "Perdido", color: "bg-red-100 text-red-700" },
+  nuevo:      { label: "Nuevo",       color: "bg-blue-100 text-blue-700",   tooltip: "Cotización recién capturada por el agente. Ningún asesor la revisó todavía." },
+  en_gestion: { label: "En gestión",  color: "bg-yellow-100 text-yellow-700", tooltip: "El asesor está trabajando activamente este lead: contactó al cliente, enviando propuestas o evaluando financiamiento." },
+  vendido:    { label: "Vendido",     color: "bg-green-100 text-green-700",  tooltip: "La venta se concretó. El lead se convirtió en cliente." },
+  perdido:    { label: "Perdido",     color: "bg-red-100 text-red-700",      tooltip: "El lead no prosperó: el cliente no respondió, compró en otro lugar o descartó la compra." },
 };
 
 function formatPrice(value, moneda = "PEN") {
@@ -41,11 +62,20 @@ function formatDate(value) {
 }
 
 function EstadoBadge({ estado }) {
-  const cfg = ESTADO_CONFIG[estado] || { label: estado, color: "bg-gray-100 text-gray-700" };
+  const cfg = ESTADO_CONFIG[estado] || { label: estado, color: "bg-gray-100 text-gray-700", tooltip: "" };
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cfg.color}`}>
-      {cfg.label}
-    </span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium cursor-default ${cfg.color}`}>
+          {cfg.label}
+        </span>
+      </TooltipTrigger>
+      {cfg.tooltip && (
+        <TooltipContent side="top" className="max-w-48 text-center">
+          {cfg.tooltip}
+        </TooltipContent>
+      )}
+    </Tooltip>
   );
 }
 
@@ -60,10 +90,13 @@ function LeadPanel({ lead, onClose, onEstadoChanged, onDeleted }) {
   const [oportunidadId, setOportunidadId] = useState(lead.oportunidad_crm_codigo || (lead.oportunidad_crm_id ? `LD-?` : null));
 
   async function handlePromover() {
-    if (oportunidadId) return; // ya promovido
+    if (oportunidadId) return;
     setPromoting(true);
     try {
-      const res = await fetch(`/api/ventas/leads/${lead.id}/promover`, { method: "POST" });
+      const res = await fetch(`/api/ventas/leads/${lead.id}/promover`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Error al promover");
       if (data.already_promoted || data.ok) {
@@ -81,7 +114,10 @@ function LeadPanel({ lead, onClose, onEstadoChanged, onDeleted }) {
     if (!confirm(`¿Eliminar la cotización de ${lead.nombre_cliente || "este cliente"}? Esta acción no se puede deshacer.`)) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/ventas/leads/${lead.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/ventas/leads/${lead.id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) throw new Error("Error al eliminar");
       toast.success("Cotización eliminada");
       onDeleted(lead.id);
@@ -96,8 +132,8 @@ function LeadPanel({ lead, onClose, onEstadoChanged, onDeleted }) {
     setSaving(true);
     try {
       const res = await fetch(`/api/ventas/leads/${lead.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify({ estado, notas_agente: notas }),
       });
       if (!res.ok) throw new Error("Error al actualizar");
@@ -175,24 +211,25 @@ function LeadPanel({ lead, onClose, onEstadoChanged, onDeleted }) {
 
           <div className="mb-3">
             <label className="block text-xs font-medium text-gray-600 mb-1">Estado del lead</label>
-            <select
-              value={estado}
-              onChange={(e) => setEstado(e.target.value)}
-              className="w-full border rounded-md px-3 py-2 text-sm bg-white"
-            >
-              {ESTADOS.map((e) => (
-                <option key={e} value={e}>{ESTADO_CONFIG[e]?.label || e}</option>
-              ))}
-            </select>
+            <Select value={estado} onValueChange={setEstado}>
+              <SelectTrigger className="w-full text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ESTADOS.map((e) => (
+                  <SelectItem key={e} value={e}>{ESTADO_CONFIG[e]?.label || e}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Notas del agente</label>
-            <textarea
+            <Textarea
               value={notas}
               onChange={(e) => setNotas(e.target.value)}
               rows={3}
-              className="w-full border rounded-md px-3 py-2 text-sm resize-none"
+              className="resize-none text-sm"
               placeholder="Agrega notas o comentarios internos"
             />
           </div>
@@ -204,30 +241,28 @@ function LeadPanel({ lead, onClose, onEstadoChanged, onDeleted }) {
         <Button onClick={handleSave} disabled={saving} className="w-full">
           {saving ? "Guardando…" : "Guardar cambios"}
         </Button>
-        <button
-          onClick={handlePromover}
+        <Button
+          variant={oportunidadId ? "outline" : "default"}
+          className={`w-full ${oportunidadId ? "text-green-700 border-green-200 bg-green-50 hover:bg-green-50 cursor-default" : ""}`}
+          onClick={() => handlePromover()}
           disabled={promoting || !!oportunidadId}
-          className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            oportunidadId
-              ? "bg-green-50 text-green-700 border border-green-200 cursor-default"
-              : "bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-          }`}
         >
-          <ArrowUpRight className="w-4 h-4" />
+          <ArrowUpRight className="w-4 h-4 mr-2" />
           {oportunidadId
             ? `Enviado a Ventas: ${oportunidadId}`
             : promoting
             ? "Enviando a Ventas…"
             : "Enviar a Ventas"}
-        </button>
-        <button
-          onClick={handleDelete}
+        </Button>
+        <Button
+          variant="outline"
+          className="w-full text-red-600 border-red-200 hover:bg-red-50"
+          onClick={() => handleDelete()}
           disabled={deleting}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium text-red-600 border border-red-200 hover:bg-red-50 disabled:opacity-50 transition-colors"
         >
-          <Trash2 className="w-4 h-4" />
+          <Trash2 className="w-4 h-4 mr-2" />
           {deleting ? "Eliminando…" : "Eliminar cotización"}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -236,9 +271,12 @@ function LeadPanel({ lead, onClose, onEstadoChanged, onDeleted }) {
 // ─── Página principal ─────────────────────────────────────────────────────────
 
 export default function VentasLeadsPage() {
+  useRequirePerm("mensajes", "view");
+
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({ total: 0, page: 1, pages: 1 });
+  const [estadoCounts, setEstadoCounts] = useState({ nuevo: 0, en_gestion: 0, vendido: 0, perdido: 0 });
   const [selectedLead, setSelectedLead] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -251,7 +289,7 @@ export default function VentasLeadsPage() {
 
   const setFilter = (k, v) => setFilters((f) => ({ ...f, [k]: v, page: 1 }));
 
-  const fetchLeads = useCallback(async () => {
+  const fetchLeads = useCallback(async (signal) => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -261,18 +299,24 @@ export default function VentasLeadsPage() {
       params.set("page", filters.page);
       params.set("limit", "50");
 
-      const res = await fetch(`/api/ventas/leads?${params}`);
+      const res = await fetch(`/api/ventas/leads?${params}`, { headers: getAuthHeaders(), signal });
       const data = await res.json();
       setLeads(data.leads || []);
       setPagination(data.pagination || { total: 0, page: 1, pages: 1 });
-    } catch {
+      if (data.estado_counts) setEstadoCounts(data.estado_counts);
+    } catch (err) {
+      if (err?.name === "AbortError") return;
       toast.error("Error al cargar los leads");
     } finally {
       setLoading(false);
     }
   }, [filters]);
 
-  useEffect(() => { fetchLeads(); }, [fetchLeads]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchLeads(controller.signal);
+    return () => controller.abort();
+  }, [fetchLeads]);
 
   function handleEstadoChanged(updated) {
     setLeads((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
@@ -288,15 +332,16 @@ export default function VentasLeadsPage() {
   const activeFilters = [filters.estado, filters.desde, filters.hasta].filter(Boolean).length;
 
   return (
+    <TooltipProvider>
     <div className="flex h-full">
       {/* Lista principal */}
       <div className="flex-1 p-6 overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Leads de ventas</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Leads del agente IA</h1>
             <p className="text-sm text-gray-500 mt-0.5">
-              Cotizaciones generadas por el agente de IA · {pagination.total} total
+              Cotizaciones generadas por el agente de IA · {pagination.total} en total
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -325,16 +370,17 @@ export default function VentasLeadsPage() {
           <div className="mb-4 p-4 border rounded-lg bg-gray-50 grid grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Estado</label>
-              <select
-                value={filters.estado}
-                onChange={(e) => setFilter("estado", e.target.value)}
-                className="w-full border rounded-md px-3 py-2 text-sm bg-white"
-              >
-                <option value="">Todos</option>
-                {ESTADOS.map((e) => (
-                  <option key={e} value={e}>{ESTADO_CONFIG[e]?.label || e}</option>
-                ))}
-              </select>
+              <Select value={filters.estado || "todos"} onValueChange={(v) => setFilter("estado", v === "todos" ? "" : v)}>
+                <SelectTrigger className="w-full text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  {ESTADOS.map((e) => (
+                    <SelectItem key={e} value={e}>{ESTADO_CONFIG[e]?.label || e}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Desde</label>
@@ -359,26 +405,32 @@ export default function VentasLeadsPage() {
         )}
 
         {/* Resumen por estado */}
-        <div className="grid grid-cols-5 gap-2 mb-4">
-          {ESTADOS.map((e) => {
-            const count = leads.filter((l) => l.estado === e).length;
-            const cfg = ESTADO_CONFIG[e];
-            return (
-              <button
-                key={e}
-                onClick={() => setFilter("estado", filters.estado === e ? "" : e)}
-                className={`text-center p-2 rounded-lg border text-xs transition-all ${
-                  filters.estado === e ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white hover:bg-gray-50"
-                }`}
-              >
-                <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium mb-1 ${cfg.color}`}>
-                  {cfg.label}
-                </span>
-                <p className="font-bold text-gray-800">{count}</p>
-              </button>
-            );
-          })}
-        </div>
+        <div className="grid grid-cols-4 gap-2 mb-4">
+            {ESTADOS.map((e) => {
+              const count = estadoCounts[e] ?? 0;
+              const cfg = ESTADO_CONFIG[e];
+              return (
+                <Tooltip key={e}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setFilter("estado", filters.estado === e ? "" : e)}
+                      className={`text-center p-2 rounded-lg border text-xs transition-all ${
+                        filters.estado === e ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white hover:bg-gray-50"
+                      }`}
+                    >
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium mb-1 ${cfg.color}`}>
+                        {cfg.label}
+                      </span>
+                      <p className="font-bold text-gray-800">{count}</p>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-48 text-center">
+                    {cfg.tooltip}
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+          </div>
 
         {/* Tabla */}
         {loading ? (
@@ -478,5 +530,6 @@ export default function VentasLeadsPage() {
         />
       )}
     </div>
+    </TooltipProvider>
   );
 }
