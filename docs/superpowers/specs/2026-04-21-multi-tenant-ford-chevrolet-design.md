@@ -20,8 +20,8 @@ Ahora hay que levantar dos instancias productivas nuevas, una por cada centro de
 
 Restricciones importantes:
 
-- Los **dos CRM viven en el mismo droplet** (distintos subdominios + puertos).
-- Las **tres bases de datos MySQL** (staging + Ford + Chevrolet) viven en el mismo droplet que los CRM.
+- **Ford y Chevrolet viven en un mismo droplet productivo** (distintos subdominios + puertos), distinto al droplet de staging.
+- Las **dos bases de datos productivas** (`db_wankamotorsford` y `db_wankamotorschevrolet`) viven en el mismo droplet que los CRM productivos. La base de staging queda en su droplet aparte.
 - **Chatwoot es una sola instancia** compartida (la de `os.app20.tech`), con cuentas separadas por tenant.
 - **n8n es una sola instancia** compartida (la de `64.23.235.153`), con flujos duplicados por tenant.
 - Las bases `db_wankamotorsford` y `db_wankamotorschevrolet` están creadas pero **vacías**.
@@ -71,33 +71,26 @@ Restricciones importantes:
                     └────┬─────────────┬─────────────┬─────────┘
                          │             │             │
                          ▼             ▼             ▼
-                    ┌─────────────────────────────────────────┐
-                    │  Droplet de CRMs (mismo hardware/SO)    │
-                    │                                          │
-                    │  :puerto 3000 (staging)  myprototipe.... │
-                    │  :puerto 3000 (ford)    wankamotorsford..│
-                    │  :puerto 3001 (chevrolet) wankamotors... │
-                    │                                          │
-                    │  MySQL 8:                                │
-                    │   • db_myprototipe (staging actual)      │
-                    │   • db_wankamotorsford                   │
-                    │   • db_wankamotorschevrolet              │
-                    └─────────────────────────────────────────┘
+    ┌──────────────────────────────────┐   ┌────────────────────────────────────┐
+    │  Droplet STAGING (aparte)        │   │  Droplet PRODUCTIVO (Ford + Chev)  │
+    │                                  │   │                                    │
+    │  :3000  myprototipe              │   │  :3000  wankamotorsford...         │
+    │                                  │   │  :3001  wankamotorschevrolet...    │
+    │  MySQL:                          │   │                                    │
+    │   • db_myprototipe               │   │  MySQL 8:                          │
+    │                                  │   │   • db_wankamotorsford             │
+    │                                  │   │   • db_wankamotorschevrolet        │
+    └──────────────────────────────────┘   └────────────────────────────────────┘
 ```
 
-> **⚠️ Punto a confirmar antes de la Fase 1:** staging (`myprototipe`) actualmente corre en el puerto 3000. Si Ford productivo se despliega en el **mismo droplet** que staging y también usa 3000, hay conflicto. Dos escenarios posibles:
->
-> - **Escenario A — droplets separados:** staging queda en su droplet actual (puerto 3000) y Ford/Chevrolet se despliegan en un droplet distinto (puertos 3000 y 3001 respectivamente). Es lo que asume este diseño.
-> - **Escenario B — mismo droplet:** staging, Ford y Chevrolet conviven. En ese caso los puertos deben ser 3000 (staging), 3001 (Ford), 3002 (Chevrolet), y todas las tablas y ejemplos de este documento donde dice `Ford=3000` pasan a `Ford=3001` y `Chevrolet=3001` pasa a `Chevrolet=3002`.
->
-> Pre-requisito de Fase 0: confirmar escenario A o B y, si fuera B, ajustar los puertos en la tabla de la sección 2 antes de arrancar.
+> **Nota sobre droplets:** staging (`myprototipe`) vive en su propio droplet, aparte. Ford y Chevrolet comparten un droplet productivo distinto — por eso pueden usar 3000 y 3001 sin chocar con staging. En el diagrama de arriba el bloque "Droplet de CRMs" refiere SOLO al droplet productivo; la línea de staging está incluida únicamente para mostrar el contexto del sistema completo.
 
 ### Tabla de componentes
 
 | Componente | Host / Instancia | Separación entre tenants |
 |------------|------------------|--------------------------|
-| **CRM (Next.js)** | Mismo droplet, 3 carpetas, 3 procesos PM2 | `.env.local` distinto, puerto distinto, subdominio distinto |
-| **MySQL** | Mismo droplet que los CRMs | 3 DBs separadas, 3 users separados con permisos sobre su propia DB únicamente |
+| **CRM (Next.js)** | Droplet productivo: 2 carpetas, 2 procesos PM2 (Ford + Chev). Staging en droplet aparte. | `.env.local` distinto, puerto distinto, subdominio distinto |
+| **MySQL** | Droplet productivo: 2 DBs (Ford + Chev). Staging en droplet aparte. | 2 users separados con permisos sobre su propia DB únicamente |
 | **Chatwoot** | `os.app20.tech` | 3 accounts separados — datos 100% aislados a nivel Chatwoot |
 | **n8n** | `64.23.235.153` | 1 instancia, flujos duplicados con tags y sufijos por tenant |
 | **Meta (WA/FB/IG)** | `business.facebook.com` | Business Portfolio separado por tenant, WABA/tokens/páginas propios |
@@ -111,26 +104,28 @@ Si Ford tiene un pico de tráfico, Chevrolet no se entera. Si la DB de Ford se c
 
 ## Sección 2 — Capa CRM (Next.js)
 
-### Layout del droplet de CRMs
+### Layout del droplet productivo
+
+El droplet productivo (distinto al de staging) tiene las dos carpetas:
 
 ```
 /var/www/
-├── myprototipe/              ← staging actual (sin tocar)
-├── crm-ford/                 ← nuevo — Ford productivo
-└── crm-chevrolet/            ← nuevo — Chevrolet productivo
+├── crm-ford/                 ← Ford productivo (puerto 3000)
+└── crm-chevrolet/            ← Chevrolet productivo (puerto 3001)
 ```
 
-Cada carpeta es un `git clone` del mismo repo, en el mismo branch (`main`). Se actualizan con `git pull && npm install && npm run build && pm2 restart <proceso> --update-env`.
+Staging sigue intacto en su propio droplet (`/var/www/myprototipe`, puerto 3000) — NO se toca.
 
-### Puertos y PM2
+Cada carpeta del droplet productivo es un `git clone` del mismo repo, en el mismo branch (`main`). Se actualizan con `git pull && npm install && npm run build && pm2 restart <proceso> --update-env`.
+
+### Puertos y PM2 (droplet productivo)
 
 | Proceso | Puerto | Nombre PM2 | Subdominio |
 |---------|--------|------------|------------|
-| Staging actual | 3000 (en droplet staging) | `automotriz-crm` | actual sin cambios |
 | **Ford productivo** | **3000** | `crm-ford` | `wankamotorsford.onesolution.website` |
 | **Chevrolet productivo** | **3001** | `crm-chevrolet` | `wankamotorschevrolet.onesolution.website` |
 
-> Ford usa el 3000 porque es el default de Next (`next start`) y simplifica el ecosystem. Chevrolet usa 3001. Si mañana aparece un tercer centro, va al 3002 y así.
+Si mañana aparece un tercer centro, va al 3002 y así.
 
 ### Ecosystem PM2 (por tenant)
 
@@ -423,9 +418,9 @@ En n8n (Credentials):
 
 El motivo: son credenciales de proveedores de LLM, pagas por consumo en UNA cuenta, y los flujos de distintos tenants pueden compartirlas sin problemas.
 
-### Acceso MySQL desde n8n al droplet de CRMs
+### Acceso MySQL desde n8n al droplet productivo
 
-n8n está en `64.23.235.153` y MySQL está en el droplet de CRMs (IP distinta). Hay que permitir acceso remoto.
+n8n está en `64.23.235.153` y MySQL productivo está en el droplet de Ford/Chev (IP distinta). Hay que permitir acceso remoto.
 
 **Opción elegida: bind a IP específica + firewall restrictivo.**
 
@@ -444,7 +439,7 @@ n8n está en `64.23.235.153` y MySQL está en el droplet de CRMs (IP distinta). 
    FLUSH PRIVILEGES;
    ```
    (Idem para `wmchev`. El CRM usa `@'127.0.0.1'` local, n8n usa `@'64.23.235.153'`.)
-3. En UFW del droplet de CRMs:
+3. En UFW del droplet productivo:
    ```bash
    ufw allow from 64.23.235.153 to any port 3306
    ufw deny 3306
@@ -529,8 +524,7 @@ El orden está pensado para **Ford primero** y después repetir para Chevrolet. 
 
 ### Fase 0 — Pre-requisitos
 
-- [ ] **Confirmar escenario de droplets (A o B — ver nota de sección 1).** Si B, ajustar puertos en tablas de sección 2 y ecosystem de Fase 3.
-- [ ] Acceso root al droplet de CRMs
+- [ ] Acceso root al droplet productivo (donde van Ford y Chevrolet)
 - [ ] Acceso al panel DNS (Cloudflare / provider de `onesolution.website`)
 - [ ] Acceso al Super Admin de Chatwoot (`os.app20.tech`)
 - [ ] Acceso al admin de n8n (`64.23.235.153`)
@@ -538,9 +532,9 @@ El orden está pensado para **Ford primero** y después repetir para Chevrolet. 
 - [ ] Secretos generados (JWT, DB pass, webhook secrets) — guardados en gestor
 - [ ] Repo `AutomotrizProjectother` en estado estable (main buildando)
 
-### Fase 1 — Provisioning del droplet de CRMs
+### Fase 1 — Provisioning del droplet productivo
 
-- [ ] DNS: apuntar `wankamotorsford.onesolution.website` al IP del droplet (A record)
+- [ ] DNS: apuntar `wankamotorsford.onesolution.website` al IP del droplet productivo (A record)
 - [ ] `certbot --nginx -d wankamotorsford.onesolution.website`
 - [ ] nginx vhost de Ford creado y reloaded
 - [ ] Directorio `/var/www/crm-ford` creado con permisos correctos
@@ -551,16 +545,17 @@ El orden está pensado para **Ford primero** y después repetir para Chevrolet. 
 
 ### Fase 2 — MySQL: schema y usuarios
 
-- [ ] `mysqldump --single-transaction --routines --triggers --no-data db_myprototipe > /tmp/schema.sql`
+- [ ] En el **droplet de staging**: `mysqldump --single-transaction --routines --triggers --no-data db_myprototipe > /tmp/schema.sql`
+- [ ] `scp /tmp/schema.sql root@<ip-droplet-productivo>:/tmp/schema.sql`
 - [ ] Revisar `schema.sql` (no tiene `CREATE DATABASE` ni `USE`)
-- [ ] `mysql -u root -p db_wankamotorsford < /tmp/schema.sql`
+- [ ] En el **droplet productivo**: `mysql -u root -p db_wankamotorsford < /tmp/schema.sql`
 - [ ] `CREATE USER 'wmford'@'127.0.0.1'` + `GRANT` sobre `db_wankamotorsford`
 - [ ] `CREATE USER 'wmford'@'64.23.235.153'` + mismo GRANT
 - [ ] `bind-address = 0.0.0.0` en MySQL + `systemctl restart mysql`
 - [ ] `ufw allow from 64.23.235.153 to any port 3306` + `ufw deny 3306`
 - [ ] Seed de roles + admin inicial (script del repo o insert manual)
 
-**Hecho:** desde el droplet de n8n, `mysql -h <ip-droplet-crms> -u wmford -p` conecta y lista las tablas de `db_wankamotorsford`.
+**Hecho:** desde el droplet de n8n, `mysql -h <ip-droplet-productivo> -u wmford -p` conecta y lista las tablas de `db_wankamotorsford`.
 
 ### Fase 3 — CRM Ford: build y arranque
 
